@@ -285,7 +285,31 @@
     /* ═══ Mobile Overrides ═══ */
     @media (max-width: 900px) {
         body {
-            padding: 40px 20px 60px;
+            padding: 24px 14px calc(60px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .right-flow .header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 12px 0;
+            background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+            backdrop-filter: blur(14px);
+        }
+
+        .mobile-tabs {
+            position: sticky;
+            top: 76px;
+            z-index: 9;
+            margin-bottom: 14px;
+            padding: 4px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            background: var(--surface-soft);
+        }
+
+        .mobile-tab {
+            min-height: 44px;
         }
 
         .mobile-tabs {

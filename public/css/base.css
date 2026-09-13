@@ -115,6 +115,15 @@ html {
     --rf-radius-sm: 10px;
     --rf-radius-md: 14px;
     --rf-glow: 0 0 24px rgba(81, 56, 201, .16);
+
+    /* Persian planner foundation */
+    --surface-raised: #11112b;
+    --surface-soft: #17173b;
+    --accent-primary: #8b7cf6;
+    --accent-primary-strong: #a99cff;
+    --accent-teal: #42d6c5;
+    --focus-ring: rgba(66, 214, 197, .38);
+    --content-max: 760px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -209,6 +218,12 @@ html.theme-light {
     --rf-muted: #64748b;
     --rf-border: rgba(15, 23, 42, .08);
     --rf-glow: 0 0 24px rgba(109, 40, 217, .10);
+    --surface-raised: #ffffff;
+    --surface-soft: #f6f7fb;
+    --accent-primary: #5b4acb;
+    --accent-primary-strong: #4636ae;
+    --accent-teal: #087f7a;
+    --focus-ring: rgba(8, 127, 122, .24);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -322,6 +337,21 @@ html.theme-light {
         max-width: 1180px;
         position: relative;
         z-index: 1;
+    }
+
+    body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(circle at 12% 0%, var(--accent-purple-soft), transparent 34%);
+        opacity: .55;
+        z-index: -1;
+    }
+
+    .panel,
+    .task-zone {
+        border-color: color-mix(in srgb, var(--border-subtle) 86%, var(--accent-primary));
     }
 
     .layout {

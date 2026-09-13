@@ -777,6 +777,84 @@
         color: var(--accent-cyan);
     }
 
+    /* Modern Persian Planner visual layer — behavior and selectors remain intact. */
+    .task-zone {
+        background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent-primary));
+        border-radius: 20px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .task-zone-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text-title);
+        letter-spacing: -.01em;
+    }
+
+    .task-zone-title::before {
+        content: '';
+        width: 5px;
+        height: 20px;
+        border-radius: var(--radius-pill);
+        background: var(--accent-teal);
+    }
+
+    .kind3 {
+        padding: 4px;
+        background: var(--surface-soft);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+    }
+
+    .kind3-btn.active,
+    .filter-btn.active {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: var(--text-white);
+        box-shadow: 0 5px 14px var(--accent-purple-soft);
+    }
+
+    .input-section input,
+    .search-row input,
+    .priority-select,
+    .sort-select,
+    .more-row input,
+    .more-row textarea {
+        background: var(--surface-raised);
+        border-color: var(--border-medium);
+    }
+
+    .input-section input:focus,
+    .search-row input:focus {
+        border-color: var(--accent-teal);
+        box-shadow: 0 0 0 4px var(--focus-ring);
+    }
+
+    .task-item,
+    .plan-item {
+        border-radius: 14px;
+        background: var(--surface-raised);
+        box-shadow: none;
+    }
+
+    .task-item:hover,
+    .plan-item:hover {
+        border-color: var(--accent-primary);
+        box-shadow: var(--shadow-sm);
+        transform: translateY(-1px);
+    }
+
+    .progress-fill {
+        background: var(--accent-teal);
+        box-shadow: none;
+    }
+
+    .settings-zone {
+        background: transparent;
+        border-style: dashed;
+    }
+
     .due-btn.small {
         padding: 8px 14px;
         font-size: 0.8rem;
