@@ -853,9 +853,32 @@ taskList.addEventListener('click', e => {
     const scopeEl = childEl || item;
     const id = scopeEl.dataset.id;
     const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) {
+        taskList.querySelectorAll('.operation-list:not([hidden])').forEach(openList => {
+            openList.hidden = true;
+            const trigger = openList.parentElement?.querySelector('.operation-trigger');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+    }
     if (!actionEl && state.editingId) return;
 
+    if (actionEl && actionEl.dataset.action === 'toggle-menu') {
+        const menu = actionEl.closest('.operation-menu');
+        const list = menu ? menu.querySelector('.operation-list') : null;
+        if (!menu || !list) return;
+        const willOpen = list.hidden;
+        taskList.querySelectorAll('.operation-list:not([hidden])').forEach(openList => {
+            openList.hidden = true;
+            const trigger = openList.parentElement?.querySelector('.operation-trigger');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+        list.hidden = !willOpen;
+        actionEl.setAttribute('aria-expanded', String(willOpen));
+        return;
+    }
+    
     const action = actionEl ? actionEl.dataset.action : null;
+
     if (action === 'toggle') toggleTask(id);
     else if (action === 'delete') deleteTask(id, scopeEl);
     else if (action === 'edit-btn') startEdit(id);

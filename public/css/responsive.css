@@ -410,6 +410,49 @@
 
     /* ═══ Small Mobile ═══ */
     @media (max-width: 480px) {
+        .task-item,
+        .plan-head,
+        .child-item {
+            min-width: 0;
+        }
+
+        .task-actions,
+        .child-actions {
+            align-self: flex-start;
+        }
+
+        .operation-trigger {
+            min-width: 42px;
+            width: 42px;
+            padding: 8px 4px;
+        }
+
+        .operation-trigger span {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .operation-list {
+            position: fixed;
+            inset-inline: 12px;
+            top: auto;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            min-width: 0;
+            width: auto;
+        }
+
+        .operation-item {
+            min-height: 46px;
+            font-size: .84rem;
+        }
+
         .child-add .btn-child-add {
             padding: 10px 12px;
             font-size: 0.8rem;

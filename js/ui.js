@@ -178,7 +178,7 @@ export function renderStats(total, done) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Template Modal
-// ═══════════════════════════════════════════════════════════════════════════
+// ════════════════════════��══════════════════════════════════════════════════
 
 export function renderTemplateList() {
     const el = document.getElementById('tplList');
@@ -359,6 +359,15 @@ export function closeCal() {
 // HTML سازها
 // ═══════════════════════════════════════════════════════════════════════════
 
+function operationMenu(items, label = 'عملیات') {
+    return `<div class="operation-menu">
+        <button type="button" class="operation-trigger" data-action="toggle-menu" aria-label="${label}" aria-expanded="false">⋯ <span>عملیات</span></button>
+        <div class="operation-list" role="menu" hidden>
+            ${items.map(item => `<button type="button" role="menuitem" class="operation-item ${item.className || ''}" data-action="${item.action}" aria-label="${item.label}">${item.icon ? `<span aria-hidden="true">${item.icon}</span>` : ''}<span>${item.label}</span></button>`).join('')}
+        </div>
+    </div>`;
+}
+
 function childHtml(c) {
     if (String(c.id) === String(state.editingId)) {
         return `<div class="child-item" data-id="${escapeHtml(String(c.id))}">
@@ -380,13 +389,17 @@ function childHtml(c) {
         ${(c.photos || []).length ? '<span class="child-due">📷</span>' : ''}
         ${recurBadge(c, 'child-due')}
         <span class="child-actions">
-            ${state.currentFilter === 'archived'
-                ? `<button class="child-btn detail" data-action="unarchive" aria-label="بازگردانی از بایگانی">↩</button>
-            <button class="child-btn delete" data-action="delete" aria-label="حذف زیرکار">✕</button>`
-                : `<button class="child-btn loc ${c.location ? 'has' : ''}" data-action="pick-loc" aria-label="${c.location ? 'نمایش محل روی نقشه' : 'ثبت محل روی نقشه'}">📍</button>
-            <button class="child-btn detail" data-action="detail" aria-label="جزئیات زیرکار">📋</button>
-            <button class="child-btn archive" data-action="archive" aria-label="بایگانی زیرکار">📦</button>
-            <button class="child-btn delete" data-action="delete" aria-label="حذف زیرکار">✕</button>`}
+            ${operationMenu(state.currentFilter === 'archived'
+                ? [
+                    { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                    { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
+                ]
+                : [
+                    { action: 'pick-loc', label: c.location ? 'نمایش محل روی نقشه' : 'ثبت محل روی نقشه', icon: '📍' },
+                    { action: 'detail', label: 'جزئیات زیرکار', icon: '📋' },
+                    { action: 'archive', label: 'بایگانی زیرکار', icon: '📦' },
+                    { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
+                ], 'عملیات زیرکار')}
         </span>
     </div>`;
 }
@@ -413,15 +426,19 @@ function planHtml(task) {
                 </div>
                 ${(task.sessions && task.sessions.length) ? sessionSummaryHtml(task) : ''}
             </div>
-            <div class="task-actions">
-                ${state.currentFilter === 'archived'
-                    ? `<button class="btn-icon btn-edit" data-action="unarchive" aria-label="بازگردانی از بایگانی">↩</button>
-                <button class="btn-icon btn-delete" data-action="delete" aria-label="حذف برنامه">✕</button>`
-                    : `<button class="btn-icon btn-pin ${task.pinned ? 'on' : ''}" data-action="pin" aria-label="سنجاق به بالا" aria-pressed="${task.pinned ? 'true' : 'false'}">📌</button>
-                <button class="btn-icon btn-detail" data-action="detail" aria-label="جزئیات برنامه">📋</button>
-                <button class="btn-icon btn-archive" data-action="archive" aria-label="بایگانی برنامه">📦</button>
-                <button class="btn-icon btn-delete" data-action="delete" aria-label="حذف برنامه">✕</button>`}
-            </div>
+<div class="task-actions">
+            ${operationMenu(state.currentFilter === 'archived'
+                ? [
+                    { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                    { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
+                ]
+                : [
+                    { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
+                    { action: 'detail', label: 'جزئیات برنامه', icon: '📋' },
+                    { action: 'archive', label: 'بایگانی برنامه', icon: '📦' },
+                    { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
+                ], 'عملیات برنامه')}
+        </div>
         </div>
         ${open ? `<div class="plan-body">
             ${kids.length ? kids.map(c => childHtml(c)).join('') : '<div class="session-empty">هنوز زیرکاری ثبت نشده است.</div>'}
@@ -446,7 +463,7 @@ function taskTypeIcon(task) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Snackbar / Undo
-// ═══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════���════════════════════════════════════════════
 
 function buildTrashMessage(ids) {
     if (!ids || ids.length === 0) return 'به سطل زباله منتقل شد';
@@ -607,14 +624,18 @@ export function render() {
                 ${sessionSummaryHtml(task)}
             </div>
             <div class="task-actions">
-                ${state.currentFilter === 'archived'
-                    ? `<button class="btn-icon btn-edit" data-action="unarchive" aria-label="بازگردانی از بایگانی">↩</button>
-                <button class="btn-icon btn-delete" data-action="delete" aria-label="حذف وظیفه">✕</button>`
-                    : `<button class="btn-icon btn-pin ${task.pinned ? 'on' : ''}" data-action="pin" aria-label="سنجاق به بالا" aria-pressed="${task.pinned ? 'true' : 'false'}">📌</button>
-                <button class="btn-icon btn-detail" data-action="detail" aria-label="جزئیات و اطلاعات بیشتر">📋</button>
-                <button class="btn-icon btn-edit" data-action="edit-btn" aria-label="ویرایش وظیفه">✎</button>
-                <button class="btn-icon btn-archive" data-action="archive" aria-label="بایگانی وظیفه">📦</button>
-                <button class="btn-icon btn-delete" data-action="delete" aria-label="حذف وظیفه">✕</button>`}
+                ${operationMenu(state.currentFilter === 'archived'
+                    ? [
+                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                    ]
+                    : [
+                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
+                        { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
+                        { action: 'edit-btn', label: 'ویرایش وظیفه', icon: '✎' },
+                        { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
+                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                    ], 'عملیات وظیفه')}
             </div>
         </div>`;
     }).join('');

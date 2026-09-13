@@ -699,6 +699,93 @@
         flex-shrink: 0;
     }
 
+    .operation-menu {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .operation-trigger {
+        min-width: 78px;
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid var(--border-medium);
+        border-radius: var(--radius-sm);
+        background: var(--surface-soft);
+        color: var(--text-primary);
+        font: inherit;
+        font-size: .78rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .operation-trigger:hover,
+    .operation-trigger:focus-visible {
+        border-color: var(--accent-teal);
+        box-shadow: 0 0 0 4px var(--focus-ring);
+        outline: none;
+    }
+
+    .operation-trigger:first-letter {
+        font-size: 1.35rem;
+        line-height: 1;
+    }
+
+    .operation-list {
+        position: absolute;
+        inset-inline-end: 0;
+        top: calc(100% + 8px);
+        z-index: 20;
+        min-width: 190px;
+        display: grid;
+        gap: 3px;
+        padding: 6px;
+        border: 1px solid var(--border-medium);
+        border-radius: 12px;
+        background: var(--surface-raised);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .operation-list[hidden] {
+        display: none;
+    }
+
+    .operation-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        min-height: 42px;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-primary);
+        font: inherit;
+        font-size: .78rem;
+        text-align: start;
+        cursor: pointer;
+    }
+
+    .operation-item:hover,
+    .operation-item:focus-visible {
+        background: var(--surface-soft);
+        outline: none;
+    }
+
+    .operation-item.danger {
+        color: var(--accent-pink);
+    }
+
+    .child-actions .operation-trigger {
+        min-width: 72px;
+        min-height: 36px;
+        padding: 6px 9px;
+    }
+
     .btn-icon.has-loc,
     .btn-detail.has-loc {
         border-color: var(--accent-yellow-border);
