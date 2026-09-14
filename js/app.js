@@ -451,7 +451,20 @@ document.getElementById('tplEndBtn').addEventListener('click', () => {
     });
 });
 
-/* ---------- دکمه‌های هدر: راهنما و حریم خصوصی ---------- */
+/* ---------- دکمه‌های هدر: راهنما و تنظیمات ---------- */
+
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+function toggleSettings(force) {
+    if (!settingsPanel || !settingsBtn) return;
+    const open = typeof force === 'boolean' ? force : settingsPanel.hidden;
+    settingsPanel.hidden = !open;
+    settingsBtn.setAttribute('aria-expanded', String(open));
+    if (open) settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+settingsBtn?.addEventListener('click', () => toggleSettings());
+settingsCloseBtn?.addEventListener('click', () => toggleSettings(false));
 
 document.getElementById('heroDescToggle').addEventListener('click', async () => {
     await showInfoModal({
@@ -558,7 +571,7 @@ function updateThemeBtn() {
     if (!btn) return;
     const icons = { auto: '🖥', dark: '🌙', light: '☀️' };
     const titles = { auto: 'حالت نمایش: خودکار', dark: 'حالت نمایش: تاریک', light: 'حالت نمایش: روشن' };
-    btn.textContent = icons[state.prefs.theme] || icons.auto;
+    btn.textContent = `${icons[state.prefs.theme] || icons.auto} ${state.prefs.theme === 'dark' ? 'تاریک' : state.prefs.theme === 'light' ? 'روشن' : 'خودکار'}`;
     btn.title = titles[state.prefs.theme] || titles.auto;
 }
 

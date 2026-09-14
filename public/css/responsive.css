@@ -284,6 +284,18 @@
 
     /* ═══ Mobile Overrides ═══ */
     @media (max-width: 900px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .settings-card-wide {
+            grid-column: auto;
+        }
+
+        .settings-panel-head {
+            align-items: stretch;
+        }
+
         body {
             padding: 24px 14px calc(60px + env(safe-area-inset-bottom, 0px));
         }

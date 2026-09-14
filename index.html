@@ -64,10 +64,7 @@
                                 <span class="time-source-icon" id="timeSourceIcon" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
                             </p>
                             <div class="header-actions">
-                                <button class="btn-small theme-btn" id="themeBtn" type="button" aria-label="تغییر حالت نمایش" title="حالت نمایش: خودکار">🖥</button>
-                                <button class="btn-small lang-btn" id="langBtn" type="button" aria-label="تغییر زبان" title="تغییر زبان">🌐 FA</button>
-                                <button class="btn-small" id="installBtn" type="button" style="display: none;">⬇ نصب اپلیکیشن</button>
-                                <button class="btn-small" id="privacyBtn" type="button" title="حریم خصوصی شما">🔒 حریم خصوصی</button>
+                                <button class="btn-small" id="settingsBtn" type="button" aria-controls="settingsPanel" aria-expanded="false">تنظیمات</button>
                             </div>
                         </div>
                     </div>
@@ -76,6 +73,38 @@
                         <button class="mobile-tab active" data-tab="tasks" role="tab" type="button">📋 وظایف</button>
                         <button class="mobile-tab" data-tab="map" role="tab" type="button">🗺 نقشه</button>
                     </div>
+
+                    <section class="settings-panel" id="settingsPanel" hidden aria-labelledby="settingsTitle">
+                        <div class="settings-panel-head">
+                            <div><span class="settings-kicker">شخصی‌سازی</span><h2 id="settingsTitle">تنظیمات</h2><p>رفتار، ظاهر و اعلان‌های راه فردا را مدیریت کنید.</p></div>
+                            <button class="btn-small settings-close" id="settingsCloseBtn" type="button" aria-label="بستن تنظیمات">بستن</button>
+                        </div>
+                        <div class="settings-grid">
+                            <section class="settings-card" aria-labelledby="appearanceSettingsTitle">
+                                <h3 id="appearanceSettingsTitle">ظاهر و زبان</h3>
+                                <div class="settings-row">
+                                    <span>حالت نمایش</span><button class="btn-small theme-btn" id="themeBtn" type="button" aria-label="تغییر حالت نمایش" title="حالت نمایش: خودکار">🖥 خودکار</button>
+                                </div>
+                                <div class="settings-row"><span>زبان رابط</span><button class="btn-small lang-btn" id="langBtn" type="button" aria-label="تغییر زبان" title="تغییر زبان">🌐 FA</button></div>
+                            </section>
+                            <section class="settings-card" aria-labelledby="appSettingsTitle">
+                                <h3 id="appSettingsTitle">برنامه و حریم خصوصی</h3>
+                                <div class="settings-row"><span>استفاده روی دستگاه</span><button class="btn-small" id="installBtn" type="button" style="display: none;">⬇ نصب اپلیکیشن</button><span class="settings-note" id="installStatus">نصب از مرورگر در دسترس است</span></div>
+                                <div class="settings-row"><span>اطلاعات و داده‌ها</span><button class="btn-small" id="privacyBtn" type="button" title="حریم خصوصی شما">🔒 حریم خصوصی</button></div>
+                            </section>
+                            <section class="settings-card settings-card-wide" aria-labelledby="reminderSettingsTitle">
+                                <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
+                                <div class="settings-row"><label><input type="checkbox" id="setRemindOn"> یادآور جلسات</label><label>چند دقیقه قبل؟ <select id="setRemindMin" class="sort-select"><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60" selected>۱ ساعت</option><option value="180">۳ ساعت</option><option value="1440">۱ روز</option></select></label></div>
+                                <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label><button class="btn-small" id="notifPermBtn" type="button">فعال‌سازی اعلان‌ها</button><button class="btn-small" id="notifTestBtn" type="button">ارسال آزمایشی</button></div>
+                                <div class="settings-row"><label><input type="checkbox" id="setSoundOn"> صدای یادآور</label><span class="settings-note">اعلان‌ها فقط برای یادآورهای فعلی استفاده می‌شوند.</span></div>
+                                <div class="settings-status" id="notifStatus"></div>
+                            </section>
+                            <section class="settings-card settings-card-wide" aria-labelledby="advancedSettingsTitle">
+                                <h3 id="advancedSettingsTitle">تجربه حرفه‌ای</h3>
+                                <div class="settings-row"><label><input type="checkbox" id="setProMode"> حالت حرفه‌ای (گزینه‌های پیشرفته همیشه در دسترس)</label><span class="settings-note">این گزینه داده‌ها یا قابلیت‌ها را حذف نمی‌کند.</span></div>
+                            </section>
+                        </div>
+                    </section>
 
                     <div class="layout">
                         <div class="panel active" id="panelTasks">
@@ -171,35 +200,6 @@
                                 <div class="form-actions">
                                     <button class="btn-add" id="addBtn">افزودن کار</button>
                                 </div>
-                            </section>
-
-                            <section class="task-zone settings-zone" aria-label="تنظیمات یادآور">
-                                <h2 class="task-zone-title">تنظیمات یادآور</h2>
-                                <details class="settings" id="settingsBox">
-                                    <summary>🔔 تنظیمات یادآور</summary>
-                                    <div class="settings-row">
-                                        <label><input type="checkbox" id="setRemindOn"> یادآور جلسات</label>
-                                        <label>چند دقیقه قبل؟
-                                            <select id="setRemindMin" class="sort-select">
-                                                <option value="15">۱۵ دقیقه</option>
-                                                <option value="30">۳۰ دقیقه</option>
-                                                <option value="60" selected>۱ ساعت</option>
-                                                <option value="180">۳ ساعت</option>
-                                                <option value="1440">۱ روز</option>
-                                            </select>
-                                        </label>
-                                    </div>
-                                    <div class="settings-row">
-                                        <label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label>
-                                        <button class="btn-small" id="notifPermBtn" type="button">فعال‌سازی اعلان‌ها</button>
-                                        <button class="btn-small" id="notifTestBtn" type="button">ارسال آزمایشی</button>
-                                    </div>
-                                    <div class="settings-row">
-                                        <label><input type="checkbox" id="setProMode"> 🚀 حالت حرفه‌ای (همه گزینه‌ها همیشه باز)</label>
-                                        <label><input type="checkbox" id="setSoundOn"> 🔔 صدای یادآور</label>
-                                    </div>
-                                    <div class="settings-status" id="notifStatus"></div>
-                                </details>
                             </section>
 
                             <section class="task-zone list-zone" aria-label="جستجوی وظایف">
