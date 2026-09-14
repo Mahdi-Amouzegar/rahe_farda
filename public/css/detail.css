@@ -22,9 +22,14 @@
     }
 
     .detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 70;
         display: flex;
         align-items: center;
         gap: 12px;
+        background: var(--bg-1);
+        padding-block: 10px;
         margin-bottom: 20px;
     }
 

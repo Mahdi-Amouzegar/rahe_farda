@@ -772,6 +772,10 @@
         flex-shrink: 0;
     }
 
+    .operation-menu:has(.operation-trigger[aria-expanded="true"]) {
+        z-index: 50;
+    }
+
     .operation-trigger {
         min-width: 78px;
         min-height: 42px;
@@ -1848,7 +1852,7 @@
     /* ═══ List Zone ═══ */
     .list-zone {
         margin-top: 28px;
-        padding-top: 4px;
+        padding: 18px;
     }
 
     .list-zone .task-zone-title {
