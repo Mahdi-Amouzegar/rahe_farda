@@ -651,10 +651,16 @@
     html[data-lang="en"] .app-shell > #panelMap { grid-column: 2; }
     html[data-lang="en"] .app-shell > .right-flow-container { grid-column: 1; }
     .right-flow-container > .map-divider-toggle {
+        left: 0;
+        right: auto;
+        transform: translate(-50%, -50%);
+    }
+    html[data-lang="en"] .right-flow-container > .map-divider-toggle {
         left: auto;
         right: 0;
         transform: translate(50%, -50%);
     }
-    body.map-hidden .right-flow-container > .map-divider-toggle { transform: translate(50%, -50%); }
+    body.map-hidden .right-flow-container > .map-divider-toggle { transform: translate(0, -50%); }
+    html[data-lang="en"] body.map-hidden .right-flow-container > .map-divider-toggle { transform: translate(0, -50%); }
     body.map-hidden .right-flow-container { grid-column: 1 / -1 !important; }
 }

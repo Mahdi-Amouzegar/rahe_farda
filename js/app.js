@@ -71,9 +71,7 @@ import {
 import {
     startReminderLoop,
     ensureNotifPerm,
-    updateNotifStatus,
-    fireNotification,
-    playChime
+    fireNotification
 } from './notify.js';
 import {
     openDetail,
@@ -709,20 +707,7 @@ function initSettings() {
         snd.checked = state.prefs.soundOn !== false;
         snd.addEventListener('change', () => { state.prefs.soundOn = snd.checked; savePrefs(); });
     }
-    document.getElementById('notifPermBtn').addEventListener('click', async () => {
-        await ensureNotifPerm();
-        updateNotifStatus();
-    });
-    document.getElementById('notifTestBtn').addEventListener('click', async () => {
-        const ok = await ensureNotifPerm();
-        if (ok) {
-            fireNotification('🔔 اعلان آزمایشی', 'یادآورها فعال‌اند و درست کار می‌کنند.');
-            playChime();
-        }
-        updateNotifStatus();
-    });
-    updateNotifStatus();
-    initSystemPermissions();
+  initSystemPermissions();
 }
 
 async function queryPermission(name) {
