@@ -384,6 +384,23 @@
     }
 
     /* ═══ Input Section ═══ */
+    .text-input-with-mic {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .text-input-with-mic input {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .mic-btn {
+        flex: 0 0 auto;
+    }
+
     .input-section {
         display: flex;
         gap: 12px;

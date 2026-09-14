@@ -722,6 +722,48 @@ function initSettings() {
         updateNotifStatus();
     });
     updateNotifStatus();
+    initSystemPermissions();
+}
+
+async function queryPermission(name) {
+    try {
+        return navigator.permissions?.query ? await navigator.permissions.query({ name }) : null;
+    } catch { return null; }
+}
+
+function setPermissionStatus(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+async function inspectSystemPermissions() {
+    const notification = typeof Notification === 'undefined' ? null : Notification.permission;
+    setPermissionStatus('permissionNotifStatus', notification === 'granted' ? 'فعال است' : notification === 'denied' ? 'مسدود شده' : notification === 'default' ? 'فعال نیست' : 'پشتیبانی نمی‌شود');
+    const location = await queryPermission('geolocation');
+    setPermissionStatus('permissionLocationStatus', location ? (location.state === 'granted' ? 'فعال است' : location.state === 'denied' ? 'مسدود شده' : 'فعال نیست') : 'برای بررسی تست کنید');
+    const microphone = await queryPermission('microphone');
+    setPermissionStatus('permissionMicStatus', microphone ? (microphone.state === 'granted' ? 'فعال است' : microphone.state === 'denied' ? 'مسدود شده' : 'فعال نیست') : 'برای بررسی تست کنید');
+}
+
+async function requestLocationPermission() {
+    if (!navigator.geolocation) return setPermissionStatus('permissionLocationStatus', 'پشتیبانی نمی‌شود');
+    navigator.geolocation.getCurrentPosition(() => setPermissionStatus('permissionLocationStatus', 'فعال است'), error => setPermissionStatus('permissionLocationStatus', error.code === 1 ? 'مسدود شده' : 'فعال نیست'), { timeout: 8000, maximumAge: 0 });
+}
+
+async function requestMicrophonePermission() {
+    if (!navigator.mediaDevices?.getUserMedia) return setPermissionStatus('permissionMicStatus', 'پشتیبانی نمی‌شود');
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); setPermissionStatus('permissionMicStatus', 'فعال است'); }
+    catch (error) { setPermissionStatus('permissionMicStatus', error.name === 'NotAllowedError' ? 'مسدود شده' : 'فعال نیست'); }
+}
+
+function initSystemPermissions() {
+    inspectSystemPermissions();
+    document.getElementById('permissionNotifBtn')?.addEventListener('click', async () => { await ensureNotifPerm(); inspectSystemPermissions(); });
+    document.getElementById('permissionNotifTestBtn')?.addEventListener('click', async () => { if (await ensureNotifPerm()) fireNotification('اعلان آزمایشی', 'مجوز اعلان فعال است.'); inspectSystemPermissions(); });
+    document.getElementById('permissionLocationBtn')?.addEventListener('click', requestLocationPermission);
+    document.getElementById('permissionLocationTestBtn')?.addEventListener('click', requestLocationPermission);
+    document.getElementById('permissionMicBtn')?.addEventListener('click', requestMicrophonePermission);
+    document.getElementById('permissionMicTestBtn')?.addEventListener('click', requestMicrophonePermission);
 }
 
 function applyProMode() {
@@ -1040,46 +1082,49 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 clearBtn.addEventListener('click', clearCompleted);
 document.getElementById('archiveDone').addEventListener('click', archiveDone);
 
-// ورود صوتی
+// ورود صوتی: مستقل از mobile و محدود به ورودی‌های متنی آزاد
 (function initMic() {
-    const btn = document.getElementById('micBtn');
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
-    if (!SR || !isMobile) {
-        btn.style.display = 'none';
+    const buttons = [...document.querySelectorAll('[data-mic-target]'), document.getElementById('micBtn')].filter(Boolean);
+    if (!SR) {
+        buttons.forEach(btn => { btn.hidden = true; });
         return;
     }
-    let rec = null;
-    let baseText = '';
-    btn.addEventListener('click', () => {
-        if (rec) {
-            rec.stop();
-            return;
-        }
-        rec = new SR();
-        rec.lang = 'fa-IR';
+    let active = null;
+    const appendText = (target, base, transcript) => {
+        const next = [base.trim(), transcript.trim()].filter(Boolean).join(' ');
+        target.value = next.slice(0, Number(target.maxLength) || MAX_LENGTH);
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.focus();
+    };
+    buttons.forEach(btn => btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.micTarget || 'taskInput');
+        if (!target) return;
+        if (active) { active.stop(); return; }
+        const rec = new SR();
+        let finalText = '';
+        const base = target.value || '';
+        rec.lang = state.prefs.lang === 'en' ? 'en-US' : 'fa-IR';
         rec.interimResults = true;
+        rec.continuous = false;
         rec.maxAlternatives = 1;
-        baseText = input.value ? input.value.trim() + ' ' : '';
+        active = rec;
         btn.classList.add('listening');
-        rec.onresult = e => {
-            let txt = '';
-            for (const r of e.results) txt += r[0].transcript;
-            input.value = (baseText + txt).slice(0, MAX_LENGTH);
-            input.focus();
+        rec.onresult = event => {
+            finalText = '';
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                const text = event.results[i][0].transcript;
+                if (event.results[i].isFinal) finalText += text;
+                else interim += text;
+            }
+            appendText(target, base, finalText || interim);
         };
-        const stop = () => {
-            rec = null;
-            btn.classList.remove('listening');
-        };
+        const stop = () => { if (active === rec) active = null; btn.classList.remove('listening'); };
         rec.onend = stop;
         rec.onerror = stop;
-        try {
-            rec.start();
-        } catch {
-            stop();
-        }
-    });
+        try { rec.start(); } catch { stop(); }
+    }));
 })();
 
 // میان‌برهای کیبورد

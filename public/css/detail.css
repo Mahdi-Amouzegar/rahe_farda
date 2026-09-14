@@ -21,12 +21,6 @@
         animation: fadeIn 0.25s ease;
     }
 
-    .detail-inner {
-        width: 100%;
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
     .detail-header {
         display: flex;
         align-items: center;
@@ -355,12 +349,6 @@
         50% { transform: scale(1.25); }
     }
 
-    @media (min-width: 901px) {
-        .mic-btn {
-            display: none;
-        }
-    }
-
     .welcome-text {
         font-size: 0.85rem;
         line-height: 2.1;
@@ -612,4 +600,20 @@
             0 1px 3px rgba(15, 23, 42, 0.06),
             0 1px 2px rgba(15, 23, 42, 0.04);
     }
+}
+
+@media (min-width: 901px) {
+    .detail-page {
+        left: auto;
+        right: 0;
+        width: clamp(400px, 42vw, 760px);
+        max-width: none;
+        margin: 0;
+        box-sizing: border-box;
+    }
+    html[data-lang="en"] .detail-page { left: 0; right: auto; }
+    body.map-hidden .detail-page { left: 0; right: 0; width: 100%; max-width: none; margin: 0; }
+    html[data-lang="en"] .detail-header { text-align: left; }
+    html[data-lang="en"] .detail-header #detailBack,
+    html[data-lang="en"] .detail-header #trashBack { order: 2; }
 }

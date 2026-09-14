@@ -175,15 +175,13 @@ export function applyMapVisibility() {
     if (btn) btn.textContent = state.prefs.mapVisible ? '🗺 نقشه: روشن' : '🗺 نقشه: خاموش';
 
     if (!state.prefs.mapVisible) {
-        setTimeout(() => {
-            document.body.classList.add('map-hidden');
-            if (!state.prefs.mapVisible) destroyMap();
-        }, 550);
+        document.body.classList.add('map-hidden');
+        destroyMap();
         return;
     }
 
     document.body.classList.remove('map-hidden');
-    if (mapReady) setTimeout(() => map.invalidateSize(), 60);
+    if (mapReady) requestAnimationFrame(() => map?.invalidateSize());
 }
 
 export function ensureMapVisible() {

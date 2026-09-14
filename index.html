@@ -100,6 +100,15 @@
                                 <div class="settings-row"><label><input type="checkbox" id="setSoundOn"> صدای یادآور</label><span class="settings-note">اعلان‌ها فقط برای یادآورهای فعلی استفاده می‌شوند.</span></div>
                                 <div class="settings-status" id="notifStatus"></div>
                             </section>
+                            <section class="settings-card settings-card-wide permissions-card" aria-labelledby="permissionsTitle">
+                                <h3 id="permissionsTitle">مجوزهای سیستم</h3>
+                                <p class="settings-note">وضعیت دسترسی‌های مرورگر را جداگانه بررسی و آزمایش کنید.</p>
+                                <div class="permission-grid">
+                                    <div class="permission-item"><div><strong>اعلان‌ها</strong><span id="permissionNotifStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionNotifBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionNotifTestBtn" type="button">تست</button></div>
+                                    <div class="permission-item"><div><strong>موقعیت مکانی</strong><span id="permissionLocationStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionLocationBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionLocationTestBtn" type="button">تست</button></div>
+                                    <div class="permission-item"><div><strong>میکروفون</strong><span id="permissionMicStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionMicBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionMicTestBtn" type="button">تست</button></div>
+                                </div>
+                            </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="advancedSettingsTitle">
                                 <h3 id="advancedSettingsTitle">تجربه حرفه‌ای</h3>
                                 <div class="settings-row"><label><input type="checkbox" id="setProMode"> حالت حرفه‌ای (گزینه‌های پیشرفته همیشه در دسترس)</label><span class="settings-note">این گزینه داده‌ها یا قابلیت‌ها را حذف نمی‌کند.</span></div>
@@ -187,14 +196,14 @@
                                             </select>
                                         </label>
                                         <label class="more-row"><span>توضیح</span>
-                                            <input type="text" id="descInput" maxlength="200" placeholder="توضیح کوتاه..." aria-label="توضیح">
+                                            <span class="text-input-with-mic"><input type="text" id="descInput" maxlength="200" placeholder="توضیح کوتاه..." aria-label="توضیح"><button class="btn-icon mic-btn" data-mic-target="descInput" type="button" aria-label="ورود صوتی برای توضیح">🎤</button></span>
                                         </label>
                                     </div>
                                 </details>
                                 <div id="planKidsWrap" style="display: none;">
                                     <div class="due-chips" id="planKidChips" style="display: none;"></div>
                                     <div class="child-add">
-                                        <input type="text" class="child-input" id="planKidInput" placeholder="کار جدید..." maxlength="200" aria-label="عنوان کار جدید">
+                                        <span class="text-input-with-mic"><input type="text" class="child-input" id="planKidInput" placeholder="کار جدید..." maxlength="200" aria-label="عنوان کار جدید"><button class="btn-icon mic-btn" data-mic-target="planKidInput" type="button" aria-label="ورود صوتی برای زیرکار">🎤</button></span>
                                         <button class="btn-add btn-child-add" id="planKidAdd" type="button">افزودن</button>
                                     </div>
                                 </div>
@@ -355,6 +364,7 @@
         <div class="picker" role="dialog" aria-modal="true" aria-label="خوش آمدید">
             <div class="picker-title">👋 خوش آمدید</div>
             <p class="welcome-text">این دستیار وظایف شماست — کاملاً آفلاین و خصوصی.<br>• عنوان را بنویسید و Enter بزنید<br>• با 📅 تاریخ، با 📍 محل اضافه کنید<br>• با «+ افزودن» کار، برنامه یا دوره بسازید</p>
+  <p class="storage-guidance">اطلاعات شما روی همین دستگاه و مرورگر ذخیره می‌شود. اگر مرورگر برای حذف خودکار داده‌های سایت تنظیم شده باشد، ممکن است اطلاعات برنامه‌ها و وظایف از بین برود.</p>
             <div class="welcome-settings">
                 <div class="welcome-settings-row">
                     <span class="welcome-settings-label">حالت نمایش:</span>
