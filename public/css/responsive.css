@@ -22,7 +22,7 @@
         .app-shell {
             display: flex;
             flex-direction: row;
-            direction: rtl;
+            direction: inherit;
             height: 100vh;
             background: var(--bg-0);
         }
@@ -35,7 +35,7 @@
         }
 
         #panelMap {
-            flex: 0 0 30%;
+            flex: 0 0 40%;
             min-width: 0;
             min-height: 0;
         }

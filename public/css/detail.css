@@ -393,7 +393,7 @@
     @media (min-width: 901px) {
         .detail-page {
             inset-inline-start: 0;
-            inset-inline-end: 30%;
+            inset-inline-end: 40%;
             padding: 28px 34px 60px;
             z-index: 60;
         }
@@ -604,7 +604,7 @@
 @media (min-width: 901px) {
     .detail-page {
         inset-inline-start: 0;
-        inset-inline-end: 30%;
+        inset-inline-end: 40%;
         width: auto;
         max-width: none;
         margin: 0;
