@@ -66,6 +66,7 @@ function flashSaved(msg) {
 
 export function openDetail(id) {
     const pageEl = document.getElementById('detailPage');
+    if (pageEl) pageEl.classList.toggle('professional-mode', state.prefs.proMode === true);
     const wasAlreadyOpen = pageEl && pageEl.style.display === 'block';
     const prevScroll = wasAlreadyOpen ? pageEl.scrollTop : 0;
 

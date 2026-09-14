@@ -497,6 +497,90 @@
         margin-top: 8px;
     }
 
+    /* Phase 3: independent detail sections preserve the legacy class contract. */
+    .detail-page .detail-card > .detail-section {
+        margin: 0;
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        background: var(--bg-4);
+        overflow: hidden;
+        transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    .detail-page .detail-section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 64px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-subtle);
+        background: color-mix(in srgb, var(--bg-2) 72%, var(--accent-purple-soft));
+    }
+
+    .detail-page .detail-section-kicker {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--accent-cyan);
+        font-size: .68rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+    }
+
+    .detail-page .detail-section-heading h3 {
+        margin: 0;
+        color: var(--text-detail-title);
+        font-size: .98rem;
+        font-weight: 800;
+    }
+
+    .detail-page .detail-section-status {
+        flex-shrink: 0;
+        padding: 4px 9px;
+        border: 1px solid var(--border-medium);
+        border-radius: var(--radius-pill);
+        color: var(--text-muted);
+        font-size: .68rem;
+        font-weight: 700;
+    }
+
+    .detail-page .detail-section-body {
+        padding: 14px 16px 16px;
+    }
+
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="recurrence"],
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="contact"],
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="timer"],
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="photos"] {
+        background: color-mix(in srgb, var(--bg-4) 92%, var(--border-subtle));
+    }
+
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="recurrence"] .detail-section-body,
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="contact"] .detail-section-body,
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="timer"] .detail-section-body,
+    .detail-page:not(.professional-mode) .detail-section[data-detail-section="photos"] .detail-section-body {
+        max-height: 0;
+        overflow: hidden;
+        padding-block: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .detail-page.professional-mode .detail-section[data-detail-section="recurrence"] .detail-section-body,
+    .detail-page.professional-mode .detail-section[data-detail-section="contact"] .detail-section-body,
+    .detail-page.professional-mode .detail-section[data-detail-section="timer"] .detail-section-body,
+    .detail-page.professional-mode .detail-section[data-detail-section="photos"] .detail-section-body {
+        max-height: none;
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .detail-page .detail-section[data-detail-section="basic"],
+    .detail-page .detail-section[data-detail-section="sessions"],
+    .detail-page .detail-section[data-detail-section="location"] {
+        box-shadow: 0 4px 16px color-mix(in srgb, var(--accent-purple-soft) 40%, transparent);
+    }
+
     /* ═══ Light theme overrides ═══ */
     html.theme-light .task-item.completed .task-text,
     html.theme-light .child-item.completed .child-text {
