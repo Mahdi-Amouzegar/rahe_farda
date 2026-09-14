@@ -170,20 +170,42 @@ export function destroyMap() {
 // Visibility
 // ═══════════════════════════════════════════════════════════════════════════
 
+const MAP_LAYOUT_DURATION = 500;
+let mapVisibilityTimer = null;
+let mapVisibilityState = 'visible';
+
+function setMapVisibilityState(nextState) {
+    mapVisibilityState = nextState;
+    document.body.dataset.mapVisibility = nextState;
+}
+
 export function applyMapVisibility() {
     const btn = document.getElementById('mapToggle');
-    if (btn) btn.textContent = state.prefs.mapVisible ? '🗺 نقشه: روشن' : '🗺 نقشه: خاموش';
+    if (btn) {
+        btn.textContent = state.prefs.mapVisible ? '🗺 نقشه: روشن' : '🗺 نقشه: خاموش';
+        btn.setAttribute('aria-pressed', String(state.prefs.mapVisible));
+    }
+
+    clearTimeout(mapVisibilityTimer);
 
     if (!state.prefs.mapVisible) {
-        setTimeout(() => {
-            document.body.classList.add('map-hidden');
-            if (!state.prefs.mapVisible) destroyMap();
-        }, 550);
+        setMapVisibilityState('closing');
+        document.body.classList.add('map-hidden');
+        mapVisibilityTimer = setTimeout(() => {
+            if (!state.prefs.mapVisible) {
+                destroyMap();
+                setMapVisibilityState('hidden');
+            }
+        }, MAP_LAYOUT_DURATION);
         return;
     }
 
+    setMapVisibilityState('opening');
     document.body.classList.remove('map-hidden');
-    if (mapReady) setTimeout(() => map.invalidateSize(), 60);
+    mapVisibilityTimer = setTimeout(() => {
+        setMapVisibilityState('visible');
+        if (mapReady) map.invalidateSize();
+    }, MAP_LAYOUT_DURATION);
 }
 
 export function ensureMapVisible() {

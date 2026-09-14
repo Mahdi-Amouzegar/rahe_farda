@@ -900,9 +900,23 @@ document.getElementById('pickerOverlay').addEventListener('click', e => {
     if (e.target.id === 'pickerOverlay') closePicker();
 });
 
+function closeOperationMenus() {
+    document.querySelectorAll('.operation-list:not([hidden])').forEach(list => {
+        list.hidden = true;
+        list.parentElement?.querySelector('.operation-trigger')?.setAttribute('aria-expanded', 'false');
+    });
+}
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('.operation-menu')) closeOperationMenus();
+});
+
 // مدیریت متمرکز Escape
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
+
+    const openMenus = document.querySelectorAll('.operation-list:not([hidden])');
+    if (openMenus.length) { closeOperationMenus(); return; }
 
     if (settingsModal && !settingsModal.hidden) { toggleSettings(false); return; }
 

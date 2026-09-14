@@ -826,8 +826,8 @@
             scrollbar-color: rgba(165, 165, 208, .34) transparent;
         }
 
-        /* The task wrapper is the physical left column in both directions.
-           Its inline-start edge is the shared boundary with the Map column. */
+        /* The wrapper is physically left in both directions. Use the shared
+           physical edge: inline-start in RTL, inline-end in LTR. */
         .right-flow-container > .map-divider-toggle {
             position: absolute;
             inset-inline-start: 0;
@@ -844,6 +844,11 @@
             place-items: center;
             padding: 0;
             margin: 0;
+        }
+
+        html[dir="ltr"] .right-flow-container > .map-divider-toggle {
+            inset-inline-start: auto;
+            inset-inline-end: 0;
         }
 
         body.map-hidden .right-flow-container > .map-divider-toggle {
