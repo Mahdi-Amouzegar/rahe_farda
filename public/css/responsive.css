@@ -99,30 +99,6 @@
             margin-top: 24px;
         }
 
-        /* Keep the Map in the layout while closing so Leaflet is destroyed
-           only after the shared grid transition has finished. */
-        body.map-hidden .app-shell {
-            grid-template-columns: minmax(0, 0fr) minmax(0, 1fr);
-        }
-
-        body.map-hidden .container {
-            max-width: none;
-        }
-
-        body.map-hidden #panelMap {
-            min-width: 0;
-            overflow: hidden;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        body.map-hidden .right-flow,
-        html[dir="ltr"] body.map-hidden .right-flow {
-            grid-column: 1;
-            max-width: 980px;
-            width: 100%;
-            justify-self: center;
-        }
 
         .plan-body {
             width: 100%;

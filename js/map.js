@@ -170,13 +170,36 @@ export function destroyMap() {
 // Visibility
 // ═══════════════════════════════════════════════════════════════════════════
 
-const MAP_LAYOUT_DURATION = 500;
-let mapVisibilityTimer = null;
 let mapVisibilityState = 'visible';
 
 function setMapVisibilityState(nextState) {
     mapVisibilityState = nextState;
     document.body.dataset.mapVisibility = nextState;
+}
+
+function finishMapVisibilityTransition() {
+    if (state.prefs.mapVisible) {
+        setMapVisibilityState('visible');
+        if (mapReady) map.invalidateSize();
+        return;
+    }
+
+    destroyMap();
+    setMapVisibilityState('hidden');
+}
+
+function handleMapGridTransitionEnd(event) {
+    if (event.target !== event.currentTarget || event.propertyName !== 'grid-template-columns') return;
+    if (mapVisibilityState !== 'closing' && mapVisibilityState !== 'opening') return;
+    finishMapVisibilityTransition();
+}
+
+function attachMapVisibilityController() {
+    const appShell = document.querySelector('.app-shell');
+    if (!appShell || appShell.dataset.mapVisibilityController === 'true') return appShell;
+    appShell.dataset.mapVisibilityController = 'true';
+    appShell.addEventListener('transitionend', handleMapGridTransitionEnd);
+    return appShell;
 }
 
 export function applyMapVisibility() {
@@ -186,26 +209,33 @@ export function applyMapVisibility() {
         btn.setAttribute('aria-pressed', String(state.prefs.mapVisible));
     }
 
-    clearTimeout(mapVisibilityTimer);
+    const appShell = attachMapVisibilityController();
+    const isDesktop = window.matchMedia('(min-width: 901px)').matches;
+
+    if (!isDesktop || !appShell) {
+        document.body.classList.toggle('map-hidden', !state.prefs.mapVisible);
+        setMapVisibilityState(state.prefs.mapVisible ? 'visible' : 'hidden');
+        if (!state.prefs.mapVisible) destroyMap();
+        return;
+    }
 
     if (!state.prefs.mapVisible) {
         setMapVisibilityState('closing');
         document.body.classList.add('map-hidden');
-        mapVisibilityTimer = setTimeout(() => {
-            if (!state.prefs.mapVisible) {
-                destroyMap();
-                setMapVisibilityState('hidden');
-            }
-        }, MAP_LAYOUT_DURATION);
         return;
     }
 
     setMapVisibilityState('opening');
     document.body.classList.remove('map-hidden');
-    mapVisibilityTimer = setTimeout(() => {
-        setMapVisibilityState('visible');
-        if (mapReady) map.invalidateSize();
-    }, MAP_LAYOUT_DURATION);
+}
+
+export function finalizeInitialMapVisibility() {
+    const appShell = attachMapVisibilityController();
+    if (!appShell || window.matchMedia('(max-width: 900px)').matches) {
+        setMapVisibilityState(state.prefs.mapVisible ? 'visible' : 'hidden');
+        return;
+    }
+    setMapVisibilityState(state.prefs.mapVisible ? 'visible' : 'hidden');
 }
 
 export function ensureMapVisible() {

@@ -786,10 +786,11 @@
     /* ═══ Map App Shell — Desktop ═══ */
     @media (min-width: 901px) {
         .app-shell {
+            --map-transition-duration: 500ms;
             max-width: 1100px;
             margin: 0 auto;
-            grid-template-columns: 400px minmax(0, 1fr);
-            transition: grid-template-columns .5s cubic-bezier(.4, 0, .2, 1);
+            grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
+            transition: grid-template-columns var(--map-transition-duration) cubic-bezier(.4, 0, .2, 1);
         }
 
         .right-flow-container {
@@ -877,7 +878,8 @@
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
-            transition: opacity .35s ease, visibility 0s linear 0s;
+            overflow: hidden;
+            transition: opacity var(--map-transition-duration) ease;
         }
 
         .app-shell > .right-flow-container {
@@ -888,16 +890,16 @@
         }
 
         body.map-hidden .app-shell {
-            grid-template-columns: 0 minmax(0, 1fr);
+            grid-template-columns: minmax(0, 0fr) minmax(0, 1fr);
         }
 
         body.map-hidden .app-shell > .panel-map {
-            display: flex;
             opacity: 0;
-            visibility: hidden;
             pointer-events: none;
-            overflow: hidden;
-            transition: opacity .25s ease, visibility 0s linear .5s;
+        }
+
+        body[data-map-visibility="hidden"] .app-shell > .panel-map {
+            visibility: hidden;
         }
     }
 
