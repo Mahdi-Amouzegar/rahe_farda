@@ -401,22 +401,18 @@
    LAYER: overrides
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer overrides {
-    /* ═══ Detail Page — Position (دسکتاپ در ستون Tasks سمت چپ) ═══ */
+    /* ═══ Detail Page — follows the Task column wrapper, not viewport geometry ═══ */
     @media (min-width: 901px) {
-        .detail-page {
-            inset-block: 0;
-            inset-inline-start: 0;
-            inset-inline-end: 42vw;
+        .right-flow-container > .detail-page {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            box-sizing: border-box;
             padding: 28px 34px 60px;
             z-index: 60;
         }
 
-        html[dir="rtl"] .detail-page {
-            inset-inline-start: 42vw;
-            inset-inline-end: 0;
-        }
-
-        .detail-page .detail-inner {
+        .right-flow-container > .detail-page .detail-inner {
             max-width: 640px;
             margin: 0 auto;
         }
@@ -431,9 +427,19 @@
             backdrop-filter: blur(14px);
         }
 
-        body.map-hidden .detail-page {
-            inset-inline: 0;
+        body.map-hidden .right-flow-container > .detail-page {
+            inset: 0;
         }
+    }
+
+    #detailBack,
+    #trashBack {
+        direction: ltr;
+    }
+
+    html[dir="ltr"] #detailBack,
+    html[dir="ltr"] #trashBack {
+        transform: rotate(180deg);
     }
 
     /* ═══ Detail Accordion ═══ */

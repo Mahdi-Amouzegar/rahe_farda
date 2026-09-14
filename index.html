@@ -271,11 +271,8 @@
                         <div class="app-footer__small">© <span id="copyYear">۱۴۰۵</span> — همه حقوق محفوظ است · 🔒 اطلاعات شما فقط روی همین دستگاه می‌ماند</div>
                     </footer>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- صفحه جزئیات و سطل زباله: در body (نه در right-flow) تا از overflow مستقل باشند -->
+    <!-- Detail follows the task-column wrapper; Map remains the sibling grid column. -->
     <section class="detail-page" id="detailPage" style="display: none;" aria-label="جزئیات وظیفه">
         <div class="detail-inner">
             <div class="detail-header">
@@ -351,6 +348,9 @@
             </div>
         </div>
     </section>
+            </div>
+        </div>
+    </div>
 
     <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردانی</button></div>
     <div class="lightbox" id="lightbox" style="display: none;"><img id="lightboxImg" alt="تصویر وظیفه"></div>

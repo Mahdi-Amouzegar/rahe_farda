@@ -24,11 +24,22 @@
             height: 100vh;
         }
 
+        /* Physical layout is stable in RTL and LTR: Map occupies the right
+           column and the task wrapper occupies the left column. */
         .app-shell {
             display: grid;
             grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
             height: 100vh;
             background: var(--bg-0);
+        }
+
+        /* Keep the physical contract in LTR too: Tasks left, Map right. */
+        html[dir="ltr"] .app-shell > #panelMap {
+            grid-column: 2;
+        }
+
+        html[dir="ltr"] .app-shell > .right-flow-container {
+            grid-column: 1;
         }
 
         .right-flow {
