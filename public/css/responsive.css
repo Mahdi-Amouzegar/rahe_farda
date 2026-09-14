@@ -21,13 +21,31 @@
 
         .app-shell {
             display: grid;
-            grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
+            grid-template-columns: 30% 1fr;
+            direction: rtl;
             height: 100vh;
             background: var(--bg-0);
         }
 
+        .right-flow-container,
+        #panelMap {
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .right-flow-container {
+            direction: rtl;
+        }
+
+        html[data-lang="en"] .app-shell {
+            direction: ltr;
+        }
+
+        html[data-lang="en"] .right-flow-container {
+            direction: ltr;
+        }
+
         .right-flow {
-            grid-column: 2;
             min-width: 0;
             height: 100vh;
             overflow-y: auto;
@@ -36,8 +54,6 @@
         }
 
         #panelMap {
-            grid-column: 1;
-            grid-row: 1;
             display: flex;
             flex-direction: column;
             min-width: 0;
@@ -82,23 +98,30 @@
             margin-top: 24px;
         }
 
+        .app-shell.map-hidden,
         body.map-hidden .app-shell {
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: 1fr;
         }
 
         body.map-hidden .container {
             max-width: none;
         }
 
+        .app-shell.map-hidden > #panelMap,
         body.map-hidden #panelMap {
             display: none !important;
         }
 
+        .app-shell.map-hidden > .right-flow-container,
+        body.map-hidden .right-flow-container {
+            min-width: 0;
+            width: 100%;
+        }
+
         body.map-hidden .right-flow {
-            grid-column: 1;
             max-width: 980px;
             width: 100%;
-            justify-self: center;
+            margin-inline: auto;
         }
 
         .plan-body {
@@ -639,66 +662,21 @@
     }
 }
 
-/* Desktop uses a physical LTR grid; planner content keeps its language direction. */
+/* The toggle follows the physical boundary created by app-shell direction. */
 @media (min-width: 901px) {
-    .app-shell {
-        direction: ltr;
-        max-width: none;
-        transition: none;
-        grid-template-columns: minmax(0, 1fr) clamp(400px, 42vw, 760px);
-    }
-
-    .app-shell > #panelMap,
     .app-shell > .right-flow-container {
         grid-row: 1;
-        min-width: 0;
     }
 
-    .app-shell > #panelMap { grid-column: 1; }
-    .app-shell > .right-flow-container {
-        grid-column: 2;
-        direction: rtl;
-    }
-
-    html[data-lang="en"] .app-shell > #panelMap { grid-column: 2; }
-    html[data-lang="en"] .app-shell > .right-flow-container {
-        grid-column: 1;
-        direction: ltr;
-    }
-
-    .right-flow-container > .map-divider-toggle {
+    .app-shell[dir="rtl"] > .right-flow-container > .map-divider-toggle {
         left: 0;
         right: auto;
         transform: translate(-50%, -50%);
     }
 
-    html[data-lang="en"] .right-flow-container > .map-divider-toggle {
+    .app-shell[dir="ltr"] > .right-flow-container > .map-divider-toggle {
         left: auto;
         right: 0;
         transform: translate(50%, -50%);
-    }
-
-    body.map-hidden .app-shell {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    body.map-hidden .app-shell > #panelMap {
-        display: none !important;
-    }
-
-    body.map-hidden .app-shell > .right-flow-container {
-        grid-column: 1;
-        direction: inherit;
-    }
-
-    body.map-hidden .right-flow-container > .map-divider-toggle {
-        left: auto;
-        right: 0;
-        transform: translate(0, -50%);
-    }
-
-    html[data-lang="en"] body.map-hidden .right-flow-container > .map-divider-toggle {
-        left: 0;
-        right: auto;
     }
 }

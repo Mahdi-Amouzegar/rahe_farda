@@ -614,10 +614,13 @@ function updateWelcomeOpts() {
 }
 
 function applyDisplaySettings() {
-    applyTheme(state.prefs.theme);
-    document.documentElement.setAttribute('data-lang', state.prefs.lang);
-    document.documentElement.setAttribute('dir', state.prefs.lang === 'en' ? 'ltr' : 'rtl');
-    updateThemeBtn();
+  applyTheme(state.prefs.theme);
+  const dir = state.prefs.lang === 'en' ? 'ltr' : 'rtl';
+  document.documentElement.setAttribute('data-lang', state.prefs.lang);
+  document.documentElement.setAttribute('lang', state.prefs.lang);
+  document.documentElement.setAttribute('dir', dir);
+  document.querySelector('.app-shell')?.setAttribute('dir', dir);
+  updateThemeBtn();
     updateLangBtn();
     updateWelcomeOpts();
 }
