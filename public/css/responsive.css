@@ -422,6 +422,12 @@
 
     /* ═══ Small Mobile ═══ */
     @media (max-width: 480px) {
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
         .task-item,
         .plan-head,
         .child-item {
@@ -463,6 +469,30 @@
         .operation-item {
             min-height: 46px;
             font-size: .84rem;
+        }
+
+        .settings-panel .settings-row,
+        .settings-panel .settings-row > label,
+        .settings-panel .settings-row > button {
+            min-height: 44px;
+        }
+
+        .settings-panel select,
+        .settings-panel input:not([type="checkbox"]),
+        .settings-panel button,
+        .detail-page button,
+        .detail-page input,
+        .detail-page select,
+        .detail-page textarea {
+            max-width: 100%;
+        }
+
+        .settings-panel :where(button, input, select):focus-visible,
+        .detail-page :where(button, input, select, textarea):focus-visible,
+        .operation-trigger:focus-visible,
+        .operation-item:focus-visible {
+            outline: 3px solid var(--accent-cyan);
+            outline-offset: 2px;
         }
 
         .child-add .btn-child-add {
