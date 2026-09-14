@@ -841,6 +841,14 @@
             margin: 0;
         }
 
+        .app-shell[dir="rtl"] > .right-flow-container > .map-divider-toggle {
+            transform: translate(-50%, -50%);
+        }
+
+        .app-shell[dir="ltr"] > .right-flow-container > .map-divider-toggle {
+            transform: translate(50%, -50%);
+        }
+
         body.map-hidden .right-flow-container > .map-divider-toggle {
             transform: translate(0%, -50%);
         }
