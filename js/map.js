@@ -174,7 +174,7 @@ let mapVisibilityState = 'visible';
 
 function setMapVisibilityState(nextState) {
     mapVisibilityState = nextState;
-    document.body.dataset.mapVisibility = nextState;
+    document.body.setAttribute('data-map-visibility', nextState);
 }
 
 function finishMapVisibilityTransition() {

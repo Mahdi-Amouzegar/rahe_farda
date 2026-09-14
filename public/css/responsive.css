@@ -68,6 +68,10 @@
             transition: opacity .5s cubic-bezier(.4, 0, .2, 1);
         }
 
+        body[data-map-visibility="hidden"] #panelMap {
+            display: none;
+        }
+
         #panelMap .map-wrap {
             flex: 1;
             min-height: 0;
