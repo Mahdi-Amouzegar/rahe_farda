@@ -684,6 +684,65 @@ document.getElementById('mapToggle').addEventListener('click', () => {
     if (state.prefs.mapVisible) initMap();
 });
 
+let locationPermissionStatus = null;
+
+async function readLocationPermission() {
+    if (!navigator.geolocation) return 'unsupported';
+    if (!navigator.permissions?.query) return 'unknown';
+    try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        locationPermissionStatus = result;
+        result.onchange = () => renderLocationPermission(result.state);
+        return result.state;
+    } catch {
+        return 'unknown';
+    }
+}
+
+function renderLocationPermission(status) {
+    const el = document.getElementById('locPermStatus');
+    const btn = document.getElementById('locPermBtn');
+    if (!el) return;
+    const labels = {
+        granted: 'فعال است',
+        prompt: 'هنوز درخواست نشده',
+        denied: 'رد شده؛ از تنظیمات مرورگر تغییر دهید',
+        unsupported: 'مرورگر از موقعیت مکانی پشتیبانی نمی‌کند',
+        unknown: 'وضعیت قابل تشخیص نیست'
+    };
+    el.textContent = labels[status] || labels.unknown;
+    el.classList.toggle('ok', status === 'granted');
+    if (btn) btn.disabled = status !== 'prompt';
+}
+
+async function initLocationPermission() {
+    const status = await readLocationPermission();
+    renderLocationPermission(status);
+}
+
+async function requestLocationPermission() {
+    const status = locationPermissionStatus?.state || await readLocationPermission();
+    if (status !== 'prompt' || !navigator.geolocation) {
+        renderLocationPermission(status);
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        () => renderLocationPermission('granted'),
+        () => readLocationPermission().then(renderLocationPermission),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
+    );
+}
+
+function initMicrophonePermissionStatus() {
+    const row = document.getElementById('micPermRow');
+    const status = document.getElementById('micPermStatus');
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
+    if (!row || !status || !isMobile || !SR) return;
+    row.hidden = false;
+    status.textContent = 'این برنامه permission مستقل میکروفون ندارد؛ در شروع ورود صوتی، مرورگر ممکن است درخواست کند.';
+}
+
 function initSettings() {
     const on = document.getElementById('setRemindOn');
     const mins = document.getElementById('setRemindMin');
@@ -721,7 +780,19 @@ function initSettings() {
         }
         updateNotifStatus();
     });
+    const locBtn = document.getElementById('locPermBtn');
+    locBtn?.addEventListener('click', requestLocationPermission);
+    initLocationPermission();
+    initMicrophonePermissionStatus();
     updateNotifStatus();
+    const permissionNotifStatus = document.getElementById('permissionNotifStatus');
+    if (permissionNotifStatus && 'Notification' in window) {
+        const syncPermissionNotif = () => {
+            permissionNotifStatus.textContent = Notification.permission === 'granted' ? 'فعال است' : Notification.permission === 'denied' ? 'رد شده' : 'هنوز درخواست نشده';
+            permissionNotifStatus.classList.toggle('ok', Notification.permission === 'granted');
+        };
+        syncPermissionNotif();
+    }
 }
 
 function applyProMode() {

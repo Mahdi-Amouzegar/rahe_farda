@@ -305,6 +305,15 @@
             align-items: stretch;
         }
 
+        .permission-center .settings-row {
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .permission-center .settings-row > .btn-small {
+            margin-inline-start: auto;
+        }
+
         body {
             padding: 24px 14px calc(60px + env(safe-area-inset-bottom, 0px));
         }

@@ -65,7 +65,8 @@
         font-weight: 300;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
     .time-source-icon {
@@ -86,17 +87,6 @@
     .time-source-icon.offline {
         color: var(--accent-yellow);
         opacity: 1;
-    }
-
-    .header-actions {
-        position: absolute;
-        inset-block-start: 14px;
-        left: 14px;
-        z-index: 2;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin: 0;
     }
 
     .settings-trigger {
@@ -165,6 +155,23 @@
     .tagline-toggle:focus-visible {
         color: var(--accent-cyan);
         outline: none;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .settings-note.ok,
+    .settings-status.ok {
+        color: var(--accent-green);
     }
 
     #installBtn {

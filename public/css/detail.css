@@ -401,25 +401,38 @@
    LAYER: overrides
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer overrides {
-    /* ═══ Detail Page — Position (دسکتاپ روی ستون راست) ═══ */
+    /* ═══ Detail Page — Position (دسکتاپ در ستون Tasks سمت چپ) ═══ */
     @media (min-width: 901px) {
         .detail-page {
-            left: calc(max(0px, (100vw - 1100px) / 2) + 400px);
-            right: max(0px, (100vw - 1100px) / 2);
+            inset-block: 0;
+            inset-inline-start: 0;
+            inset-inline-end: 42vw;
             padding: 28px 34px 60px;
             z-index: 60;
         }
 
-        body.map-hidden .detail-page {
-            left: 0;
-            right: 0;
-            max-width: 980px;
-            margin: 0 auto;
+        html[dir="rtl"] .detail-page {
+            inset-inline-start: 42vw;
+            inset-inline-end: 0;
         }
 
         .detail-page .detail-inner {
             max-width: 640px;
             margin: 0 auto;
+        }
+
+        .detail-page .detail-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding: 12px 0;
+            margin: -12px 0 20px;
+            background: color-mix(in srgb, var(--bg-1) 94%, transparent);
+            backdrop-filter: blur(14px);
+        }
+
+        body.map-hidden .detail-page {
+            inset-inline: 0;
         }
     }
 

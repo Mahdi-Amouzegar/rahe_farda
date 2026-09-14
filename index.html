@@ -62,10 +62,8 @@
                             <p class="today-line">
                                 <span id="todayLine"></span>
                                 <span class="time-source-icon" id="timeSourceIcon" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
-                            </p>
-                            <div class="header-actions">
                                 <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
-                            </div>
+                            </p>
                         </div>
                     </div>
 
@@ -99,6 +97,12 @@
                                 <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label><button class="btn-small" id="notifPermBtn" type="button">فعال‌سازی اعلان‌ها</button><button class="btn-small" id="notifTestBtn" type="button">ارسال آزمایشی</button></div>
                                 <div class="settings-row"><label><input type="checkbox" id="setSoundOn"> صدای یادآور</label><span class="settings-note">اعلان‌ها فقط برای یادآورهای فعلی استفاده می‌شوند.</span></div>
                                 <div class="settings-status" id="notifStatus"></div>
+                            </section>
+                            <section class="settings-card settings-card-wide permission-center" aria-labelledby="permissionSettingsTitle">
+                                <h3 id="permissionSettingsTitle">دسترسی‌ها</h3>
+                                <div class="settings-row"><span>اعلان‌ها</span><span class="settings-note" id="permissionNotifStatus">در حال بررسی...</span></div>
+                                <div class="settings-row"><span>موقعیت مکانی</span><span class="settings-note" id="locPermStatus">در حال بررسی...</span><button class="btn-small" id="locPermBtn" type="button">درخواست دسترسی</button></div>
+                                <div class="settings-row microphone-permission-row" id="micPermRow" hidden><span>میکروفون برای ورود صوتی</span><span class="settings-note" id="micPermStatus">فقط هنگام استفاده از ورود صوتی بررسی می‌شود.</span></div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="advancedSettingsTitle">
                                 <h3 id="advancedSettingsTitle">تجربه حرفه‌ای</h3>
@@ -291,13 +295,13 @@
                 <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها</h3></div><span class="detail-section-status">فعال</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">جلسه‌ها / تاریخ‌ها <span class="count-badge" id="sessCount"></span></span><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
+                        <div class="field"><span class="sr-only">جلسه‌ها و تاریخ‌ها <span class="count-badge" id="sessCount"></span></span><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion location" data-detail-section="location" aria-labelledby="detailLocationTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">مکان</span><h3 id="detailLocationTitle">محل روی نقشه</h3></div><span class="detail-section-status">مکان‌محور</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field" id="fLocField"><span class="field-label">محل روی نقشه</span><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
+                        <div class="field" id="fLocField"><span class="sr-only">محل روی نقشه</span><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion recurrence" data-detail-section="recurrence" aria-labelledby="detailRecurrenceTitle">
@@ -320,13 +324,13 @@
                 <section class="detail-section detail-accordion timer" data-detail-section="timer" aria-labelledby="detailTimerTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">تمرکز</span><h3 id="detailTimerTitle">زمان صرف‌شده</h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">⏱ زمان صرف‌شده</span><div class="loc-btns"><span class="loc-line" id="timerLabel">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button">▶ شروع</button></div></div>
+                        <div class="field"><span class="sr-only">زمان صرف‌شده</span><div class="loc-btns"><span class="loc-line" id="timerLabel">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button">▶ شروع</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion photos" data-detail-section="photos" aria-labelledby="detailPhotosTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک</h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">📷 تصاویر و مدارک <span class="count-badge" id="photoCount"></span></span><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
+                        <div class="field"><span class="sr-only">تصاویر و مدارک <span class="count-badge" id="photoCount"></span></span><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
                     </div>
                 </section>
                 <div class="detail-actions"><button class="btn-clear" id="detailDelete" type="button">حذف این وظیفه</button></div>
@@ -399,7 +403,7 @@
     <div class="picker-overlay" id="calOverlay" style="display: none;">
         <div class="picker cal-wide" role="dialog" aria-modal="true" aria-label="تقویم جلسات">
             <div class="picker-title">📅 تقویم جلسات</div>
-            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" aria-label="ماه قبل">›</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" aria-label="ماه بعد">‹</button></div>
+            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" aria-label="ماه قبل">←</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" aria-label="ماه بعد">→</button></div>
             <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
             <div class="picker-days" id="calDays"></div>
             <div class="picker-actions"><button class="btn-clear" id="calClose">بستن</button></div>
@@ -410,7 +414,7 @@
         <div class="picker" role="dialog" aria-modal="true" aria-label="انتخاب سررسید">
             <div class="picker-title">انتخاب سررسید</div>
             <div class="picker-chips"><button type="button" data-preset="evening">امروز عصر</button><button type="button" data-preset="tomorrow">فردا ۹ صبح</button><button type="button" data-preset="week">هفته بعد</button></div>
-            <div class="picker-nav"><button class="picker-nav-btn" id="pickerPrev" aria-label="ماه قبل">›</button><div class="picker-month" id="pickerMonthLabel"></div><button class="picker-nav-btn" id="pickerNext" aria-label="ماه بعد">‹</button></div>
+            <div class="picker-nav"><button class="picker-nav-btn" id="pickerPrev" aria-label="ماه قبل">←</button><div class="picker-month" id="pickerMonthLabel"></div><button class="picker-nav-btn" id="pickerNext" aria-label="ماه بعد">→</button></div>
             <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
             <div class="picker-days" id="pickerDays"></div>
             <div class="picker-time"><span>ساعت</span><select id="pickerHour" aria-label="ساعت سررسید"></select><span>:</span><select id="pickerMinute" aria-label="دقیقه سررسید"></select></div>

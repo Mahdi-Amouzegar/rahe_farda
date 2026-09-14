@@ -350,7 +350,7 @@ function ensureList() {
         <button type="button" class="saved-locations-manage" id="savedLocationsManage" aria-label="مدیریت مکان‌های ذخیره‌شده">
             📌 مکان‌های ذخیره‌شده
             <span class="saved-locations-count" id="savedLocationsCount"></span>
-            <span class="saved-locations-chevron" aria-hidden="true">‹</span>
+            <span class="saved-locations-chevron" aria-hidden="true">›</span>
         </button>
         <div class="saved-locations-list"></div>
     `;
@@ -540,7 +540,7 @@ export function saveLocationFromPopup(loc) {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════���════════════════════════════════════════════════
 // حالت تغییر مکان
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -582,7 +582,7 @@ function bindMapRelocate() {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // نوار موبایل
-// ═══════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════��══════════
 
 export function showMobileBanner(text) {
     if (!window.matchMedia('(max-width: 900px)').matches) return;
