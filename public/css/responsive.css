@@ -292,6 +292,15 @@
             grid-column: auto;
         }
 
+        .settings-overlay {
+            align-items: center;
+            padding: 12px;
+        }
+
+        .settings-panel {
+            max-height: calc(100vh - 24px);
+        }
+
         .settings-panel-head {
             align-items: stretch;
         }

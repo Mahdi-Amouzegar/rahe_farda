@@ -9,14 +9,14 @@
     <meta name="theme-color" content="#0a0a1a">
     <title>راه فردا | برنامه‌ریزی شخصی و مدیریت کارها</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
-    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="manifest" href="./manifest.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<link rel="icon" href="/icons/favicon-32.ico" sizes="32x32">
-<link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96x96.png">
-<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" href="./icons/favicon-32.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="96x96" href="./icons/favicon-96x96.png">
+  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg">
 
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/components.css">
@@ -64,7 +64,7 @@
                                 <span class="time-source-icon" id="timeSourceIcon" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
                             </p>
                             <div class="header-actions">
-                                <button class="btn-small" id="settingsBtn" type="button" aria-controls="settingsPanel" aria-expanded="false">تنظیمات</button>
+                                <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
                             </div>
                         </div>
                     </div>
@@ -74,10 +74,11 @@
                         <button class="mobile-tab" data-tab="map" role="tab" type="button">🗺 نقشه</button>
                     </div>
 
-                    <section class="settings-panel" id="settingsPanel" hidden aria-labelledby="settingsTitle">
+                    <div class="picker-overlay settings-overlay" id="settingsModal" hidden>
+                        <section class="settings-panel settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
                         <div class="settings-panel-head">
                             <div><span class="settings-kicker">شخصی‌سازی</span><h2 id="settingsTitle">تنظیمات</h2><p>رفتار، ظاهر و اعلان‌های راه فردا را مدیریت کنید.</p></div>
-                            <button class="btn-small settings-close" id="settingsCloseBtn" type="button" aria-label="بستن تنظیمات">بستن</button>
+                            <button class="settings-close" id="settingsCloseBtn" type="button" aria-label="بستن تنظیمات">×</button>
                         </div>
                         <div class="settings-grid">
                             <section class="settings-card" aria-labelledby="appearanceSettingsTitle">
@@ -104,7 +105,8 @@
                                 <div class="settings-row"><label><input type="checkbox" id="setProMode"> حالت حرفه‌ای (گزینه‌های پیشرفته همیشه در دسترس)</label><span class="settings-note">این گزینه داده‌ها یا قابلیت‌ها را حذف نمی‌کند.</span></div>
                             </section>
                         </div>
-                    </section>
+                        </section>
+                    </div>
 
                     <div class="layout">
                         <div class="panel active" id="panelTasks">
@@ -147,7 +149,7 @@
                                     </div>
                                     <div id="seriesSubHours" style="display: none;">
                                         <div class="chip-row" style="margin-bottom: 8px;">
-                                            <button type="button" class="day-chip" data-snh="2">۲</button>
+                                            <button type="button" class="day-chip" data-snh="2">��</button>
                                             <button type="button" class="day-chip" data-snh="4">۴</button>
                                             <button type="button" class="day-chip" data-snh="6">۶</button>
                                             <button type="button" class="day-chip" data-snh="8">۸</button>
@@ -478,6 +480,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="./js/app.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import {
     uid,
     showConfirmModal,
     showInfoModal,
+    trapFocus,
     MAX_LENGTH,
     input,
     addBtn,
@@ -453,18 +454,35 @@ document.getElementById('tplEndBtn').addEventListener('click', () => {
 
 /* ---------- دکمه‌های هدر: راهنما و تنظیمات ---------- */
 
-const settingsPanel = document.getElementById('settingsPanel');
+const settingsModal = document.getElementById('settingsModal');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+let settingsTrapCleanup = null;
+let settingsReturnFocus = null;
 function toggleSettings(force) {
-    if (!settingsPanel || !settingsBtn) return;
-    const open = typeof force === 'boolean' ? force : settingsPanel.hidden;
-    settingsPanel.hidden = !open;
+    if (!settingsModal || !settingsBtn) return;
+    const open = typeof force === 'boolean' ? force : settingsModal.hidden;
+    settingsModal.hidden = !open;
+    settingsModal.style.display = open ? 'flex' : 'none';
     settingsBtn.setAttribute('aria-expanded', String(open));
-    if (open) settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.body.classList.toggle('modal-open', open);
+    if (open) {
+        settingsReturnFocus = document.activeElement;
+        settingsTrapCleanup?.();
+        settingsTrapCleanup = trapFocus(settingsModal);
+        setTimeout(() => settingsCloseBtn?.focus(), 60);
+    } else {
+        settingsTrapCleanup?.();
+        settingsTrapCleanup = null;
+        settingsReturnFocus?.focus?.({ preventScroll: true });
+        settingsReturnFocus = null;
+    }
 }
 settingsBtn?.addEventListener('click', () => toggleSettings());
 settingsCloseBtn?.addEventListener('click', () => toggleSettings(false));
+settingsModal?.addEventListener('click', event => {
+    if (event.target === settingsModal) toggleSettings(false);
+});
 
 document.getElementById('heroDescToggle').addEventListener('click', async () => {
     await showInfoModal({
@@ -814,7 +832,9 @@ document.getElementById('pickerOverlay').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
 
-    const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal'];
+    if (settingsModal && !settingsModal.hidden) { toggleSettings(false); return; }
+
+  const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal'];
     for (const id of stacked) {
         const el = document.getElementById(id);
         if (el && el.style.display === 'flex') return;
