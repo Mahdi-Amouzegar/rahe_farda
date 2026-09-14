@@ -32,12 +32,10 @@
     /* ═══ Map Wrap ═══ */
     .map-wrap {
         position: relative;
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-lg);
         overflow: hidden;
-        border: 1.5px solid var(--border-medium);
-        box-shadow:
-            0 10px 40px rgba(0, 0, 0, 0.3),
-            0 0 30px var(--accent-purple-soft);
+        border: 1px solid var(--border-medium);
+        box-shadow: var(--shadow-sm);
     }
 
     #map {
@@ -908,11 +906,28 @@
     }
 
     @media (max-width: 600px) {
+        .map-head-actions {
+            width: 100%;
+        }
+
+        .map-head-actions .btn-small {
+            flex: 1 1 auto;
+            min-height: 42px;
+        }
+
+        #map {
+            height: min(62vh, 420px);
+            min-height: 300px;
+        }
+
         .route-summary {
-            top: 8px;
+            top: auto;
+            bottom: 8px;
             right: 8px;
             left: auto;
             width: calc(100% - 16px);
+            max-height: calc(100% - 16px);
+            overflow-y: auto;
         }
         .route-summary-title {
             font-size: 11px;

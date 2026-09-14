@@ -30,13 +30,11 @@
     .picker {
         width: 100%;
         max-width: 360px;
-        background: linear-gradient(145deg, var(--bg-3), var(--bg-12));
-        border: 1.5px solid var(--border-medium);
-        border-radius: var(--radius-xl);
-        padding: 24px;
-        box-shadow:
-            0 20px 60px rgba(0, 0, 0, 0.6),
-            0 0 40px rgba(123, 47, 247, 0.15);
+        background: var(--bg-3);
+        border: 1px solid var(--border-medium);
+        border-radius: var(--radius-lg);
+        padding: 22px;
+        box-shadow: var(--shadow-md);
     }
 
     .picker-title {
@@ -212,6 +210,45 @@
     /* ═══ Calendar ═══ */
     .cal-wide {
         max-width: 430px;
+    }
+
+    #calOverlay .picker-title {
+        margin-bottom: 20px;
+        text-align: start;
+    }
+
+    #calOverlay .picker-nav {
+        padding: 8px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+    }
+
+    #calOverlay .picker-month {
+        color: var(--text-primary);
+        font-size: 1rem;
+    }
+
+    #calOverlay .picker-weekdays {
+        padding-inline: 4px;
+        color: var(--accent-cyan);
+    }
+
+    #calOverlay .cal-day {
+        min-height: 52px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-2);
+    }
+
+    #calOverlay .cal-day:hover:not(:disabled) {
+        border-color: var(--accent-cyan-border);
+        background: var(--accent-cyan-soft);
+    }
+
+    #calOverlay .cal-day.selected {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: -2px;
+        background: var(--bg-4);
     }
 
     .cal-day {
