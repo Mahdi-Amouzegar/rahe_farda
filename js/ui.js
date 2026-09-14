@@ -178,7 +178,7 @@ export function renderStats(total, done) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Template Modal
-// ════════════════════════��══════════════════════════════════════════════════
+// ════════════════════════���══════════════════════════════════════════════════
 
 export function renderTemplateList() {
     const el = document.getElementById('tplList');
@@ -632,7 +632,7 @@ export function render() {
                     : [
                         { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
                         { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
-                        { action: 'edit-btn', label: 'ویرایش وظیفه', icon: '✎' },
+                        { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
                         { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
                         { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
                     ], 'عملیات وظیفه')}

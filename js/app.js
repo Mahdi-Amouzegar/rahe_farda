@@ -618,6 +618,7 @@ function updateWelcomeOpts() {
 function applyDisplaySettings() {
     applyTheme(state.prefs.theme);
     document.documentElement.setAttribute('data-lang', state.prefs.lang);
+    document.documentElement.setAttribute('dir', state.prefs.lang === 'en' ? 'ltr' : 'rtl');
     updateThemeBtn();
     updateLangBtn();
     updateWelcomeOpts();

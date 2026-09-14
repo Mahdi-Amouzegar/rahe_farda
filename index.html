@@ -288,6 +288,18 @@
                         <label class="field"><span class="field-label">توضیح بیشتر</span><textarea id="fDesc" rows="3" maxlength="1000" placeholder="مثلاً نام پزشک، علت مراجعه..."></textarea></label>
                     </div>
                 </section>
+                <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها</h3></div><span class="detail-section-status">فعال</span></div>
+                    <div class="detail-section-body detail-accordion-body">
+                        <div class="field"><span class="field-label">جلسه‌ها / تاریخ‌ها <span class="count-badge" id="sessCount"></span></span><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
+                    </div>
+                </section>
+                <section class="detail-section detail-accordion location" data-detail-section="location" aria-labelledby="detailLocationTitle">
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker">مکان</span><h3 id="detailLocationTitle">محل روی نقشه</h3></div><span class="detail-section-status">مکان‌محور</span></div>
+                    <div class="detail-section-body detail-accordion-body">
+                        <div class="field" id="fLocField"><span class="field-label">محل روی نقشه</span><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
+                    </div>
+                </section>
                 <section class="detail-section detail-accordion recurrence" data-detail-section="recurrence" aria-labelledby="detailRecurrenceTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">زمان‌بندی</span><h3 id="detailRecurrenceTitle">تکرار و زمان‌بندی</h3></div><span class="detail-section-status">پیشرفته</span></div>
                     <div class="detail-section-body detail-accordion-body">
@@ -303,18 +315,6 @@
                         <div class="field"><label class="field-label" for="fPhone">تلفن تماس</label><input type="tel" id="fPhone" class="ltr" maxlength="20" placeholder="0912..." autocomplete="off"><a class="due-btn call-btn" id="fPhoneCall" href="#" style="display: none;">📞 تماس گرفتن</a><span class="field-error" id="fPhoneError"></span></div>
                         <label class="field"><span class="field-label">آدرس پستی</span><textarea id="fAddr" rows="2" maxlength="500" placeholder="آدرس مطب یا محل..."></textarea></label>
                         <div class="field"><label class="field-label" for="fUrl">آدرس اینترنتی</label><input type="url" id="fUrl" class="ltr" maxlength="300" placeholder="https://..." autocomplete="off" dir="ltr"><div class="link-row"><a class="field-link" id="fUrlOpen" href="#" target="_blank" rel="noopener" style="display: none;">باز کردن پیوند ↗</a><button class="due-btn" id="fUrlCopy" type="button" style="display: none;">📋 کپی لینک</button></div></div>
-                    </div>
-                </section>
-                <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها</h3></div><span class="detail-section-status">فعال</span></div>
-                    <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">جلسه‌ها / تاریخ‌ها <span class="count-badge" id="sessCount"></span></span><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
-                    </div>
-                </section>
-                <section class="detail-section detail-accordion location" data-detail-section="location" aria-labelledby="detailLocationTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">مکان</span><h3 id="detailLocationTitle">محل روی نقشه</h3></div><span class="detail-section-status">مکان‌محور</span></div>
-                    <div class="detail-section-body detail-accordion-body">
-                        <div class="field" id="fLocField"><span class="field-label">محل روی نقشه</span><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion timer" data-detail-section="timer" aria-labelledby="detailTimerTitle">
@@ -348,7 +348,7 @@
         </div>
     </section>
 
-    <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردا��ی</button></div>
+    <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردانی</button></div>
     <div class="lightbox" id="lightbox" style="display: none;"><img id="lightboxImg" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" style="display: none;">
