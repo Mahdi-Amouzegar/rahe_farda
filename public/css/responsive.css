@@ -639,28 +639,66 @@
     }
 }
 
-/* Language-aware desktop columns: the visual placement is intentional. */
+/* Desktop uses a physical LTR grid; planner content keeps its language direction. */
 @media (min-width: 901px) {
     .app-shell {
+        direction: ltr;
         max-width: none;
         transition: none;
         grid-template-columns: minmax(0, 1fr) clamp(400px, 42vw, 760px);
     }
+
+    .app-shell > #panelMap,
+    .app-shell > .right-flow-container {
+        grid-row: 1;
+        min-width: 0;
+    }
+
     .app-shell > #panelMap { grid-column: 1; }
-    .app-shell > .right-flow-container { grid-column: 2; }
+    .app-shell > .right-flow-container {
+        grid-column: 2;
+        direction: rtl;
+    }
+
     html[data-lang="en"] .app-shell > #panelMap { grid-column: 2; }
-    html[data-lang="en"] .app-shell > .right-flow-container { grid-column: 1; }
+    html[data-lang="en"] .app-shell > .right-flow-container {
+        grid-column: 1;
+        direction: ltr;
+    }
+
     .right-flow-container > .map-divider-toggle {
         left: 0;
         right: auto;
         transform: translate(-50%, -50%);
     }
+
     html[data-lang="en"] .right-flow-container > .map-divider-toggle {
         left: auto;
         right: 0;
         transform: translate(50%, -50%);
     }
-    body.map-hidden .right-flow-container > .map-divider-toggle { transform: translate(0, -50%); }
-    html[data-lang="en"] body.map-hidden .right-flow-container > .map-divider-toggle { transform: translate(0, -50%); }
-    body.map-hidden .right-flow-container { grid-column: 1 / -1 !important; }
+
+    body.map-hidden .app-shell {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.map-hidden .app-shell > #panelMap {
+        display: none !important;
+    }
+
+    body.map-hidden .app-shell > .right-flow-container {
+        grid-column: 1;
+        direction: inherit;
+    }
+
+    body.map-hidden .right-flow-container > .map-divider-toggle {
+        left: auto;
+        right: 0;
+        transform: translate(0, -50%);
+    }
+
+    html[data-lang="en"] body.map-hidden .right-flow-container > .map-divider-toggle {
+        left: 0;
+        right: auto;
+    }
 }

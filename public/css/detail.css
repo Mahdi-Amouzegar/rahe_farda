@@ -604,15 +604,27 @@
 
 @media (min-width: 901px) {
     .detail-page {
-        left: auto;
+        left: calc(100vw - clamp(400px, 42vw, 760px));
         right: 0;
-        width: clamp(400px, 42vw, 760px);
+        width: auto;
         max-width: none;
         margin: 0;
         box-sizing: border-box;
     }
-    html[data-lang="en"] .detail-page { left: 0; right: auto; }
-    body.map-hidden .detail-page { left: 0; right: 0; width: 100%; max-width: none; margin: 0; }
+
+    html[data-lang="en"] .detail-page {
+        left: 0;
+        right: calc(100vw - clamp(400px, 42vw, 760px));
+    }
+
+    body.map-hidden .detail-page {
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        margin: 0;
+    }
+
     html[data-lang="en"] .detail-header { text-align: left; }
     html[data-lang="en"] .detail-header #detailBack,
     html[data-lang="en"] .detail-header #trashBack { order: 2; }
