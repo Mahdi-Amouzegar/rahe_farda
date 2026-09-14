@@ -828,7 +828,8 @@
             position: absolute;
             top: 50%;
             bottom: auto;
-            transform: translate(-50%, -50%);
+            inset-inline-end: 0;
+            transform: translate(50%, -50%);
             z-index: 30;
             width: 34px;
             height: 34px;
@@ -863,17 +864,6 @@
             min-width: 0;
         }
 
-        .app-shell[dir="rtl"] > .right-flow-container > .map-divider-toggle {
-            left: 0;
-            right: auto;
-            transform: translate(-50%, -50%);
-        }
-
-        .app-shell[dir="ltr"] > .right-flow-container > .map-divider-toggle {
-            left: auto;
-            right: 0;
-            transform: translate(50%, -50%);
-        }
     }
 
     /* ═══ Responsive — Small Screens ═══ */

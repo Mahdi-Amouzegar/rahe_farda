@@ -28,27 +28,6 @@
 <body>
     <div class="container">
         <div class="app-shell">
-            <div class="panel" id="panelMap">
-                <div class="map-head">
-                    <span class="map-title">🗺 نقشه محل وظایف</span>
-                    <div class="map-head-actions">
-                        <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
-                        <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
-                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
-                    </div>
-                </div>
-                <div class="map-wrap">
-                    <div id="map" aria-label="نقشه"></div>
-                    <div class="map-hint" id="mapHint"></div>
-                    <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
-                </div>
-                <div class="mobile-pick-banner" id="mobilePickBanner" style="display: none;">
-                    <span class="mobile-pick-banner-text" id="mobilePickBannerText">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
-                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button">لغو</button>
-                </div>
-                <p class="map-note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
-            </div>
-
             <div class="right-flow-container">
                 <button class="btn-small map-context-toggle map-divider-toggle" id="mapToggle" type="button" aria-label="نمایش یا پنهان کردن نقشه" title="نمایش یا پنهان کردن نقشه">🗺 نقشه: روشن</button>
                 <div class="right-flow">
@@ -275,6 +254,27 @@
                         <div class="app-footer__small">© <span id="copyYear">۱۴۰۵</span> — همه حقوق محفوظ است · 🔒 اطلاعات شما فقط روی همین دستگاه می‌ماند</div>
                     </footer>
                 </div>
+            </div>
+
+            <div class="panel" id="panelMap">
+                <div class="map-head">
+                    <span class="map-title">🗺 نقشه محل وظایف</span>
+                    <div class="map-head-actions">
+                        <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
+                        <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
+                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
+                    </div>
+                </div>
+                <div class="map-wrap">
+                    <div id="map" aria-label="نقشه"></div>
+                    <div class="map-hint" id="mapHint"></div>
+                    <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
+                </div>
+                <div class="mobile-pick-banner" id="mobilePickBanner" style="display: none;">
+                    <span class="mobile-pick-banner-text" id="mobilePickBannerText">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
+                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button">لغو</button>
+                </div>
+                <p class="map-note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
             </div>
         </div>
     </div>

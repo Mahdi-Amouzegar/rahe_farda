@@ -392,15 +392,14 @@
     /* ═══ Detail Page — Position (دسکتاپ روی ستون راست) ═══ */
     @media (min-width: 901px) {
         .detail-page {
-            left: calc(max(0px, (100vw - 1100px) / 2) + 400px);
-            right: max(0px, (100vw - 1100px) / 2);
+            inset-inline-start: 0;
+            inset-inline-end: 30%;
             padding: 28px 34px 60px;
             z-index: 60;
         }
 
         body.map-hidden .detail-page {
-            left: 0;
-            right: 0;
+            inset-inline: 0;
             max-width: 980px;
             margin: 0 auto;
         }
@@ -604,17 +603,12 @@
 
 @media (min-width: 901px) {
     .detail-page {
-        left: 30%;
-        right: 0;
+        inset-inline-start: 0;
+        inset-inline-end: 30%;
         width: auto;
         max-width: none;
         margin: 0;
         box-sizing: border-box;
-    }
-
-    html[data-lang="en"] .detail-page {
-        left: 0;
-        right: 30%;
     }
 
     body.map-hidden .detail-page {
