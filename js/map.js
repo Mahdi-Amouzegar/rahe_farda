@@ -225,6 +225,8 @@ export function applyMapVisibility() {
         return;
     }
 
+    // Move out of the hidden state first so CSS restores display:flex before
+    // the grid expansion begins.
     setMapVisibilityState('opening');
     document.body.classList.remove('map-hidden');
 }

@@ -28,7 +28,11 @@
            column and the task wrapper occupies the left column. */
         .app-shell {
             display: grid;
-            grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+            max-width: 1100px;
+            box-sizing: border-box;
+            grid-template-columns: minmax(0, 42vw) minmax(0, 1fr);
             height: 100vh;
             background: var(--bg-0);
         }

@@ -787,9 +787,11 @@
     @media (min-width: 901px) {
         .app-shell {
             --map-transition-duration: 500ms;
+            width: 100%;
+            min-width: 0;
             max-width: 1100px;
             margin: 0 auto;
-            grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 42vw) minmax(0, 1fr);
             transition: grid-template-columns var(--map-transition-duration) cubic-bezier(.4, 0, .2, 1);
         }
 
@@ -899,7 +901,12 @@
         }
 
         body[data-map-visibility="hidden"] .app-shell > .panel-map {
-            visibility: hidden;
+            display: none;
+        }
+
+        body[data-map-visibility="opening"] .app-shell > .panel-map {
+            display: flex;
+            visibility: visible;
         }
     }
 
