@@ -520,17 +520,6 @@ document.getElementById('privacyBtn').addEventListener('click', async () => {
 
 /* ---------- Theme (حالت نمایش) و Lang (زبان) ---------- */
 
-// تشخیص TWA: اگر در حالت standalone باز شده و referrer از android-app باشد
-function isTWA() {
-    // روش ۱: matchMedia display-mode
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    // روش ۲: referrer (TWA معمولاً با android-app:// می‌آید)
-    const isAndroidApp = document.referrer && document.referrer.startsWith('android-app://');
-    // روش ۳: userAgent (اگر PWABuilder TWA باشد)
-    const isTWAUserAgent = /wv\)/.test(navigator.userAgent) || /Version\/\d+\.\d+ Chrome\/\d+/.test(navigator.userAgent);
-    return isStandalone || isAndroidApp || isTWAUserAgent;
-}
-
 function applyTheme(theme) {
     const html = document.documentElement;
     const body = document.body;
@@ -545,16 +534,9 @@ function applyTheme(theme) {
         effective = 'light';
         html.setAttribute('data-theme', 'light');
     } else {
-        // در TWA، حالت auto را نادیده بگیر و از سیستم استفاده نکن
-        // چون WebView اندروید ممکن است prefers-color-scheme را متفاوت تفسیر کند
-        if (isTWA()) {
-            // پیش‌فرض در TWA: dark (هماهنگ با theme-color اصلی)
-            effective = 'dark';
-            html.setAttribute('data-theme', 'dark');
-        } else {
-            html.removeAttribute('data-theme');
-            effective = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        }
+        html.removeAttribute('data-theme');
+        effective = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        html.setAttribute('data-theme', effective);
     }
 
     const cls = effective === 'light' ? 'theme-light' : 'theme-dark';
@@ -576,10 +558,9 @@ function applyTheme(theme) {
         }
     }
 
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) {
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
         meta.setAttribute('content', effective === 'light' ? '#f0f3f8' : '#0a0a1a');
-    }
+    });
 }
 
 function updateThemeBtn() {

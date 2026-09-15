@@ -6,7 +6,23 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن. بدون حساب کاربری، حتی آفلاین.">
-    <meta name="theme-color" content="#0a0a1a">
+    <meta name="theme-color" content="#f0f3f8">
+    <script>
+        (() => {
+            let preference = 'auto';
+            try {
+                const saved = JSON.parse(localStorage.getItem('spaceTodoPrefs') || 'null');
+                if (saved && ['auto', 'dark', 'light'].includes(saved.theme)) preference = saved.theme;
+            } catch {}
+            const effective = preference === 'light' || (preference === 'auto' && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+            const html = document.documentElement;
+            html.classList.add(`theme-${effective}`);
+            html.dataset.theme = effective;
+            html.style.colorScheme = effective;
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.content = effective === 'light' ? '#f0f3f8' : '#0a0a1a';
+        })();
+    </script>
     <title>راه فردا | برنامه‌ریزی شخصی و مدیریت کارها</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
     <link rel="manifest" href="./manifest.webmanifest">
