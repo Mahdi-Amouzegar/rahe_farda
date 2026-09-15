@@ -1463,7 +1463,11 @@
         color: var(--text-secondary);
         cursor: pointer;
         font-family: inherit;
-        font-size: 0.9rem;
+        font-size: 1.9rem;
+        line-height: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         flex-shrink: 0;
         transition: all 0.25s ease;
     }
