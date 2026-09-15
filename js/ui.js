@@ -178,7 +178,7 @@ export function renderStats(total, done) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Template Modal
-// ════════════════════════���══════════════════════════════════════════════════
+// ════════════════════════����══════════════════════════════════════════════════
 
 export function renderTemplateList() {
     const el = document.getElementById('tplList');
@@ -388,7 +388,7 @@ function childHtml(c) {
         ${(c.location || (c.sessions || []).some(s => s.location)) ? '<span class="child-due">📍</span>' : ''}
         ${(c.photos || []).length ? '<span class="child-due">📷</span>' : ''}
         ${recurBadge(c, 'child-due')}
-        <span class="child-actions">
+        <div class="child-actions">
             ${operationMenu(state.currentFilter === 'archived'
                 ? [
                     { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
@@ -400,7 +400,7 @@ function childHtml(c) {
                     { action: 'archive', label: 'بایگانی زیرکار', icon: '📦' },
                     { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
                 ], 'عملیات زیرکار')}
-        </span>
+        </div>
     </div>`;
 }
 

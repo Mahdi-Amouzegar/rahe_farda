@@ -311,7 +311,7 @@
                 <section class="detail-section detail-accordion recurrence" data-detail-section="recurrence" aria-labelledby="detailRecurrenceTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">زمان‌بندی</span><h3 id="detailRecurrenceTitle">تکرار و زمان‌بندی</h3></div><span class="detail-section-status">پیشرفته</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <label class="field"><span class="field-label">تکرار</span><select id="fRecur" class="sort-select"><option value="none">بدون تکرار</option><option value="daily">روزانه</option><option value="weekly">هفتگی</option><option value="monthly">ماهانه</option><option value="custom">هر چند روز...</option><option value="hourly">هر چند ساعت...</option><option value="weeklyDays">روزهای هفته...</option><option value="monthlyDays">روزهای ماه...</option></select></label>
+                        <label class="field"><select id="fRecur" class="sort-select"><option value="none">بدون تکرار</option><option value="daily">روزانه</option><option value="weekly">هفتگی</option><option value="monthly">ماهانه</option><option value="custom">هر چند روز...</option><option value="hourly">هر چند ساعت...</option><option value="weeklyDays">روزهای هفته...</option><option value="monthlyDays">روزهای ماه...</option></select></label>
                         <div class="field" id="fRecurWeekRow" style="display: none;"><span class="field-label">کدام روزها؟</span><div class="chip-row" id="fRecurWeekChips"></div></div>
                         <div class="field" id="fRecurMonthRow" style="display: none;"><span class="field-label">کدام روزهای ماه؟</span><div class="chip-row" id="fRecurMonthChips"></div></div>
                         <div class="field" id="fRecurNRow" style="display: none;"><span class="field-label">هر چند روز؟</span><input type="number" id="fRecurN" min="1" max="365" value="2"></div>
@@ -328,13 +328,13 @@
                 <section class="detail-section detail-accordion timer" data-detail-section="timer" aria-labelledby="detailTimerTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">تمرکز</span><h3 id="detailTimerTitle">زمان صرف‌شده</h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">⏱ زمان صرف‌شده</span><div class="loc-btns"><span class="loc-line" id="timerLabel">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button">▶ شروع</button></div></div>
+                        <div class="field"><div class="loc-btns"><span class="loc-line" id="timerLabel">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button">▶ شروع</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion photos" data-detail-section="photos" aria-labelledby="detailPhotosTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک</h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">📷 تصاویر و مدارک <span class="count-badge" id="photoCount"></span></span><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
+                        <div class="field"><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
                     </div>
                 </section>
                 <div class="detail-actions"><button class="btn-clear" id="detailDelete" type="button">حذف این وظیفه</button></div>
