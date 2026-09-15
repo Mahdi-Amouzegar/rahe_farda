@@ -293,7 +293,7 @@ function renderDetail() {
     const host = changeBtn ? changeBtn.parentElement : line.parentElement;
     if (!host) return;
 
-    const staleSave = host.querySelector('[data-save-detail-location]');
+    const staleSave = line.querySelector('[data-save-detail-location]') || host.querySelector('[data-save-detail-location]');
     if (staleSave) staleSave.remove();
 
     if (!task.location) {
@@ -333,8 +333,7 @@ function renderDetail() {
         save.dataset.saveDetailLocation = '';
         save.textContent = '📌 ذخیره نام مکان';
         save.setAttribute('aria-label', 'ذخیره نام این مکان');
-        if (removeBtn && removeBtn.parentElement === host) host.insertBefore(save, removeBtn);
-        else host.appendChild(save);
+        line.appendChild(save);
     }
 }
 
@@ -540,7 +539,7 @@ export function saveLocationFromPopup(loc) {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════��═══════════════════════════════════════════════════
 // حالت تغییر مکان
 // ═══════════════════════════════════════════════════════════════════════════
 

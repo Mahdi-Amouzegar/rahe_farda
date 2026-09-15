@@ -464,8 +464,26 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
         gap: 8px;
         min-width: 0;
+    }
+
+    .loc-line .location-save-btn {
+        flex: 0 0 auto;
+    }
+
+    .loc-btns {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .loc-btns .due-btn {
+        flex: 1 1 auto;
+        min-width: min(150px, 100%);
     }
 
     .loc-line .location-display {
