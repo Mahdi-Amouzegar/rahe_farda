@@ -13,11 +13,6 @@
             height: 100%;
         }
 
-        body {
-            padding: 0;
-            overflow: hidden;
-        }
-
         .container {
             width: 100%;
             max-width: none;
@@ -25,14 +20,27 @@
         }
 
         .app-shell {
-            display: grid;
-            grid-template-columns: minmax(360px, 42vw) minmax(0, 1fr);
+            display: flex;
+            flex-direction: row;
+            direction: inherit;
             height: 100vh;
             background: var(--bg-0);
         }
 
+        .right-flow-container {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 0;
+            direction: inherit;
+        }
+
+        #panelMap {
+            flex: 0 0 40%;
+            min-width: 0;
+            min-height: 0;
+        }
+
         .right-flow {
-            grid-column: 2;
             min-width: 0;
             height: 100vh;
             overflow-y: auto;
@@ -41,8 +49,6 @@
         }
 
         #panelMap {
-            grid-column: 1;
-            grid-row: 1;
             display: flex;
             flex-direction: column;
             min-width: 0;
@@ -87,23 +93,26 @@
             margin-top: 24px;
         }
 
-        body.map-hidden .app-shell {
-            grid-template-columns: minmax(0, 1fr);
-        }
-
         body.map-hidden .container {
             max-width: none;
         }
 
+        .app-shell.map-hidden > #panelMap,
         body.map-hidden #panelMap {
             display: none !important;
         }
 
+        .app-shell.map-hidden > .right-flow-container,
+        body.map-hidden .right-flow-container {
+            flex: 1 1 100%;
+            min-width: 0;
+            width: 100%;
+        }
+
         body.map-hidden .right-flow {
-            grid-column: 1;
             max-width: 980px;
             width: 100%;
-            justify-self: center;
+            margin-inline: auto;
         }
 
         .plan-body {

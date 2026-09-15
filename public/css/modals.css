@@ -431,6 +431,18 @@
     }
 
     /* ═══ Welcome Settings ═══ */
+    .storage-guidance {
+        margin: -4px 0 16px;
+        padding: 9px 12px;
+        border-inline-start: 3px solid var(--accent-cyan);
+        border-radius: var(--radius-sm);
+        background: var(--accent-cyan-soft);
+        color: var(--text-muted);
+        font-size: .76rem;
+        line-height: 1.8;
+        text-align: start;
+    }
+
     .welcome-settings {
         margin: 0 0 18px;
         padding: 12px 14px;
@@ -497,6 +509,35 @@
     .welcome-opt:focus-visible {
         outline: 2px solid var(--accent-cyan);
         outline-offset: 2px;
+    }
+
+    .permission-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    .permission-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+    }
+
+    .permission-item > div {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+    }
+
+    .permission-item span {
+        color: var(--text-muted);
+        font-size: .75rem;
     }
 
     /* ═══ Snackbar ═══ */

@@ -28,27 +28,6 @@
 <body>
     <div class="container">
         <div class="app-shell">
-            <div class="panel" id="panelMap">
-                <div class="map-head">
-                    <span class="map-title">🗺 نقشه محل وظایف</span>
-                    <div class="map-head-actions">
-                        <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
-                        <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
-                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
-                    </div>
-                </div>
-                <div class="map-wrap">
-                    <div id="map" aria-label="نقشه"></div>
-                    <div class="map-hint" id="mapHint"></div>
-                    <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
-                </div>
-                <div class="mobile-pick-banner" id="mobilePickBanner" style="display: none;">
-                    <span class="mobile-pick-banner-text" id="mobilePickBannerText">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
-                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button">لغو</button>
-                </div>
-                <p class="map-note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
-            </div>
-
             <div class="right-flow-container">
                 <button class="btn-small map-context-toggle map-divider-toggle" id="mapToggle" type="button" aria-label="نمایش یا پنهان کردن نقشه" title="نمایش یا پنهان کردن نقشه">🗺 نقشه: روشن</button>
                 <div class="right-flow">
@@ -96,9 +75,17 @@
                             <section class="settings-card settings-card-wide" aria-labelledby="reminderSettingsTitle">
                                 <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
                                 <div class="settings-row"><label><input type="checkbox" id="setRemindOn"> یادآور جلسات</label><label>چند دقیقه قبل؟ <select id="setRemindMin" class="sort-select"><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60" selected>۱ ساعت</option><option value="180">۳ ساعت</option><option value="1440">۱ روز</option></select></label></div>
-                                <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label><button class="btn-small" id="notifPermBtn" type="button">فعال‌سازی اعلان‌ها</button><button class="btn-small" id="notifTestBtn" type="button">ارسال آزمایشی</button></div>
+                                <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label></div>
                                 <div class="settings-row"><label><input type="checkbox" id="setSoundOn"> صدای یادآور</label><span class="settings-note">اعلان‌ها فقط برای یادآورهای فعلی استفاده می‌شوند.</span></div>
-                                <div class="settings-status" id="notifStatus"></div>
+                            </section>
+                            <section class="settings-card settings-card-wide permissions-card" aria-labelledby="permissionsTitle">
+                                <h3 id="permissionsTitle">مجوزهای سیستم</h3>
+                                <p class="settings-note">وضعیت دسترسی‌های مرورگر را جداگانه بررسی و آزمایش کنید.</p>
+                                <div class="permission-grid">
+                                    <div class="permission-item"><div><strong>اعلان‌ها</strong><span id="permissionNotifStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionNotifBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionNotifTestBtn" type="button">تست</button></div>
+                                    <div class="permission-item"><div><strong>موقعیت مکانی</strong><span id="permissionLocationStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionLocationBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionLocationTestBtn" type="button">تست</button></div>
+                                    <div class="permission-item"><div><strong>میکروفون</strong><span id="permissionMicStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionMicBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionMicTestBtn" type="button">تست</button></div>
+                                </div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="advancedSettingsTitle">
                                 <h3 id="advancedSettingsTitle">تجربه حرفه‌ای</h3>
@@ -187,14 +174,14 @@
                                             </select>
                                         </label>
                                         <label class="more-row"><span>توضیح</span>
-                                            <input type="text" id="descInput" maxlength="200" placeholder="توضیح کوتاه..." aria-label="توضیح">
+                                            <span class="text-input-with-mic"><input type="text" id="descInput" maxlength="200" placeholder="توضیح کوتاه..." aria-label="توضیح"><button class="btn-icon mic-btn" data-mic-target="descInput" type="button" aria-label="ورود صوتی برای توضیح">🎤</button></span>
                                         </label>
                                     </div>
                                 </details>
                                 <div id="planKidsWrap" style="display: none;">
                                     <div class="due-chips" id="planKidChips" style="display: none;"></div>
                                     <div class="child-add">
-                                        <input type="text" class="child-input" id="planKidInput" placeholder="کار جدید..." maxlength="200" aria-label="عنوان کار جدید">
+                                        <span class="text-input-with-mic"><input type="text" class="child-input" id="planKidInput" placeholder="کار جدید..." maxlength="200" aria-label="عنوان کار جدید"><button class="btn-icon mic-btn" data-mic-target="planKidInput" type="button" aria-label="ورود صوتی برای زیرکار">🎤</button></span>
                                         <button class="btn-add btn-child-add" id="planKidAdd" type="button">افزودن</button>
                                     </div>
                                 </div>
@@ -268,6 +255,27 @@
                     </footer>
                 </div>
             </div>
+
+            <div class="panel" id="panelMap">
+                <div class="map-head">
+                    <span class="map-title">🗺 نقشه محل وظایف</span>
+                    <div class="map-head-actions">
+                        <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
+                        <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
+                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
+                    </div>
+                </div>
+                <div class="map-wrap">
+                    <div id="map" aria-label="نقشه"></div>
+                    <div class="map-hint" id="mapHint"></div>
+                    <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
+                </div>
+                <div class="mobile-pick-banner" id="mobilePickBanner" style="display: none;">
+                    <span class="mobile-pick-banner-text" id="mobilePickBannerText">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
+                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button">لغو</button>
+                </div>
+                <p class="map-note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
+            </div>
         </div>
     </div>
 
@@ -289,15 +297,15 @@
                     </div>
                 </section>
                 <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها</h3></div><span class="detail-section-status">فعال</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها <span class="count-badge" id="sessCount" aria-label="تعداد جلسه‌ها"></span></h3></div><span class="detail-section-status">فعال</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><span class="field-label">جلسه‌ها / تاریخ‌ها <span class="count-badge" id="sessCount"></span></span><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
+                        <div class="field"><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion location" data-detail-section="location" aria-labelledby="detailLocationTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">مکان</span><h3 id="detailLocationTitle">محل روی نقشه</h3></div><span class="detail-section-status">مکان‌محور</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field" id="fLocField"><span class="field-label">محل روی نقشه</span><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
+                        <div class="field" id="fLocField"><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion recurrence" data-detail-section="recurrence" aria-labelledby="detailRecurrenceTitle">
@@ -355,6 +363,7 @@
         <div class="picker" role="dialog" aria-modal="true" aria-label="خوش آمدید">
             <div class="picker-title">👋 خوش آمدید</div>
             <p class="welcome-text">این دستیار وظایف شماست — کاملاً آفلاین و خصوصی.<br>• عنوان را بنویسید و Enter بزنید<br>• با 📅 تاریخ، با 📍 محل اضافه کنید<br>• با «+ افزودن» کار، برنامه یا دوره بسازید</p>
+  <p class="storage-guidance">اطلاعات شما روی همین دستگاه و مرورگر ذخیره می‌شود. اگر مرورگر برای حذف خودکار داده‌های سایت تنظیم شده باشد، ممکن است اطلاعات برنامه‌ها و وظایف از بین برود.</p>
             <div class="welcome-settings">
                 <div class="welcome-settings-row">
                     <span class="welcome-settings-label">حالت نمایش:</span>

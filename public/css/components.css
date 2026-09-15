@@ -98,8 +98,8 @@
 
     .settings-trigger {
         position: absolute;
-        inset-block-start: 14px;
-        left: 14px;
+        inset-block-start: -8px;
+        inset-inline-end: -8px;
         z-index: 2;
         width: 44px;
         height: 44px;
@@ -110,7 +110,8 @@
         border-radius: 50%;
         background: var(--bg-3);
         color: var(--text-secondary);
-        font-size: 1.25rem;
+        font-size: 2.5rem;
+        line-height: 0;
         cursor: pointer;
         box-shadow: var(--shadow-sm);
         transition: color .18s ease, border-color .18s ease, transform .18s ease, background .18s ease;
@@ -384,6 +385,23 @@
     }
 
     /* ═══ Input Section ═══ */
+    .text-input-with-mic {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .text-input-with-mic input {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .mic-btn {
+        flex: 0 0 auto;
+    }
+
     .input-section {
         display: flex;
         gap: 12px;
@@ -753,6 +771,10 @@
     .operation-menu {
         position: relative;
         flex-shrink: 0;
+    }
+
+    .operation-menu:has(.operation-trigger[aria-expanded="true"]) {
+        z-index: 50;
     }
 
     .operation-trigger {
@@ -1831,7 +1853,7 @@
     /* ═══ List Zone ═══ */
     .list-zone {
         margin-top: 28px;
-        padding-top: 4px;
+        padding: 18px;
     }
 
     .list-zone .task-zone-title {
