@@ -1998,4 +1998,14 @@
     html.theme-light .task-item:hover {
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 0 0 1px var(--accent-cyan-border);
     }
+
+    /* ═══ Pro Mode — فیلتر و مرتب‌سازی فقط در حالت پیشرفته ═══ */
+    /* در حالت ساده، فیلترها و انتخاب مرتب‌سازی پنهان می‌شوند.
+       دکمه‌های «تقویم» و «سطل» داخل sort-row باقی می‌مانند. */
+    body:not(.pro-mode) .list-zone .filters,
+    body:not(.pro-mode) .list-zone .sort-row > label,
+    body:not(.pro-mode) .list-zone .sort-row > .sort-select {
+        display: none;
+    }
 }
+

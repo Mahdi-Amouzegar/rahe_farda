@@ -20,6 +20,8 @@ const _callbacks = {
     showMobilePickBanner: null,
     hideMobilePickBanner: null,
     isRelocateLocationActive: null,
+    hasActiveRoute: null,
+    getActiveRouteDestination: null,
 };
 
 export function registerMapCallbacks(cbs) {
@@ -48,6 +50,13 @@ let markerTimer = null;
 let mapDomClickHandler = null;
 let mapLoadHandler = null;
 let mapInitTimers = [];
+
+// Live tracking state
+let liveWatchId = null;
+let lastAcceptedTime = 0;
+const LIVE_TRACK_MIN_INTERVAL_MS = 2500;  // حداقل فاصله بین دو آپدیت پذیرفته‌شده
+let liveTrackActive = false;
+let liveTrackingFirstFix = true;  // فلگ اولین fix برای تصمیم‌گیری zoom/fit
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Public getters/setters
@@ -146,6 +155,7 @@ export function destroyMap() {
     mapInitTimers.forEach(clearTimeout);
     mapInitTimers = [];
     clearRoute();
+    stopLiveTracking();
     window.dispatchEvent(new Event('rahe-map-destroy'));
     const mapEl = document.getElementById('map');
     if (mapEl && mapDomClickHandler) mapEl.removeEventListener('click', mapDomClickHandler);
@@ -224,10 +234,52 @@ function getInitialMapView() {
     });
 }
 
-export function setYouMarker(ll) {
+// ═══════════════════════════════════════════════════════════════════════════
+// You marker (with pan/zoom support)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function setYouMarker(ll, options) {
     if (!mapReady || !map) return;
-    if (youMarker) youMarker.setLatLng(ll);
-    else youMarker = L.circleMarker(ll,{radius:8,color:'#fff',weight:2,fillColor:'#00d4ff',fillOpacity:1}).addTo(map).bindPopup('<div class="pp"><div class="pp-title">موقعیت شما</div></div>');
+    const opts = options || {};
+    const { pan = false, zoom = null, fitBounds = null } = opts;
+
+    if (youMarker) {
+        youMarker.setLatLng(ll);
+    } else {
+        youMarker = L.circleMarker(ll, {
+            radius: 8,
+            color: '#fff',
+            weight: 2,
+            fillColor: '#00d4ff',
+            fillOpacity: 1
+        }).addTo(map).bindPopup('<div class="pp"><div class="pp-title">موقعیت شما</div></div>');
+    }
+
+    // fitBounds: اگر آرایه‌ای از نقاط داده شد، روی همه‌ی آن‌ها fit کن
+    if (Array.isArray(fitBounds) && fitBounds.length >= 2) {
+        const bounds = L.latLngBounds(fitBounds);
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        return;
+    }
+
+    // pan و zoom دلخواه
+    if (zoom !== null) {
+        map.setView(ll, zoom, { animate: true, duration: 0.8 });
+    } else if (pan) {
+        map.panTo(ll, { animate: true, duration: 0.6 });
+    }
+}
+
+// چک می‌کند که آیا یک نقطه در محدوده‌ی دید فعلی نقشه است (با حاشیه‌ی اختیاری)
+function isLatLngInView(ll, marginRatio) {
+    if (!mapReady || !map) return false;
+    const bounds = map.getBounds();
+    if (!marginRatio) return bounds.contains(ll);
+    const size = map.getSize();
+    const maxDim = Math.max(size.x, size.y);
+    const pad = marginRatio;
+    const inner = bounds.pad(-pad);
+    return inner.contains(ll);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -493,7 +545,7 @@ export function onMapClick(e) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Locate user
+// Locate user (one-shot)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function locateUser(fly) {
@@ -505,6 +557,110 @@ export function locateUser(fly) {
         if (fly) map.flyTo(ll, 14, { duration: 1.2 });
         else map.flyTo(ll, 13, { duration: 1.5 });
     }, () => { if (fly && mapReady) mapHint('دسترسی به موقعیت داده نشد'); }, { timeout: 8000 });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Live tracking (ردیابی آنلاین)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function startLiveTracking() {
+    if (liveTrackActive) return;
+    if (!mapReady || !navigator.geolocation) {
+        mapHint('موقعیت‌یابی در دسترس نیست');
+        return;
+    }
+
+    liveTrackActive = true;
+    lastAcceptedTime = 0;
+    liveTrackingFirstFix = true;
+
+    const btn = document.getElementById('liveTrackBtn');
+    if (btn) {
+        btn.classList.add('active');
+        btn.textContent = '⏹ توقف ردیابی';
+    }
+
+    mapHint('ردیابی آنلاین فعال شد — موقعیت هر ۵ ثانیه به‌روز می‌شود', 4000);
+
+    liveWatchId = navigator.geolocation.watchPosition(
+        position => {
+            if (!liveTrackActive || !mapReady || !map) return;
+
+            const now = Date.now();
+            if (now - lastAcceptedTime < LIVE_TRACK_MIN_INTERVAL_MS) {
+                return;
+            }
+            lastAcceptedTime = now;
+
+            const ll = [position.coords.latitude, position.coords.longitude];
+
+            if (liveTrackingFirstFix) {
+                liveTrackingFirstFix = false;
+
+                // اگر مسیر فعال است، هم موقعیت و هم مقصد را در دید بگیر
+                if (call('hasActiveRoute')) {
+                    const dest = call('getActiveRouteDestination');
+                    if (dest && Number.isFinite(dest.lat) && Number.isFinite(dest.lng)) {
+                        setYouMarker(ll, {
+                            fitBounds: [ll, [dest.lat, dest.lng]]
+                        });
+                    } else {
+                        setYouMarker(ll, { zoom: 15 });
+                    }
+                } else {
+                    setYouMarker(ll, { zoom: 15 });
+                }
+            } else {
+                // آپدیت‌های بعدی: فقط اگر موقعیت خارج از دید است، pan کن
+                if (!isLatLngInView(ll, 0.15)) {
+                    setYouMarker(ll, { pan: true });
+                } else {
+                    setYouMarker(ll);
+                }
+            }
+
+            // اطلاع به سایر ماژول‌ها (route-ui برای به‌روزرسانی مسیر)
+            const event = new CustomEvent('rahe-live-position', {
+                detail: { lat: ll[0], lng: ll[1] }
+            });
+            window.dispatchEvent(event);
+        },
+        error => {
+            if (error.code === 1) {
+                mapHint('دسترسی به موقعیت مکانی رد شد');
+                stopLiveTracking();
+            }
+        },
+        {
+            enableHighAccuracy: false,
+            maximumAge: 5000,
+            timeout: 15000
+        }
+    );
+}
+
+export function stopLiveTracking() {
+    if (!liveTrackActive) return;
+    liveTrackActive = false;
+    liveTrackingFirstFix = true;
+
+    if (liveWatchId !== null) {
+        navigator.geolocation.clearWatch(liveWatchId);
+        liveWatchId = null;
+    }
+    lastAcceptedTime = 0;
+
+    const btn = document.getElementById('liveTrackBtn');
+    if (btn) {
+        btn.classList.remove('active');
+        btn.textContent = '📡 ردیابی آنلاین';
+    }
+
+    mapHint('ردیابی آنلاین متوقف شد');
+}
+
+export function isLiveTrackingActive() {
+    return liveTrackActive;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

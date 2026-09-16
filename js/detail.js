@@ -4,7 +4,7 @@
 import { state, toFa, uid, escapeHtml, debounce, showConfirmModal, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
-import { faShort, hasSessionAt } from './sessions.js';
+import { faShort, hasSessionAt, parseFaDateTime } from './sessions.js';
 import {
     ensureMapVisible,
     switchToTab,
@@ -21,6 +21,11 @@ import { openPicker } from './picker.js';
 
 let timerTick = null;
 let saveHintTimer = null;
+
+// smart suggest state (مخصوص صفحه‌ی جزئیات)
+let detailSmartTimer = null;
+let detailSmartDismissedFor = { fTitle: '', fDesc: '' };
+let detailSmartTargetId = null;
 
 // callback registry برای توابعی که نمی‌توانیم import کنیم (circular)
 const _callbacks = {
@@ -61,6 +66,77 @@ function flashSaved(msg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Smart suggest تاریخ (در صفحه‌ی جزئیات)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function hideDetailSmart() {
+    const chip = document.getElementById('detailSmartChip');
+    if (chip) chip.style.display = 'none';
+    detailSmartTargetId = null;
+}
+
+function resetDetailSmart() {
+    detailSmartDismissedFor = { fTitle: '', fDesc: '' };
+    hideDetailSmart();
+    clearTimeout(detailSmartTimer);
+    detailSmartTimer = null;
+}
+
+function maybeSuggestDueInDetail(value, targetId) {
+    const v = (value || '').trim();
+    hideDetailSmart();
+
+    if (!v || v === detailSmartDismissedFor[targetId]) return;
+
+    const iso = parseFaDateTime(v, getNow());
+    if (!iso) return;
+
+    const task = getDetailTask();
+    if (!task) return;
+    if (hasSessionAt(task.sessions, iso)) return;
+
+    detailSmartTargetId = targetId;
+    const sourceLabel = targetId === 'fDesc' ? 'توضیح' : 'عنوان';
+    const textEl = document.getElementById('detailSmartChipText');
+    if (textEl) textEl.textContent = `📅 پیشنهاد از ${sourceLabel}: ${faShort(iso)}`;
+    const chip = document.getElementById('detailSmartChip');
+    if (chip) chip.style.display = 'flex';
+
+    const acceptBtn = document.getElementById('detailSmartAccept');
+    const dismissBtn = document.getElementById('detailSmartDismiss');
+
+    if (acceptBtn) {
+        acceptBtn.onclick = () => {
+            const t = getDetailTask();
+            if (!t) { hideDetailSmart(); return; }
+            if (hasSessionAt(t.sessions, iso)) { hideDetailSmart(); return; }
+            t.sessions.push({ id: uid(), at: iso });
+            saveTasks();
+            renderDetailSessions();
+            call('render');
+            const focusTarget = document.getElementById(detailSmartTargetId || 'fTitle');
+            hideDetailSmart();
+            if (focusTarget) focusTarget.focus();
+            flashSaved('سررسید اضافه شد');
+        };
+    }
+    if (dismissBtn) {
+        dismissBtn.onclick = () => {
+            detailSmartDismissedFor[targetId] = v;
+            hideDetailSmart();
+        };
+    }
+}
+
+function attachDetailSmartSuggest(el, targetId) {
+    if (!el) return;
+    el.addEventListener('input', () => {
+        clearTimeout(detailSmartTimer);
+        detailSmartTimer = setTimeout(() => maybeSuggestDueInDetail(el.value, targetId), 400);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Open / Close
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -73,6 +149,9 @@ export function openDetail(id) {
     state.currentDetailId = id;
     const task = getDetailTask();
     if (!task) return;
+
+    // ریست smart suggest برای این وظیفه
+    resetDetailSmart();
 
     document.getElementById('detailTitle').textContent = (task.kind === 'plan' ? '📁 ' : '') + task.text;
     document.getElementById('fTitle').value = task.text;
@@ -159,8 +238,6 @@ function updateUrlLink() {
     const link = document.getElementById('fUrlOpen');
     const copy = document.getElementById('fUrlCopy');
     const task = getDetailTask();
-    // از همان sanitizeUrl استفاده می‌کنیم تا دقیقاً همان مقداری که ذخیره می‌شود،
-    // در لینک و کپی نمایش داده شود. اگر نامعتبر باشد، null برمی‌گرداند.
     const safe = task ? sanitizeUrl(task.url || '') : '';
     if (!safe) {
         link.style.display = 'none';
@@ -190,12 +267,14 @@ function updateCallBtn() {
 // Sessions
 // ═══════════════════════════════════════════════════════════════════════════
 
-function renderDetailSessions() {
+export function renderDetailSessions() {
     const task = getDetailTask();
     if (!task) return;
     const list = [...(task.sessions || [])].sort((a, b) => new Date(a.at) - new Date(b.at));
-    document.getElementById('sessCount').textContent = list.length > 0 ? `(${toFa(list.length)})` : '';
+    const countEl = document.getElementById('sessCount');
+    if (countEl) countEl.textContent = list.length > 0 ? `(${toFa(list.length)})` : '';
     const el = document.getElementById('sessList');
+    if (!el) return;
     if (list.length === 0) {
         el.innerHTML = '<div class="session-empty">هنوز جلسه‌ای ثبت نشده است.</div>';
         return;
@@ -248,8 +327,11 @@ function renderDetailPhotos() {
     const task = getDetailTask();
     if (!task) return;
     const list = task.photos || [];
-    document.getElementById('photoCount').textContent = list.length ? `(${toFa(list.length)})` : '';
-    document.getElementById('photoGrid').innerHTML = list.length ? list.map(p => `
+    const countEl = document.getElementById('photoCount');
+    if (countEl) countEl.textContent = list.length ? `(${toFa(list.length)})` : '';
+    const grid = document.getElementById('photoGrid');
+    if (!grid) return;
+    grid.innerHTML = list.length ? list.map(p => `
         <div class="photo-thumb">
             <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="تصویر وظیفه" loading="lazy">
             <button data-photo-del="${escapeHtml(String(p.id))}" aria-label="حذف عکس">✕</button>
@@ -281,8 +363,10 @@ function faDuration(sec) {
 function renderTimer() {
     const task = getDetailTask();
     if (!task) return;
-    document.getElementById('timerLabel').textContent = faDuration(currentSpent(task));
-    document.getElementById('timerToggle').textContent = task.timerStartedAt ? '⏸ توقف' : '▶ شروع';
+    const labelEl = document.getElementById('timerLabel');
+    if (labelEl) labelEl.textContent = faDuration(currentSpent(task));
+    const toggleEl = document.getElementById('timerToggle');
+    if (toggleEl) toggleEl.textContent = task.timerStartedAt ? '⏸ توقف' : '▶ شروع';
 }
 
 function toggleTimer() {
@@ -309,14 +393,22 @@ function renderRecurRows() {
     const task = getDetailTask();
     if (!task) return;
     const r = task.recur;
-    document.getElementById('fRecurNRow').style.display = (r === 'custom' || r === 'hourly') ? '' : 'none';
-    document.getElementById('fRecurWeekRow').style.display = r === 'weeklyDays' ? '' : 'none';
-    document.getElementById('fRecurMonthRow').style.display = r === 'monthlyDays' ? '' : 'none';
-    document.querySelector('#fRecurNRow .field-label').textContent = r === 'hourly' ? 'هر چند ساعت؟' : 'هر چند روز؟';
+    const nRow = document.getElementById('fRecurNRow');
+    if (nRow) nRow.style.display = (r === 'custom' || r === 'hourly') ? '' : 'none';
+    const weekRow = document.getElementById('fRecurWeekRow');
+    if (weekRow) weekRow.style.display = r === 'weeklyDays' ? '' : 'none';
+    const monthRow = document.getElementById('fRecurMonthRow');
+    if (monthRow) monthRow.style.display = r === 'monthlyDays' ? '' : 'none';
+
+    const nLabel = document.querySelector('#fRecurNRow .field-label');
+    if (nLabel) nLabel.textContent = r === 'hourly' ? 'هر چند ساعت؟' : 'هر چند روز؟';
+
     const nInp = document.getElementById('fRecurN');
-    nInp.max = r === 'hourly' ? 168 : 365;
+    if (nInp) nInp.max = r === 'hourly' ? 168 : 365;
+
     const wc = document.getElementById('fRecurWeekChips');
     if (wc) wc.innerHTML = WEEK_ORDER.map(([name, v]) => `<button type="button" class="day-chip${(task.recurDays || []).includes(v) ? ' on' : ''}" data-wday="${v}">${name}</button>`).join('');
+
     const mc = document.getElementById('fRecurMonthChips');
     if (mc) {
         let mhtml = '';
@@ -379,8 +471,6 @@ const debouncedSaveAddr = debounce(() => {
 const debouncedSaveUrl = debounce(() => {
     const task = getDetailTask();
     if (!task) return;
-    // sanitizeUrl هم اعتبارسنجی می‌کند و هم استاندارد می‌کند (https:// اضافه می‌کند)
-    // اگر نامعتبر باشد، رشته خالی برمی‌گرداند.
     task.url = sanitizeUrl(document.getElementById('fUrl').value);
     updateUrlLink();
     saveTasks();
@@ -406,7 +496,6 @@ export function bindDetailInputs() {
     document.getElementById('fPhone').addEventListener('input', e => {
         const v = e.target.value.trim();
         const err = document.getElementById('fPhoneError');
-        // validation فوری (چون خطا باید سریع دیده شود)
         if (v && !/^[0-9+\-\s()]{5,20}$/.test(v)) {
             err.textContent = 'شماره تلفن معتبر نیست';
             return;
@@ -421,6 +510,11 @@ export function bindDetailInputs() {
     document.getElementById('fUrl').addEventListener('input', () => {
         debouncedSaveUrl();
     });
+
+    // اتصال smart suggest تاریخ به فیلدهای عنوان و توضیح
+    attachDetailSmartSuggest(document.getElementById('fTitle'), 'fTitle');
+    attachDetailSmartSuggest(document.getElementById('fDesc'), 'fDesc');
+
     document.getElementById('addSessionBtn').addEventListener('click', () => {
         openPicker('session', iso => {
             const task = getDetailTask();
@@ -444,7 +538,6 @@ export function bindDetailInputs() {
             state.pendingReturnDetail = state.currentDetailId;
             ensureMapVisible();
             switchToTab('map');
-            // روی موبایل، صفحه جزئیات مخفی شود تا کاربر نقشه را ببیند
             if (window.matchMedia('(max-width: 900px)').matches) {
                 const pageEl = document.getElementById('detailPage');
                 if (pageEl) pageEl.style.display = 'none';

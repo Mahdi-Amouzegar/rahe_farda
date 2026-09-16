@@ -3,7 +3,7 @@
 <html lang="fa" dir="rtl" data-lang="fa">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن. بدون حساب کاربری، حتی آفلاین.">
     <meta name="theme-color" content="#f0f3f8">
@@ -32,7 +32,6 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <link rel="icon" href="./icons/favicon-32.ico" sizes="32x32">
   <link rel="icon" type="image/png" sizes="96x96" href="./icons/favicon-96x96.png">
-  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg">
 
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/components.css">
@@ -152,7 +151,7 @@
                                     </div>
                                     <div id="seriesSubHours" style="display: none;">
                                         <div class="chip-row" style="margin-bottom: 8px;">
-                                            <button type="button" class="day-chip" data-snh="2">��</button>
+                                            <button type="button" class="day-chip" data-snh="2">۲</button>
                                             <button type="button" class="day-chip" data-snh="4">۴</button>
                                             <button type="button" class="day-chip" data-snh="6">۶</button>
                                             <button type="button" class="day-chip" data-snh="8">۸</button>
@@ -277,9 +276,19 @@
                     <span class="map-title">🗺 نقشه محل وظایف</span>
                     <div class="map-head-actions">
                         <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
+                        <button class="btn-small" id="liveTrackBtn" type="button" aria-label="ردیابی موقعیت آنلاین" title="ردیابی موقعیت آنلاین">📡 ردیابی آنلاین</button>
                         <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
                         <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
                     </div>
+                </div>
+                <div class="map-search">
+                    <div class="map-search-row">
+                        <span class="map-search-icon" aria-hidden="true">🔍</span>
+                        <input type="search" id="mapSearchInput" placeholder="جستجوی مکان، آدرس، شهر..." autocomplete="off" aria-label="جستجوی مکان">
+                        <button class="btn-icon mic-btn map-search-mic" type="button" data-mic-target="mapSearchInput" aria-label="ورود صوتی برای جستجو">🎤</button>
+                        <button class="map-search-clear" id="mapSearchClear" type="button" aria-label="پاک کردن جستجو" style="display: none;">✕</button>
+                    </div>
+                    <div class="map-search-results" id="mapSearchResults" style="display: none;"></div>
                 </div>
                 <div class="map-wrap">
                     <div id="map" aria-label="نقشه"></div>
@@ -312,6 +321,11 @@
                         <label class="field"><span class="field-label">توضیح بیشتر</span><textarea id="fDesc" rows="3" maxlength="1000" placeholder="مثلاً نام پزشک، علت مراجعه..."></textarea></label>
                     </div>
                 </section>
+                <div class="smart-chip detail-smart-chip" id="detailSmartChip" style="display: none;">
+                    <span id="detailSmartChipText"></span>
+                    <button id="detailSmartAccept" type="button">✓ اضافه کن</button>
+                    <button id="detailSmartDismiss" type="button" aria-label="بی‌خیال">✕</button>
+                </div>
                 <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها <span class="count-badge" id="sessCount" aria-label="تعداد جلسه‌ها"></span></h3></div><span class="detail-section-status">فعال</span></div>
                     <div class="detail-section-body detail-accordion-body">
@@ -348,7 +362,7 @@
                     </div>
                 </section>
                 <section class="detail-section detail-accordion photos" data-detail-section="photos" aria-labelledby="detailPhotosTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک</h3></div><span class="detail-section-status">اختیاری</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک <span class="count-badge" id="photoCount" aria-label="تعداد تصاویر"></span></h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
                         <div class="field"><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
                     </div>
@@ -424,7 +438,7 @@
     <div class="picker-overlay" id="calOverlay" style="display: none;">
         <div class="picker cal-wide" role="dialog" aria-modal="true" aria-label="تقویم جلسات">
             <div class="picker-title">📅 تقویم جلسات</div>
-            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" aria-label="ماه قبل">›</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" aria-label="ماه بعد">‹</button></div>
+            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" aria-label="ماه قبل">‹</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" aria-label="ماه بعد">›</button></div>
             <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
             <div class="picker-days" id="calDays"></div>
             <div class="picker-actions"><button class="btn-clear" id="calClose">بستن</button></div>
