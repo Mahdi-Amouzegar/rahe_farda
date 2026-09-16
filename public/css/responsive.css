@@ -137,8 +137,12 @@
     /* ═══ Mobile: App Shell ═══ */
     @media (max-width: 900px) {
         .app-shell {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-flow-container {
+            display: contents;
         }
 
         .right-flow {
@@ -146,23 +150,30 @@
         }
 
         .app-shell .header {
-            grid-row: 1;
+            order: 1;
         }
 
         .app-shell .mobile-tabs {
-            grid-row: 2;
+            order: 2;
         }
 
         .app-shell .layout {
-            grid-row: 3;
+            order: 3;
         }
 
         .app-shell #panelMap {
-            grid-row: 4;
+            order: 4;
         }
 
         .app-shell .app-footer {
-            grid-row: 5;
+            order: 5;
+        }
+
+        /* مودال‌ها همیشه بالا و fixed بمانند */
+        .app-shell .picker-overlay,
+        .app-shell .settings-overlay {
+            order: 0;
+            position: fixed;
         }
 
         body.map-hidden .mobile-tabs {

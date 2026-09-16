@@ -11,6 +11,7 @@ import {
     fmtDur,
     getMap,
     getMapReady,
+    getYouMarker,
     setYouMarker
 } from './map.js';
 
@@ -40,6 +41,7 @@ let mapClickBoundTo = null;
 let clearButtonBound = false;
 let mapCaptureBound = false;
 let summaryHidden = false; // آیا پنل route-summary پنهان است؟
+let liveRouteUpdateTimer = null; // debounce برای به‌روزرسانی مسیر در حالت ردیابی آنلاین
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -122,6 +124,8 @@ function hideActiveLayer() {
 function clearMapRoute() {
     clearTimeout(clearTimer);
     clearTimer = null;
+    clearTimeout(liveRouteUpdateTimer);
+    liveRouteUpdateTimer = null;
     if (controller) {
         controller.abort();
         controller = null;
@@ -143,20 +147,24 @@ function hideSummaryOnly() {
     removeSummary();
 }
 
-function drawRoute(key, fit = true) {
+function drawRoute(key, fit = true, showSummary = true) {
     const map = getMap();
     if (!activeRoutes || !activeRoutes[key] || !map) return;
     const route = activeRoutes[key];
     const profile = PROFILES.find(p => p.key === key) || PROFILES[0];
     hideActiveLayer();
     activeKey = key;
-    summaryHidden = false; // با رسم مجدد، پنل باید دیده شود
+    if (showSummary) {
+        summaryHidden = false;
+    }
     activeLayer = L.polyline(
         route.geometry.coordinates.map(c => [c[1], c[0]]),
         { color: profile.color, weight: 5, opacity: .95, lineCap: 'round', lineJoin: 'round' }
     ).addTo(map);
     if (fit) map.flyToBounds(activeLayer.getBounds().pad(.2), { duration: .8 });
-    renderSummary();
+    if (showSummary) {
+        renderSummary();
+    }
 }
 
 function renderSummary() {
@@ -249,6 +257,78 @@ async function showRouteTo(taskId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Live route update (وقتی ردیابی آنلاین فعال است)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function updateActiveRoute() {
+    // اگر مسیری فعال نیست، کاری نکن
+    if (!activeRoutes || !activeTask || !activeTask.location) return;
+
+    const map = getMap();
+    if (!map || !getMapReady()) return;
+
+    // موقعیت فعلی کاربر را از marker زنده بگیر
+    const youMarker = getYouMarker();
+    if (!youMarker) return;
+    const ll = youMarker.getLatLng();
+
+    const origin = { lat: ll.lat, lng: ll.lng };
+    const destination = activeTask.location;
+
+    // ذخیره‌ی حالت فعلی (کدام profile فعال بود)
+    const currentKey = activeKey;
+    const currentFit = false;  // در حالت live، نقشه نباید دوباره fit شود
+
+    // محاسبه‌ی مجدد مسیرها
+    if (controller) {
+        controller.abort();
+        controller = null;
+    }
+    controller = new AbortController();
+    const localController = controller;
+
+    const results = {};
+    try {
+        for (const profile of PROFILES) {
+            if (localController.signal.aborted) return;
+            try {
+                results[profile.key] = await fetchRoute(profile, origin, destination, localController.signal);
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+                results[profile.key] = null;
+            }
+        }
+
+        if (localController.signal.aborted || !getMap() || !getMapReady()) return;
+
+        activeRoutes = results;
+        if (!activeRoutes[currentKey]) {
+            activeKey = results.car ? 'car' : (results.bike ? 'bike' : 'foot');
+        } else {
+            activeKey = currentKey;
+        }
+        if (!activeRoutes[activeKey]) return;
+
+        drawRoute(activeKey, currentFit, !summaryHidden);
+
+    } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        // silent fail — مسیر قدیمی روی نقشه می‌ماند
+    } finally {
+        if (controller === localController) controller = null;
+    }
+}
+
+// گوش دادن به رویداد موقعیت زنده از map.js
+window.addEventListener('rahe-live-position', () => {
+    // debounce برای جلوگیری از محاسبه‌ی مکرر
+    clearTimeout(liveRouteUpdateTimer);
+    liveRouteUpdateTimer = setTimeout(() => {
+        updateActiveRoute();
+    }, 800);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Binding
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -319,7 +399,11 @@ function init() {
     bindClearButton();
     bindMapInstance();
     window.addEventListener('rahe-map-ready', bindMapInstance);
-    window.addEventListener('rahe-map-destroy', () => clearMapRoute());
+    window.addEventListener('rahe-map-destroy', () => {
+        clearTimeout(liveRouteUpdateTimer);
+        liveRouteUpdateTimer = null;
+        clearMapRoute();
+    });
 }
 
 if (document.readyState === 'loading') {
@@ -328,4 +412,17 @@ if (document.readyState === 'loading') {
     init();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Public API
+// ═══════════════════════════════════════════════════════════════════════════
+
 export { showRouteTo, clearMapRoute };
+
+// برای map.js در چرخه‌ی live tracking
+export function hasActiveRoute() {
+    return Boolean(activeRoutes && activeTask && activeTask.location);
+}
+
+export function getActiveRouteDestination() {
+    return activeTask && activeTask.location ? activeTask.location : null;
+}

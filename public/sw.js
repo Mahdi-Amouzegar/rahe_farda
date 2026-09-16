@@ -31,8 +31,11 @@
 //   v1.1.2.0-2026-09-11 — فاز ۵-د: تقسیم CSS به ۶ فایل منطقی + دکمه‌های done-actions کنار هم
 //   v1.1.2.1-2026-09-12 — فاز ۶-ب: Refactor ESM + Vite + Vitest
 //   v1.2.0.0-2026-09-12 — فاز ۷: حذف کامل shim‌ها + refactor نهایی ESM + Vite build
+//   v1.2.0.1-2026-09-16 — فاز ۷-الف: حذف favicon.svg (۳MB) + پاکسازی ارجاع‌ها
+//   v1.2.0.2-2026-09-16 — فاز ۷-ب: افزودن جستجوی مکان با Nominatim (map-search.js) + دکمه میکروفن
+//   v1.3.0.0-2026-09-16 — فاز ۸: ردیابی آنلاین، حالت پیشرفته، بهبود چیدمان موبایل، رفع باگ‌ها
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.2.0.0-2026-09-12';
+const CACHE = 'rahefarda-v1.3.0.0-2026-09-16';
 
 // فایل‌ها بدون query-string (?v=N) کش می‌شوند.
 // networkFirst + ignoreSearch تضمین می‌کند همیشه نسخه درست لود شود:
@@ -55,8 +58,7 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.ico',
-  './icons/favicon-96x96.png',
-  './icons/favicon.svg'
+  './icons/favicon-96x96.png'
 ];
 
 self.addEventListener('notificationclick', e => {

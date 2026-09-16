@@ -66,7 +66,10 @@ import {
     setPickMarker,
     removePickMarker,
     flyToTask,
-    registerMapCallbacks
+    registerMapCallbacks,
+    startLiveTracking,
+    stopLiveTracking,
+    isLiveTrackingActive
 } from './map.js';
 import {
     startReminderLoop,
@@ -109,7 +112,20 @@ import {
     isRelocateActive,
     registerLocationCallbacks
 } from './location-ui.js';
-import { showRouteTo, clearMapRoute } from './route-ui.js';
+import {
+    showRouteTo,
+    clearMapRoute,
+    hasActiveRoute,
+    getActiveRouteDestination
+} from './route-ui.js';
+import { initMapSearch } from './map-search.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// State داخلی ماژول (جایگزین window.__dueHome)
+// ═══════════════════════════════════════════════════════════════════════════
+// نگه‌داشتن محل اصلی dueChips تا وقتی در حالت series/dates جابه‌جا می‌شود،
+// بتوانیم آن را به جای اولش برگردانیم.
+const _dueHome = { p: null, n: null };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Register callbacks (به جای shim‌های window.X)
@@ -145,6 +161,8 @@ registerMapCallbacks({
     hideMobilePickBanner: hideMobileBanner,
     isRelocateLocationActive: isRelocateActive,
     clearMapRoute,
+    hasActiveRoute,
+    getActiveRouteDestination,
 });
 
 // برای detail.js
@@ -189,6 +207,14 @@ document.getElementById('locChip').addEventListener('click', e => {
     refreshSavedLocationUI();
 });
 document.getElementById('myLocBtn').addEventListener('click', () => { ensureMapVisible(); locateUser(true); });
+document.getElementById('liveTrackBtn').addEventListener('click', () => {
+    ensureMapVisible();
+    if (isLiveTrackingActive()) {
+        stopLiveTracking();
+    } else {
+        startLiveTracking();
+    }
+});
 document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('fsExit').addEventListener('click', toggleFullscreen);
 document.getElementById('routeClearBtn').addEventListener('click', clearRoute);
@@ -247,9 +273,10 @@ function updateDueRow() {
     const dc = document.getElementById('dueChips');
     const slot = document.getElementById('dueChipsSlot');
     if (dc && slot) {
-        if (isDates) slot.appendChild(dc);
-        else if (window.__dueHome && dc.parentElement !== window.__dueHome.p) {
-            window.__dueHome.p.insertBefore(dc, window.__dueHome.n);
+        if (isDates) {
+            slot.appendChild(dc);
+        } else if (_dueHome.p && dc.parentElement !== _dueHome.p) {
+            _dueHome.p.insertBefore(dc, _dueHome.n);
         }
     }
 }
@@ -543,11 +570,8 @@ function applyTheme(theme) {
     html.classList.add(cls);
     if (body) body.classList.add(cls);
 
-    // اعمال color-scheme به صورت inline (مهم برای WebView)
     html.style.colorScheme = effective;
 
-    // ⚠️ مهم: در TWA، رنگ پس‌زمینه body را هم مستقیم ست کن
-    // چون WebView ممکن است CSS Variables را درست اعمال نکند
     if (body) {
         if (effective === 'light') {
             body.style.backgroundColor = '#f0f3f8';
@@ -736,10 +760,26 @@ function initSystemPermissions() {
 }
 
 function applyProMode() {
-    if (state.prefs.proMode) {
+    const on = state.prefs.proMode === true;
+    document.body.classList.toggle('pro-mode', on);
+
+    if (on) {
+        // در حالت پیشرفته، همه‌ی برنامه‌ها را باز کن
         state.tasks.forEach(t => { if (t.kind === 'plan') state.expandedPlans.add(String(t.id)); });
         render();
+        return;
     }
+
+    // در حالت ساده، فیلترها و مرتب‌سازی را ریست کن
+    state.selectedDay = null;
+    state.currentFilter = 'all';
+    state.currentSort = 'newest';
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === 'all');
+    });
+    const sortSel = document.getElementById('sortSelect');
+    if (sortSel) sortSel.value = 'newest';
+    render();
 }
 
 // PWA: نصب به‌عنوان اپلیکیشن
@@ -1163,35 +1203,76 @@ taskList.addEventListener('dragend', () => {
     taskList.querySelectorAll('.drop-target,.dragging').forEach(el => el.classList.remove('drop-target', 'dragging'));
 });
 
-// پیشنهاد هوشمند تاریخ
+// ═══════════════════════════════════════════════════════════════════════════
+// پیشنهاد هوشمند تاریخ — مشترک بین تایپ، میکروفون، و توضیحات
+// ═══════════════════════════════════════════════════════════════════════════
+
 let smartTimer = null;
-let smartDismissedFor = '';
+// هر فیلد جداگانه رد شدن خودش را نگه می‌دارد
+let smartDismissedFor = { taskInput: '', descInput: '' };
+let smartTargetId = null;
+
 const hideSmart = () => {
-    document.getElementById('smartChip').style.display = 'none';
+    const chip = document.getElementById('smartChip');
+    if (chip) chip.style.display = 'none';
+    smartTargetId = null;
 };
-input.addEventListener('input', () => {
-    clearTimeout(smartTimer);
-    smartTimer = setTimeout(() => {
-        const v = input.value.trim();
+
+/**
+ * بررسی می‌کند که آیا متن داده‌شده شامل یک الگوی زمانی است.
+ * اگر بله، smart chip را نمایش می‌دهد.
+ * @param {string} value - متن برای بررسی
+ * @param {string} targetId - id المان مبدأ ('taskInput' یا 'descInput')
+ */
+function maybeSuggestDue(value, targetId) {
+    const v = (value || '').trim();
+    hideSmart();
+
+    // اگر کاربر این متن را قبلاً رد کرده، دوباره پیشنهاد نده
+    if (!v || v === smartDismissedFor[targetId]) return;
+
+    // در حالت «برنامه»، پیشنهاد تاریخ منطقی نیست
+    if (state.pendingKind === 'plan') return;
+
+    // در حالت «دوره»، فقط اگر نوع «تاریخ سررسید» باشد پیشنهاد بده
+    if (state.pendingKind === 'series' && state.seriesType !== 'dates') return;
+
+    const iso = parseFaDateTime(v, getNow());
+    if (!iso) return;
+
+    // اگر این تاریخ از قبل در draft sessions هست، دوباره پیشنهاد نده
+    if (state.addDraftSessions.some(s => Math.abs(new Date(s.at).getTime() - new Date(iso).getTime()) < 60000)) return;
+
+    smartTargetId = targetId;
+    const sourceLabel = targetId === 'descInput' ? 'توضیح' : 'عنوان';
+    document.getElementById('smartChipText').textContent = `📅 پیشنهاد از ${sourceLabel}: ${faShort(iso)}`;
+    document.getElementById('smartChip').style.display = 'flex';
+
+    document.getElementById('smartAccept').onclick = () => {
+        state.addDraftSessions.push({ id: uid(), at: iso });
+        updateDueChips();
+        const target = document.getElementById(smartTargetId || 'taskInput');
         hideSmart();
-        if (!v || v === smartDismissedFor || state.pendingKind === 'plan') return;
-        const iso = parseFaDateTime(v, getNow());
-        if (!iso) return;
-        if (state.addDraftSessions.some(s => Math.abs(new Date(s.at).getTime() - new Date(iso).getTime()) < 60000)) return;
-        document.getElementById('smartChipText').textContent = `📅 پیشنهاد: ${faShort(iso)}`;
-        document.getElementById('smartChip').style.display = 'flex';
-        document.getElementById('smartAccept').onclick = () => {
-            state.addDraftSessions.push({ id: uid(), at: iso });
-            updateDueChips();
-            hideSmart();
-            input.focus();
-        };
-        document.getElementById('smartDismiss').onclick = () => {
-            smartDismissedFor = v;
-            hideSmart();
-        };
-    }, 400);
-});
+        if (target) target.focus();
+    };
+    document.getElementById('smartDismiss').onclick = () => {
+        smartDismissedFor[targetId] = v;
+        hideSmart();
+    };
+}
+
+/**
+ * یک شنونده‌ی ورودی «debounced» را به یک input متصل می‌کند.
+ * @param {HTMLInputElement} el
+ * @param {string} targetId
+ */
+function attachSmartSuggest(el, targetId) {
+    if (!el) return;
+    el.addEventListener('input', () => {
+        clearTimeout(smartTimer);
+        smartTimer = setTimeout(() => maybeSuggestDue(el.value, targetId), 400);
+    });
+}
 
 // پر کردن انتخاب‌های ساعت و دقیقه
 (function initTimeSelects() {
@@ -1225,9 +1306,12 @@ try {
 
 bindDetailInputs();
 loadPrefs();
-(function () {
+(function initDueHome() {
     const dc = document.getElementById('dueChips');
-    if (dc) window.__dueHome = { p: dc.parentElement, n: dc.nextElementSibling };
+    if (dc) {
+        _dueHome.p = dc.parentElement;
+        _dueHome.n = dc.nextElementSibling;
+    }
 })();
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
@@ -1248,6 +1332,12 @@ if (window.matchMedia('(min-width: 901px)').matches && !state.prefs.tourSeen) {
 initSettings();
 applyMapVisibility();
 applyDisplaySettings();
+applyProMode();
+
+// اتصال پیشنهاد هوشمند تاریخ به هر دو ورودی
+attachSmartSuggest(input, 'taskInput');
+attachSmartSuggest(document.getElementById('descInput'), 'descInput');
+
 loadTasks().then(async () => {
     await loadTrash();
     if (state.prefs.proMode) state.tasks.forEach(t => { if (t.kind === 'plan') state.expandedPlans.add(String(t.id)); });
@@ -1256,14 +1346,19 @@ loadTasks().then(async () => {
     render();
     renderTrash();
     initMap();
+    initMapSearch();
     syncServerTime();
     startReminderLoop();
 });
 
-// برای دسترسی از کنسول (debug)
-window.TodoApp = {
-    getState: () => state,
-    findTask,
-    saveTasks,
-    render
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// Debug-only global (در build نهایی حذف می‌شود)
+// ═══════════════════════════════════════════════════════════════════════════
+if (import.meta.env.DEV) {
+    window.TodoApp = {
+        getState: () => state,
+        findTask,
+        saveTasks,
+        render
+    };
+}
