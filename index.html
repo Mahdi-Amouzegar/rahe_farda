@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://api.open-meteo.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن. بدون حساب کاربری، حتی آفلاین.">
     <meta name="theme-color" content="#f0f3f8">
     <script>
@@ -255,7 +255,8 @@
                                     <span>انجام شده: <span class="num" id="doneCount">۰</span></span>
                                     <span>باقی‌مانده: <span class="num" id="remainCount">۰</span></span>
                                 </div>
-                                <div class="task-list" id="taskList" aria-live="polite"></div>
+                                <div class="task-list" id="taskList"></div>
+                                <div class="live-status" id="taskListStatus" role="status" aria-live="polite"></div>
                                 <div class="done-actions" id="doneActions" style="display: none;">
                                     <button class="btn-clear" id="clearDone" type="button">پاک کردن انجام شده‌ها</button>
                                     <button class="btn-clear" id="archiveDone" type="button">📦 بایگانی انجام‌شده‌ها</button>
@@ -299,7 +300,7 @@
                     <div class="map-search-results" id="mapSearchResults" style="display: none;"></div>
                 </div>
                 <div class="map-wrap">
-                    <div id="map" aria-label="نقشه"></div>
+                    <div id="map" role="application" aria-label="نقشه تعاملی"></div>
                     <div class="map-hint" id="mapHint"></div>
                     <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
                 </div>
@@ -409,7 +410,7 @@
     </section>
 
     <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردانی</button></div>
-    <div class="lightbox" id="lightbox" style="display: none;"><img id="lightboxImg" alt="تصویر وظیفه"></div>
+    <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="نمایش تصویر"><img id="lightboxImg" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-label="خوش آمدید">

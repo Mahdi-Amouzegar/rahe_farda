@@ -128,10 +128,6 @@
             flex: 1 1 auto;
             white-space: normal;
         }
-
-        .child-due {
-            flex-shrink: 0;
-        }
     }
 
     /* ═══ Mobile: App Shell ═══ */
@@ -378,7 +374,7 @@
         }
     }
 
-    /* ═══ Mobile Fixes (از styles.css) ═══ */
+    /* ═══ Mobile Fixes ═══ */
     @media (max-width: 900px) {
         .input-section {
             flex-wrap: nowrap;
@@ -409,6 +405,7 @@
             overflow-wrap: anywhere;
         }
 
+        /* ═══ Child Add Row در موبایل ═══ */
         .child-add {
             flex-wrap: wrap;
         }
@@ -431,61 +428,49 @@
             flex-wrap: wrap;
         }
 
-@media (max-width: 900px) {
-    /* ... سایر قواعد موجود ... */
+        /* ═══ Child Item — تنظیمات موبایل ═══ */
+        .child-item {
+            padding: 10px 12px;
+            gap: 6px;
+        }
 
-    /* ═══ Child Item در موبایل: ۲ سطری ═══ */
-    .child-item {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        padding: 10px 12px;
-    }
+        .child-main-row {
+            gap: 8px;
+        }
 
-    /* wrapperها در موبایل واقعی می‌شوند */
-    .child-main-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-    }
+        .child-text {
+            font-size: 0.85rem;
+        }
 
-    .child-text-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        width: 100%;
-    }
+        .child-actions {
+            gap: 4px;
+        }
 
-    /* ترتیب فرزندان در سطر اول */
-    .child-main-row .task-checkbox {
-        order: 1;
-        flex: 0 0 auto;
-    }
+        .child-actions .operation-trigger {
+            min-width: 44px;
+            min-height: 34px;
+            padding: 4px 8px;
+        }
 
-    .child-main-row .child-due {
-        order: 2;
-        flex: 0 0 auto;
-    }
+        /* در موبایل، عملیات مخفی باشد (فقط ⋯) */
+        .child-actions .operation-trigger span {
+            display: none;
+        }
 
-    .child-main-row .child-actions {
-        order: 3;
-        margin-inline-start: auto;
-        flex: 0 0 auto;
-    }
+        /* متادیتا در موبایل با padding کمتر */
+        .child-meta-row {
+            padding-inline-start: 30px;
+            gap: 6px;
+            font-size: 0.68rem;
+        }
 
-    /* سطر دوم: متن */
-    .child-text-row .child-text {
-        order: 1;
-        flex: 1 1 auto;
-        min-width: 0;
-        width: 100%;
-    }
-}
+        .child-meta-item {
+            font-size: 0.68rem;
+        }
 
-        .child-item .child-text {
-            flex: 1 1 100%;
+        .child-meta-row .priority-badge {
+            padding: 1px 6px;
+            font-size: 0.62rem;
         }
 
         .child-due {
@@ -608,7 +593,6 @@
             flex-wrap: wrap;
         }
 
-        /* دکمه‌های done-actions در موبایل کوچک: عمودی */
         .done-actions {
             flex-direction: column;
             align-items: stretch;
@@ -617,9 +601,32 @@
         .done-actions .btn-clear {
             width: 100%;
         }
+
+        /* ═══ Child Item — موبایل کوچک ═══ */
+        .child-item {
+            padding: 10px 12px;
+        }
+
+        .child-meta-row {
+            padding-inline-start: 0;
+            margin-inline-start: 30px;
+            gap: 5px;
+        }
+
+        .child-meta-row .priority-badge {
+            font-size: 0.62rem;
+            padding: 1px 6px;
+        }
+
+        .child-actions .operation-trigger {
+            min-width: 38px;
+            width: 38px;
+            min-height: 32px;
+            padding: 4px;
+        }
     }
 
-    /* ═══ Create Zone Responsive (از ui-fixes.css) ═══ */
+    /* ═══ Create Zone Responsive ═══ */
     @media (max-width: 900px) {
         #panelTasks {
             padding-bottom: 20px;

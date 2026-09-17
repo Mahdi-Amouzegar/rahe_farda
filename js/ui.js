@@ -38,6 +38,7 @@ import {
     jalaliMonthLength
 } from './jalali.js';
 import { scheduleMarkerRefresh } from './map.js';
+import { getWeatherIcon } from './weather.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -62,6 +63,64 @@ function hasAnyLocation(t) {
     if (t.location) return true;
     if (Array.isArray(t.sessions) && t.sessions.some(s => s && s.location)) return true;
     return false;
+}
+
+/**
+ * بارگذاری غیرهمزمان آیکن هوا برای همه‌ی اسلات‌های موجود در DOM.
+ * بعد از هر render() صدا زده می‌شود.
+ *
+ * این اسلات‌ها توسط sessionSummaryHtml (در sessions.js) و weatherButtonHtml
+ * در childHtml ساخته می‌شوند. کلید = `taskId|at`.
+ *
+ * خود getWeatherIcon کش localStorage دارد (TTL 3 ساعت) پس نیازی به کش
+ * در این لایه نیست.
+ */
+function hydrateWeatherIcons(rootEl) {
+    if (!rootEl) return;
+    const slots = rootEl.querySelectorAll('[data-weather-icon-for]');
+    slots.forEach(slot => {
+        const key = slot.dataset.weatherIconFor;
+        if (!key) return;
+
+        if (slot.dataset.loading === '1') return;
+        slot.dataset.loading = '1';
+
+        const sepIdx = key.indexOf('|');
+        if (sepIdx < 0) {
+            delete slot.dataset.loading;
+            return;
+        }
+        const taskId = key.slice(0, sepIdx);
+        const at = key.slice(sepIdx + 1);
+
+        const found = findTask(taskId);
+        const task = found ? found.task : null;
+        if (!task || !task.location) {
+            slot.textContent = '';
+            return;
+        }
+
+        // ساخت آبجکت موقت برای getWeatherIcon (که task با location و sessions می‌خواهد)
+        const tempTask = {
+            location: task.location,
+            sessions: [{ at }]
+        };
+
+        getWeatherIcon(tempTask)
+            .then(icon => {
+                if (!icon) {
+                    if (slot.isConnected) slot.textContent = '';
+                    return;
+                }
+                if (slot.isConnected) slot.textContent = icon;
+            })
+            .catch(() => {
+                if (slot.isConnected) slot.textContent = '';
+            })
+            .finally(() => {
+                if (slot.isConnected) delete slot.dataset.loading;
+            });
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -383,7 +442,24 @@ function operationMenu(items, label = 'عملیات') {
     </div>`;
 }
 
+/**
+ * ساخت HTML دکمه‌ی هوا با اسلات آیکن.
+ * فقط برای زیرکارها استفاده می‌شود (task اصلی دکمه‌اش را در sessionSummaryHtml دارد).
+ */
+function childWeatherButton(c) {
+    if (!c || !c.location) return '';
+    const n = nearestUpcoming(c);
+    if (!n) return '';
+    const due = new Date(n.at).getTime();
+    if (!Number.isFinite(due)) return '';
+    const daysAhead = (due - Date.now()) / 86400000;
+    if (daysAhead < 0 || daysAhead > 16) return '';
+    const key = `${escapeHtml(String(c.id))}|${escapeHtml(n.at)}`;
+    return `<button type="button" class="weather-icon-btn weather-icon-btn-sm" data-weather-task="${escapeHtml(String(c.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
+}
+
 function childHtml(c) {
+    // حالت ویرایش
     if (String(c.id) === String(state.editingId)) {
         return `<div class="child-item" data-id="${escapeHtml(String(c.id))}">
             <div class="edit-wrap">
@@ -393,16 +469,23 @@ function childHtml(c) {
             </div>
         </div>`;
     }
+
     const n = nearestUpcoming(c);
+    const prioLabel = PRIORITY_LABELS[c.priority] || PRIORITY_LABELS.medium;
+    const hasLoc = Boolean(c.location);
+    const hasPhotos = (c.photos || []).length > 0;
+    const wBtn = childWeatherButton(c);
+    const recur = recurBadge(c, 'child-meta-badge');
+
+    // آیا ردیف متادیتا محتوایی دارد؟
+    const hasMeta = n || hasLoc || hasPhotos || recur || wBtn;
+
     return `<div class="child-item ${c.completed ? 'completed' : ''} ${String(c.id) === String(state.justAddedId) ? 'just-added' : ''}" data-id="${escapeHtml(String(c.id))}">
         <div class="child-main-row">
             <button class="task-checkbox ${c.completed ? 'checked' : ''}" data-action="toggle"
                 aria-label="${c.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
                 aria-pressed="${c.completed}"></button>
-            ${n ? `<span class="child-due">📅 ${faShort(n.at)}</span>` : ''}
-            ${(c.location || (c.sessions || []).some(s => s.location)) ? '<span class="child-due">📍</span>' : ''}
-            ${(c.photos || []).length ? '<span class="child-due">📷</span>' : ''}
-            ${recurBadge(c, 'child-due')}
+            <div class="child-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید">${escapeHtml(c.text)}</div>
             <div class="child-actions">
                 ${operationMenu(state.currentFilter === 'archived'
                     ? [
@@ -418,9 +501,14 @@ function childHtml(c) {
                     ], 'عملیات زیرکار')}
             </div>
         </div>
-        <div class="child-text-row">
-            <span class="child-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید">${escapeHtml(c.text)}</span>
-        </div>
+        ${hasMeta ? `<div class="child-meta-row">
+            <span class="priority-badge p-${c.priority}">${prioLabel}</span>
+            ${recur}
+            ${n ? `<span class="child-meta-item">📅 ${faShort(n.at)}</span>` : ''}
+            ${hasLoc ? '<span class="child-meta-item" title="مکان ثبت شده">📍</span>' : ''}
+            ${hasPhotos ? `<span class="child-meta-item" title="${toFa(c.photos.length)} عکس">📷</span>` : ''}
+            ${wBtn}
+        </div>` : ''}
     </div>`;
 }
 
@@ -474,7 +562,7 @@ function planHtml(task) {
                     <option value="high">زیاد</option>
                 </select>
                 <button class="btn-icon btn-detail" data-action="child-date" aria-label="تعیین سررسید زیرکار">📅</button>
-                <button class="btn-add btn-child-add" data-action="child-add">افزودن</button>
+                <button class="btn-add btn-child-add" data-action="child-add">افزودن زیرکار به برنامه</button>
             </div>
         </div>` : ''}
     </div>`;
@@ -614,6 +702,7 @@ export function render() {
                 ${state.tasks.length === 0 && !state.searchQuery ? '<p class="empty-hint">برای شروع عنوان را بنویسید و «افزودن» را بزنید — با 📅 تاریخ و با 📍 محل هم می‌توانید اضافه کنید.</p>' : ''}
             </div>`;
         state.justAddedId = null;
+        updateTaskListStatus('');
         return;
     }
 
@@ -669,7 +758,21 @@ export function render() {
         </div>`;
     }).join('');
 
+    // بارگذاری غیرهمزمان آیکن‌های هوا
+    hydrateWeatherIcons(taskList);
+
+    // به‌روزرسانی ناحیه‌ی status برای screen reader
+    updateTaskListStatus(`${filtered.length} مورد نمایش داده می‌شود`);
+
     state.justAddedId = null;
+}
+
+/**
+ * به‌روزرسانی ناحیه‌ی aria-live (برای screen reader).
+ */
+function updateTaskListStatus(msg) {
+    const el = document.getElementById('taskListStatus');
+    if (el) el.textContent = msg || '';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

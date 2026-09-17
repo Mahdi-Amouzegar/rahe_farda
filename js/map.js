@@ -216,22 +216,100 @@ function showMapFallback() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Initial view
+// Initial view resolution
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// استراتژی:
+//  1. اگر Permissions API در دسترس باشد، وضعیت geolocation را چک می‌کنیم.
+//     - granted  → منتظر موقعیت می‌مانیم (تا ۵ ثانیه). اگر آمد، مستقیم آنجا.
+//                  اگر نیامد (timeout)، تهران.
+//     - denied   → فوری تهران.
+//     - prompt   → فوری تهران + درخواست موازی برای دفعات بعد (بدون انتظار).
+//  2. اگر Permissions API در دسترس نباشد (مرورگرهای قدیمی)، فوری تهران
+//     و در پس‌زمینه موقعیت را می‌گیریم (بدون پرش).
+//
+const DEFAULT_CENTER = [35.69, 51.39]; // تهران
+const DEFAULT_ZOOM = 12;
+const GEO_WAIT_MS = 5000;
 
-function getInitialMapView() {
+/**
+ * وضعیت geolocation را از Permissions API چک می‌کند.
+ * @returns {Promise<'granted'|'denied'|'prompt'|'unknown'>}
+ */
+async function queryGeolocationPermission() {
+    if (!navigator.permissions || !navigator.permissions.query) return 'unknown';
+    try {
+        const status = await navigator.permissions.query({ name: 'geolocation' });
+        return status.state; // 'granted' | 'denied' | 'prompt'
+    } catch {
+        return 'unknown';
+    }
+}
+
+/**
+ * یک‌بار موقعیت کاربر را می‌گیرد.
+ * @param {number} timeoutMs
+ * @returns {Promise<{lat:number, lng:number} | null>}
+ */
+function getCurrentPositionOnce(timeoutMs) {
     return new Promise(resolve => {
-        const fallback = () => resolve({ center:[35.69,51.39], zoom:13, user:null });
-        if (!navigator.geolocation) return fallback();
+        if (!navigator.geolocation) return resolve(null);
         let settled = false;
-        const finish = value => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
-        const timer = setTimeout(fallback, 5000);
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            resolve(null);
+        }, timeoutMs);
         navigator.geolocation.getCurrentPosition(
-            pos => { const center=[pos.coords.latitude,pos.coords.longitude]; finish({center,zoom:13,user:center}); },
-            fallback,
-            {timeout:5000,maximumAge:120000}
+            pos => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            },
+            () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(null);
+            },
+            { timeout: timeoutMs, maximumAge: 120000, enableHighAccuracy: false }
         );
     });
+}
+
+/**
+ * مرکز و زوم اولیه نقشه را تعیین می‌کند.
+ * بدون پرش بصری — یک‌بار و برای همیشه.
+ */
+async function resolveInitialView() {
+    const permission = await queryGeolocationPermission();
+
+    if (permission === 'denied') {
+        return { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, user: null };
+    }
+
+    if (permission === 'granted') {
+        const pos = await getCurrentPositionOnce(GEO_WAIT_MS);
+        if (pos) {
+            return { center: [pos.lat, pos.lng], zoom: 14, user: [pos.lat, pos.lng] };
+        }
+        return { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, user: null };
+    }
+
+    // prompt یا unknown → فوری تهران، درخواست موازی در پس‌زمینه
+    // (این درخواست ممکن است prompt نشان دهد، ولی ما منتظرش نمی‌مانیم)
+    getCurrentPositionOnce(GEO_WAIT_MS).then(pos => {
+        if (!pos) return;
+        if (!mapReady || !map) return;
+        // اگر کاربر prompt را زد و اجازه داد، حالا pan می‌کنیم
+        // (این پرش فقط در حالت prompt اتفاق می‌افتد که کاربر تازه اجازه داده)
+        const ll = [pos.lat, pos.lng];
+        setYouMarker(ll);
+        map.flyTo(ll, 13, { duration: 1 });
+    });
+
+    return { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, user: null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -280,7 +358,7 @@ function isLatLngInView(ll, marginRatio) {
 // Init
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function initMap() {
+export async function initMap() {
     if (!state.prefs.mapVisible || mapReady || mapInitializing) return;
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
@@ -292,46 +370,56 @@ export function initMap() {
         }, 9000);
         return;
     }
+
     mapInitializing = true;
-    getInitialMapView().then(initial => {
-        if (!state.prefs.mapVisible || mapReady) { mapInitializing = false; return; }
-        map = L.map('map').setView(initial.center, initial.zoom);
-        map.zoomControl.setPosition('topleft');
-        const layers = {};
-        ['normal','dark','sat'].forEach(k => {
-            const c = TILES[k];
-            layers[c.name] = L.tileLayer(c.url, { maxZoom: c.max, subdomains: c.sub, attribution: c.attr, className: c.cls || '' });
-        });
-        layers[TILES.normal.name].addTo(map);
-        L.control.layers(layers, null, { position: 'topleft' }).addTo(map);
-        markersLayer = L.layerGroup().addTo(map);
-        mapReady = true;
+
+    // تعیین مرکز اولیه بر اساس وضعیت geolocation
+    const initial = await resolveInitialView();
+
+    // چک مجدد — ممکن است در فاصله انتظار، نقشه مخفی شده باشد
+    if (!state.prefs.mapVisible || mapReady) {
         mapInitializing = false;
-        if (initial.user) setYouMarker(initial.user);
-        map.on('click', onMapClick);
-        map.on('moveend zoomend', () => scheduleMarkerRefresh());
-        mapDomClickHandler = e => {
-            const s = e.target.closest('[data-save-popup-location]');
-            if (s) {
-                call('saveLocationFromPopup', { lat: +s.dataset.lat, lng: +s.dataset.lng });
-                return;
-            }
-            const r = e.target.closest('[data-pproute]');
-            if (r) { call('showRouteTo', r.dataset.pproute); return; }
-            const b = e.target.closest('[data-ppdetail]');
-            if (!b) return;
-            call('openDetail', b.dataset.ppdetail);
-        };
-        mapEl.addEventListener('click', mapDomClickHandler);
-        refreshMarkers();
-        mapInitTimers = [
-            setTimeout(() => { if (mapReady && map) map.invalidateSize(); }, 350),
-            setTimeout(() => { if (mapReady && map) map.invalidateSize(); }, 1500)
-        ];
-        mapLoadHandler = () => { if (mapReady && map) map.invalidateSize(); };
-        window.addEventListener('load', mapLoadHandler);
-        window.dispatchEvent(new Event('rahe-map-ready'));
+        return;
+    }
+
+    map = L.map('map').setView(initial.center, initial.zoom);
+    map.zoomControl.setPosition('topleft');
+    const layers = {};
+    ['normal','dark','sat'].forEach(k => {
+        const c = TILES[k];
+        layers[c.name] = L.tileLayer(c.url, { maxZoom: c.max, subdomains: c.sub, attribution: c.attr, className: c.cls || '' });
     });
+    layers[TILES.normal.name].addTo(map);
+    L.control.layers(layers, null, { position: 'topleft' }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+    mapReady = true;
+    mapInitializing = false;
+
+    if (initial.user) setYouMarker(initial.user);
+
+    map.on('click', onMapClick);
+    map.on('moveend zoomend', () => scheduleMarkerRefresh());
+    mapDomClickHandler = e => {
+        const s = e.target.closest('[data-save-popup-location]');
+        if (s) {
+            call('saveLocationFromPopup', { lat: +s.dataset.lat, lng: +s.dataset.lng });
+            return;
+        }
+        const r = e.target.closest('[data-pproute]');
+        if (r) { call('showRouteTo', r.dataset.pproute); return; }
+        const b = e.target.closest('[data-ppdetail]');
+        if (!b) return;
+        call('openDetail', b.dataset.ppdetail);
+    };
+    mapEl.addEventListener('click', mapDomClickHandler);
+    refreshMarkers();
+    mapInitTimers = [
+        setTimeout(() => { if (mapReady && map) map.invalidateSize(); }, 350),
+        setTimeout(() => { if (mapReady && map) map.invalidateSize(); }, 1500)
+    ];
+    mapLoadHandler = () => { if (mapReady && map) map.invalidateSize(); };
+    window.addEventListener('load', mapLoadHandler);
+    window.dispatchEvent(new Event('rahe-map-ready'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -583,7 +671,6 @@ export function onMapClick(e) {
                     if (names.fa) cn.fa = names.fa;
                     if (names.en) cn.en = names.en;
                     state.pendingLoc = { ...state.pendingLoc, cityNames: cn };
-                    // loc-chip فقط مختصات نمایش می‌دهد، پس updateLocChip لازم نیست
                 }
             }
         } catch { /* silent */ }

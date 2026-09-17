@@ -1,7 +1,7 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // detail.js -- detail page (ESM)
 
-import { state, toFa, uid, escapeHtml, debounce, showConfirmModal, MAX_LENGTH } from './core.js';
+import { state, toFa, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
 import { faShort, hasSessionAt, parseFaDateTime } from './sessions.js';
@@ -21,6 +21,7 @@ import { openPicker } from './picker.js';
 
 let timerTick = null;
 let saveHintTimer = null;
+let lightboxTrapCleanup = null;
 
 // smart suggest state (مخصوص صفحه‌ی جزئیات)
 let detailSmartTimer = null;
@@ -73,6 +74,84 @@ function formatDateShort(iso) {
         return d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch {
         return '';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Lightbox (A1 + A2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openLightbox(src) {
+    const lb = document.getElementById('lightbox');
+    const img = document.getElementById('lightboxImg');
+    if (!lb || !img) return;
+
+    // ذخیره focus قبلی برای بازگشت
+    const previousFocus = document.activeElement;
+
+    img.src = src;
+    lb.style.display = 'flex';
+
+    // پاک‌سازی trap قبلی
+    if (lightboxTrapCleanup) {
+        try { lightboxTrapCleanup(); } catch { /* silent */ }
+        lightboxTrapCleanup = null;
+    }
+
+    // trap focus داخل lightbox
+    try {
+        lightboxTrapCleanup = trapFocus(lb);
+    } catch {
+        lightboxTrapCleanup = null;
+    }
+
+    // Escape برای بستن
+    const onKey = e => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeLightbox();
+        }
+    };
+    document.addEventListener('keydown', onKey, true);
+
+    // ذخیره listener برای cleanup
+    lb._escHandler = onKey;
+    lb._previousFocus = previousFocus;
+
+    // focus به lightbox برای accessibility
+    // (lightbox خودش role="dialog" دارد)
+    setTimeout(() => {
+        lb.focus?.({ preventScroll: true });
+    }, 30);
+}
+
+function closeLightbox() {
+    const lb = document.getElementById('lightbox');
+    const img = document.getElementById('lightboxImg');
+    if (!lb || !img) return;
+
+    // پاک‌سازی trap
+    if (lightboxTrapCleanup) {
+        try { lightboxTrapCleanup(); } catch { /* silent */ }
+        lightboxTrapCleanup = null;
+    }
+
+    // حذف Escape handler
+    if (lb._escHandler) {
+        document.removeEventListener('keydown', lb._escHandler, true);
+        lb._escHandler = null;
+    }
+
+    // مخفی کردن
+    lb.style.display = 'none';
+    img.removeAttribute('src');
+
+    // بازگشت focus
+    const prev = lb._previousFocus;
+    lb._previousFocus = null;
+    if (prev && document.body.contains(prev) && typeof prev.focus === 'function') {
+        setTimeout(() => prev.focus({ preventScroll: true }), 30);
     }
 }
 
@@ -834,13 +913,11 @@ export function bindDetailInputs() {
         }
         const img = e.target.closest('[data-photo-view]');
         if (img) {
-            document.getElementById('lightboxImg').src = img.src;
-            document.getElementById('lightbox').style.display = 'flex';
+            openLightbox(img.src);
         }
     });
     document.getElementById('lightbox').addEventListener('click', () => {
-        document.getElementById('lightbox').style.display = 'none';
-        document.getElementById('lightboxImg').removeAttribute('src');
+        closeLightbox();
     });
     document.getElementById('timerToggle').addEventListener('click', toggleTimer);
     document.getElementById('detailBack').addEventListener('click', closeDetail);

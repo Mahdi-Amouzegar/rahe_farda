@@ -603,7 +603,7 @@
         gap: 12px;
     }
 
-    /* ═══ Task Item — ساختار جدید (flex-direction: column) ═══ */
+    /* ═══ Task Item ═══ */
     .task-item {
         display: flex;
         flex-direction: column;
@@ -617,7 +617,7 @@
         box-shadow: none;
     }
 
-    /* ═══ Task Main Row — ردیف اول افقی سه‌ستونه ═══ */
+    /* ═══ Task Main Row ═══ */
     .task-main-row {
         display: flex;
         align-items: center;
@@ -625,14 +625,14 @@
         width: 100%;
     }
 
-    /* ═══ Task Info Row — ردیف دوم افقی با wrap ═══ */
+    /* ═══ Task Info Row ═══ */
     .task-info-row {
         display: flex;
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
         width: 100%;
-        padding-inline-start: 38px; /* = عرض checkbox (26) + gap (12) — برای هم‌راستایی با متن */
+        padding-inline-start: 38px;
         font-size: 0.72rem;
         color: var(--text-faint);
     }
@@ -693,7 +693,6 @@
     .task-item.prio-medium { border-inline-end-color: var(--accent-yellow); }
     .task-item.prio-low { border-inline-end-color: var(--accent-cyan); }
 
-    /* ⚠️ رفع مشکل operation-list */
     .task-item:has(.operation-trigger[aria-expanded="true"]) {
         z-index: 100;
         position: relative;
@@ -718,6 +717,11 @@
     .task-checkbox:hover {
         border-color: var(--accent-cyan);
         box-shadow: 0 3px 12px var(--accent-cyan-soft);
+    }
+
+    .task-checkbox:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
     }
 
     .task-checkbox.checked {
@@ -747,7 +751,22 @@
         cursor: default;
     }
 
-    /* ⚠️ task-meta همچنان برای plan-meta-row حفظ می‌شود */
+    /* ═══ Task Type Icon ═══ */
+    .task-type-icon {
+        display: inline-block;
+        font-size: 0.9rem;
+        line-height: 1;
+        margin-inline-end: 4px;
+        vertical-align: middle;
+        opacity: 0.9;
+    }
+
+    /* ═══ Created Date ═══ */
+    .created-date {
+        color: var(--text-faintest);
+        font-size: 0.72rem;
+    }
+
     .task-meta {
         display: flex;
         align-items: center;
@@ -934,6 +953,15 @@
         margin-top: 10px;
         line-height: 2;
         font-weight: 300;
+    }
+
+    /* ═══ Session Empty (shared) ═══ */
+    /* این کلاس در detail.css هم هست ولی برای استقلال components.css اینجا هم تعریف شده */
+    .session-empty {
+        font-size: 0.8rem;
+        color: var(--text-faintest);
+        text-align: center;
+        padding: 12px;
     }
 
     /* ═══ Due Row / Chips ═══ */
@@ -1509,7 +1537,6 @@
         border-color: var(--accent-purple);
     }
 
-    /* ═══ Plan Meta Row ═══ */
     .plan-meta-row {
         display: flex;
         align-items: center;
@@ -1526,7 +1553,6 @@
         max-width: 200px;
     }
 
-    /* ═══ Plan Session Row ═══ */
     .plan-session-row {
         display: block;
         width: 100%;
@@ -1559,37 +1585,20 @@
         width: 100%;
     }
 
- /* ═══ Child Item (زیرکار) ═══ */
+    /* ═══ Child Item ═══ */
     .child-item {
         display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
+        flex-direction: column;
         gap: 8px;
-        padding: 10px 12px;
+        padding: 12px 14px;
         border-radius: var(--radius-md);
         background: var(--bg-4);
         border: 1px solid var(--border-subtle);
+        transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
     }
 
-    /* دسکتاپ: با display: contents، فرزندان wrapperها مستقیماً در child-item قرار می‌گیرند */
-    .child-main-row,
-    .child-text-row {
-        display: contents;
-    }
-
-    .child-item .task-checkbox {
-        width: 22px;
-        height: 22px;
-        flex-shrink: 0;
-    }
-
-    .child-text {
-        flex: 1 1 auto;
-        min-width: 0;
-        font-size: 0.88rem;
-        line-height: 1.7;
-        overflow-wrap: break-word;
+    .child-item:hover {
+        border-color: var(--accent-cyan-border);
     }
 
     .child-item.completed .child-text {
@@ -1601,11 +1610,26 @@
         animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
-    .child-due {
-        font-size: 0.72rem;
-        color: var(--accent-cyan);
-        white-space: nowrap;
+    .child-main-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .child-main-row .task-checkbox {
+        width: 22px;
+        height: 22px;
         flex-shrink: 0;
+    }
+
+    .child-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 0.88rem;
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+        cursor: default;
     }
 
     .child-actions {
@@ -1615,95 +1639,54 @@
         margin-inline-start: auto;
     }
 
-    .child-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: var(--radius-sm);
-        border: 1.5px solid var(--border-medium);
-        cursor: pointer;
+    .child-meta-row {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-size: 0.9rem;
-        font-family: inherit;
-        flex-shrink: 0;
-        transition: all 0.25s ease;
-        box-shadow: var(--shadow-sm);
-        background: var(--bg-2);
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-inline-start: 32px;
+        font-size: 0.72rem;
+        color: var(--text-faint);
+        min-height: 1.6em;
     }
 
-    .child-btn.detail {
-        background: linear-gradient(145deg, var(--bg-18), var(--bg-19));
-        color: var(--accent-cyan);
+    .child-meta-row:empty {
+        display: none;
     }
 
-    .child-btn.detail:hover {
-        border-color: var(--accent-cyan-border);
-        box-shadow: 0 4px 15px var(--accent-cyan-soft);
+    .child-meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        white-space: nowrap;
     }
 
-    .child-btn.delete {
-        background: linear-gradient(145deg, var(--bg-16), var(--bg-17));
-        color: var(--accent-pink);
+    .child-meta-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.8rem;
+        line-height: 1;
+        color: var(--text-muted);
     }
 
-    .child-btn.delete:hover {
-        border-color: var(--accent-pink-border);
-        box-shadow: 0 4px 15px var(--accent-pink-soft);
+    .child-meta-row .priority-badge {
+        padding: 1px 8px;
+        font-size: 0.66rem;
     }
 
-    .child-btn.archive {
-        background: linear-gradient(145deg, var(--bg-20), var(--bg-21));
-        color: var(--accent-yellow);
-    }
-
-    .child-btn.archive:hover {
-        border-color: var(--accent-yellow-border);
-        box-shadow: 0 4px 15px var(--accent-yellow-soft);
-    }
-
-    .child-btn.loc {
-        background: linear-gradient(145deg, var(--bg-20), var(--bg-21));
-        color: var(--accent-yellow);
-    }
-
-    .child-btn.loc:hover {
-        border-color: var(--accent-yellow-border);
-        box-shadow: 0 4px 15px var(--accent-yellow-soft);
-    }
-
-    .child-btn.loc.has {
-        border-color: var(--accent-yellow-border);
-    }
-
-    .mini-link {
-        background: none;
-        border: none;
-        color: var(--text-secondary);
-        cursor: pointer;
-        font-size: 0.75rem;
-        font-weight: 700;
-        font-family: inherit;
-        padding: 0;
-    }
-
-    .mini-link:hover {
-        color: var(--accent-cyan);
-        text-decoration: underline;
-    }
-
-    .mini-link.danger {
-        color: var(--accent-pink);
-    }
-
+    /* ═══ Child Add Row (فرم افزودن زیرکار) ═══ */
     .child-add {
         display: flex;
         gap: 8px;
         margin-top: 4px;
+        flex-wrap: wrap;
+        align-items: center;
     }
 
     .child-input {
-        flex: 1;
+        flex: 1 1 180px;
         min-width: 0;
         padding: 10px 14px;
         border: 1.5px solid var(--border-subtle);
@@ -1713,10 +1696,16 @@
         font-family: inherit;
         font-size: 0.85rem;
         outline: none;
+        transition: border-color var(--transition-base), box-shadow var(--transition-base);
     }
 
     .child-input:focus {
         border-color: var(--accent-cyan-border);
+        box-shadow: 0 0 0 3px var(--accent-cyan-soft);
+    }
+
+    .child-input::placeholder {
+        color: var(--text-faintest);
     }
 
     .child-input.input-error {
@@ -1725,21 +1714,76 @@
     }
 
     .child-prio {
-        padding: 0 10px;
+        flex: 0 0 auto;
+        padding: 10px 12px;
         border: 1.5px solid var(--border-subtle);
         border-radius: var(--radius-md);
         background: var(--bg-2);
         color: var(--text-secondary);
         font-family: inherit;
-        font-size: 0.78rem;
+        font-size: 0.8rem;
         font-weight: 600;
         outline: none;
         cursor: pointer;
+        transition: border-color var(--transition-base);
     }
 
-    .btn-child-add {
+    .child-prio:focus {
+        border-color: var(--accent-purple);
+    }
+
+    .child-add .btn-child-add {
+        flex: 0 0 auto;
         padding: 10px 18px;
         font-size: 0.85rem;
+    }
+
+    .child-add .btn-icon {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 38px;
+    }
+
+    /* ═══ Weather Icon Button ═══ */
+    .weather-icon-btn {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        border: 0;
+        background: transparent;
+        padding: 1px 4px;
+        margin-inline-start: 4px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        line-height: 1;
+        vertical-align: middle;
+        transition: background 0.15s ease;
+    }
+
+    .weather-icon-btn:hover {
+        background: var(--accent-cyan-soft);
+    }
+
+    .weather-icon-btn:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+
+    .weather-icon-btn-sm {
+        font-size: 0.82rem;
+        padding: 0 3px;
+        margin-inline-start: 0;
+    }
+
+    .weather-icon-emoji {
+        display: inline-block;
+        min-width: 1em;
+        font-size: 1em;
+        line-height: 1;
+        text-align: center;
     }
 
     /* ═══ Plan Dates (فرم افزودن) ═══ */
@@ -1753,6 +1797,19 @@
 
     #planDatesWrap .due-clear {
         flex: 0 0 auto;
+    }
+
+    /* ═══ Task List Status (aria-live for screen readers) ═══ */
+    .live-status {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 }
 
@@ -2067,7 +2124,6 @@
         transform: translateY(1px);
     }
 
-    /* سازگاری با کلاس قدیمی .task-item .mini-link */
     .task-item .mini-link {
         appearance: none;
         display: inline-flex;

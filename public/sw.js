@@ -35,8 +35,13 @@
 //   v1.2.0.2-2026-09-16 — فاز ۷-ب: افزودن جستجوی مکان با Nominatim (map-search.js) + دکمه میکروفن
 //   v1.3.0.0-2026-09-16 — فاز ۸: ردیابی آنلاین، حالت پیشرفته، بهبود چیدمان موبایل، رفع باگ‌ها
 //   v1.3.0.1-2026-09-16 — فاز ۸-الف: پیش‌بینی هوا با Open-Meteo (weather.js + weather-modal.js)
+//   v1.3.1.0-2026-09-17 — فیچر: آیکن وضعیت هوا روی کارت وظایف (با کش پایدار localStorage)
+//                          + تصحیحات فاز ۱+۲ (viewport-fit، structuredClone fallback، حذف taskIndex،
+//                            TTL برای cache جستجو، کلمپ endDate در weather، guard در weather-modal،
+//                            try/finally در location-ui، مخفی‌سازی route-summary در map-hidden،
+//                            رفع تکرار دکمه هوا، بازطراحی child-item، کاهش timeout زمان‌سنج)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.3.0.1-2026-09-16';
+const CACHE = 'rahefarda-v1.3.1.0-2026-09-17';
 
 // فایل‌ها بدون query-string (?v=N) کش می‌شوند.
 // networkFirst + ignoreSearch تضمین می‌کند همیشه نسخه درست لود شود:

@@ -1,7 +1,7 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // vite.config.js — Vite + Vitest configuration
 
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 

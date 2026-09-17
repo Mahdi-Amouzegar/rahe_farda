@@ -596,6 +596,11 @@
         font-weight: 700;
     }
 
+    /* ═══ B7: مخفی کردن route-summary وقتی نقشه مخفی است ═══ */
+    body.map-hidden .route-summary {
+        display: none !important;
+    }
+
     /* ═══ Saved Locations ═══ */
     .loc-chip-actions {
         display: flex;
@@ -1096,6 +1101,7 @@
             min-height: 300px;
         }
 
+        /* B7: route-summary در موبایل کوچک — پایین، پرعرض، اسکرول‌پذیر */
         .route-summary {
             top: auto;
             bottom: 8px;
@@ -1105,10 +1111,12 @@
             max-height: calc(100% - 16px);
             overflow-y: auto;
         }
+
         .route-summary-title {
             font-size: 11px;
             padding: 8px 10px;
         }
+
         .route-option {
             min-height: 42px;
             padding: 6px 9px;
@@ -1120,11 +1128,13 @@
             font-size: .84rem;
             padding-inline-start: 36px;
         }
+
         .task-item .mini-link {
             min-height: 27px;
             padding-inline: 8px;
             font-size: .72rem;
         }
+
         .detail-page .detail-accordion-body {
             padding-inline: 10px;
         }

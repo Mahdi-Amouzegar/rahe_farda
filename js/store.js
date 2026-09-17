@@ -228,12 +228,27 @@ export async function loadTasks() {
         .map(sanitizeTask);
 }
 
+/**
+ * کپی عمیق از داده‌ها با fallback برای مرورگرهای قدیمی.
+ * structuredClone در Safari < 15.4 و برخی WebViewها در دسترس نیست.
+ */
+function deepClone(value) {
+    if (typeof structuredClone === 'function') {
+        try {
+            return structuredClone(value);
+        } catch {
+            // اگر structuredClone با داده‌های غیرقابل clone برخورد کرد، به JSON برمی‌گردیم
+        }
+    }
+    return JSON.parse(JSON.stringify(value));
+}
+
 export function saveTasks() {
     let snapshot;
     try {
-        snapshot = structuredClone(state.tasks);
+        snapshot = deepClone(state.tasks);
     } catch (e) {
-        console.error('saveTasks: structuredClone failed', e);
+        console.error('saveTasks: deepClone failed', e);
         return Promise.reject(e);
     }
 
@@ -262,26 +277,17 @@ export function saveTasks() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Task Index
+// Cache Invalidation
 // ═══════════════════════════════════════════════════════════════════════════
-
+//
+// ⚠️ نکته: قبلاً این ماژول یک Map به نام `taskIndex` می‌ساخت که هیچ‌وقت
+// استفاده نمی‌شد (findTask همیشه روی state.tasks لوپ می‌زد). حالا حذف شده.
+// اما `state.taskIndexVersion` را نگه می‌داریم چون `sessions.js` برای
+// invalidate کردن cache خودش به آن وابسته است.
+//
 export function invalidateTaskIndex() {
     state.taskIndex = null;
     state.taskIndexVersion++;
-}
-
-export function buildTaskIndex() {
-    const map = new Map();
-    for (const t of state.tasks) {
-        map.set(String(t.id), { task: t, parent: null });
-        if (t.kind === 'plan' && Array.isArray(t.children)) {
-            for (const c of t.children) {
-                map.set(String(c.id), { task: c, parent: t });
-            }
-        }
-    }
-    state.taskIndex = map;
-    return map;
 }
 
 export function findTask(id) {

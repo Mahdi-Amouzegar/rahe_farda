@@ -10,8 +10,18 @@ import { findTask } from './store.js';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+// Open-Meteo تا ۱۶ روز پیش‌بینی می‌دهد، اما برای اطمینان از اینکه endDate
+// از محدوده خارج نشود، یک روز کمتر در نظر می‌گیریم.
 const MAX_FORECAST_DAYS = 16;
-const CACHE_TTL_MS = 30 * 60 * 1000; // ۳۰ دقیقه
+const MAX_FORECAST_DAYS_SAFE = MAX_FORECAST_DAYS - 1;
+const CACHE_TTL_MS = 30 * 60 * 1000; // ۳۰ دقیقه (کش داده کامل هوا)
+
+// ─── کش پایدار آیکن (localStorage) ───
+// این کش برای آیکن‌های کوچک استفاده می‌شود و از fetch تکراری در refresh
+// صفحه جلوگیری می‌کند. کلید = lat|lng|date (چون آیکن روزانه است).
+const ICON_CACHE_KEY = 'spaceTodoWeatherIcons';
+const ICON_CACHE_TTL_MS = 3 * 60 * 60 * 1000; // ۳ ساعت
+const ICON_CACHE_MAX = 100;
 
 // کد وضعیت WMO → آیکن + برچسب فارسی
 const WMO_MAP = {
@@ -45,7 +55,7 @@ const WMO_MAP = {
     99: { icon: '⛈️', label: 'رعد و برق با تگرگ' }
 };
 
-// کش: کلید = `lat,lng,start,end` → مقدار = { data, fetchedAt }
+// کش داده کامل هوا: کلید = `lat,lng,start,end` → مقدار = { data, fetchedAt }
 const weatherCache = new Map();
 const MAX_CACHE_SIZE = 100;
 
@@ -60,8 +70,65 @@ function toDateString(d) {
     return `${y}-${m}-${day}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Icon Persistent Cache (localStorage)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function loadIconCache() {
+    try {
+        const raw = localStorage.getItem(ICON_CACHE_KEY);
+        if (!raw) return {};
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== 'object') return {};
+        const now = Date.now();
+        // پاک‌سازی ورودی‌های منقضی
+        const cleaned = {};
+        for (const [k, v] of Object.entries(data)) {
+            if (v && typeof v.t === 'number' && (now - v.t) < ICON_CACHE_TTL_MS) {
+                cleaned[k] = v;
+            }
+        }
+        return cleaned;
+    } catch {
+        return {};
+    }
+}
+
+function saveIconCache(cache) {
+    try {
+        // محدود کردن به N ورودی جدیدتر
+        const entries = Object.entries(cache)
+            .sort((a, b) => (b[1].t || 0) - (a[1].t || 0))
+            .slice(0, ICON_CACHE_MAX);
+        localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch { /* storage full یا private mode — silent fail */ }
+}
+
+function iconCacheKey(lat, lng, date) {
+    return `${lat.toFixed(3)}|${lng.toFixed(3)}|${date}`;
+}
+
+function getCachedIcon(lat, lng, date) {
+    const cache = loadIconCache();
+    const entry = cache[iconCacheKey(lat, lng, date)];
+    if (!entry) return null;
+    if ((Date.now() - entry.t) > ICON_CACHE_TTL_MS) return null;
+    return entry.i || null;
+}
+
+function setCachedIcon(lat, lng, date, icon) {
+    const cache = loadIconCache();
+    cache[iconCacheKey(lat, lng, date)] = { i: icon, t: Date.now() };
+    saveIconCache(cache);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Eligibility
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
  * بررسی می‌کند که آیا یک وظیفه واجد شرط نمایش هوا است.
+ * شرط: وظیفه مکان دارد AND نزدیک‌ترین سررسید آینده در بازه مجاز است.
  * @param {object} task
  * @returns {boolean}
  */
@@ -70,6 +137,7 @@ export function isWeatherEligible(task) {
     const next = nearestUpcoming(task);
     if (!next) return false;
     const due = new Date(next.at).getTime();
+    if (!Number.isFinite(due)) return false;
     const now = Date.now();
     const daysAhead = (due - now) / 86400000;
     return daysAhead >= 0 && daysAhead <= MAX_FORECAST_DAYS;
@@ -86,6 +154,10 @@ export function getWeatherSession(task) {
     if (!next) return null;
     return { at: next.at, location: task.location };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Weather Cache (in-memory، داده کامل)
+// ═══════════════════════════════════════════════════════════════════════════
 
 function cacheKey(lat, lng, startStr, endStr) {
     return `${lat.toFixed(4)},${lng.toFixed(4)},${startStr},${endStr}`;
@@ -115,6 +187,10 @@ function setCache(key, data) {
 
 /**
  * محاسبه‌ی بازه‌ی هوشمند برای یک تاریخ سررسید.
+ *
+ * بازه = [target-1, target+3] با کلمپ به [today, today+MAX_SAFE]
+ * کلمپ بالا به MAX_FORECAST_DAYS_SAFE انجام می‌شود تا از خطای API جلوگیری شود.
+ *
  * @param {string} isoDate
  * @returns {{ startStr: string, endStr: string } | null}
  */
@@ -125,8 +201,9 @@ export function computeDateRange(isoDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // سقف مجاز API (کمی محافظه‌کارانه‌تر از ۱۶)
     const maxDate = new Date(today);
-    maxDate.setDate(maxDate.getDate() + MAX_FORECAST_DAYS);
+    maxDate.setDate(maxDate.getDate() + MAX_FORECAST_DAYS_SAFE);
 
     const startDate = new Date(target);
     startDate.setHours(0, 0, 0, 0);
@@ -208,7 +285,7 @@ export async function fetchWeather(location, isoDate) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Extract helpers (جدید)
+// Extract helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -290,28 +367,50 @@ export function extractHourlyAt(weatherData, isoDate) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Extract helpers (قدیمی — برای سازگاری)
+// Quick icon (برای نمایش در task list)
 // ═══════════════════════════════════════════════════════════════════════════
-
-export function extractHourly(weatherData, isoDate) {
-    return extractHourlyAt(weatherData, isoDate);
-}
-
-export function extractDaily(weatherData) {
-    return extractDailyByIndex(weatherData, 0);
-}
 
 /**
  * آیکن سریع برای نمایش روی کارت وظیفه.
+ *
+ * جریان کش (سه لایه):
+ *  1. localStorage (persistent, TTL 3 ساعت) — چک اول
+ *  2. weatherCache در حافظه (TTL 30 دقیقه) — از fetchWeather
+ *  3. fetch از Open-Meteo
+ *
  * @param {object} task
- * @returns {Promise<string | null>}
+ * @returns {Promise<string | null>} - آیکن (مثل '☀️') یا null در صورت عدم امکان
  */
 export async function getWeatherIcon(task) {
     const session = getWeatherSession(task);
     if (!session) return null;
-    const data = await fetchWeather(session.location, session.at);
+
+    const date = toDateString(new Date(session.at));
+    const loc = session.location;
+
+    // Layer 1: localStorage
+    const persistentCached = getCachedIcon(loc.lat, loc.lng, date);
+    if (persistentCached) return persistentCached;
+
+    // Layer 2 & 3: fetchWeather (با کش in-memory)
+    const data = await fetchWeather(loc, session.at);
     if (!data) return null;
     const dayIdx = findDayIndex(data, session.at);
-    const daily = extractDailyByIndex(data, dayIdx >= 0 ? dayIdx : 0);
-    return daily ? daily.icon : null;
+    if (dayIdx < 0) return null;
+    const daily = extractDailyByIndex(data, dayIdx);
+    if (!daily) return null;
+
+    // ذخیره در localStorage برای دفعات بعد
+    setCachedIcon(loc.lat, loc.lng, date, daily.icon);
+    return daily.icon;
+}
+
+/**
+ * پاک‌سازی کش پایدار آیکن‌ها.
+ * مفید برای دیباگ یا وقتی کاربر می‌خواهد داده‌ها را ریست کند.
+ */
+export function clearIconCache() {
+    try {
+        localStorage.removeItem(ICON_CACHE_KEY);
+    } catch { /* silent */ }
 }

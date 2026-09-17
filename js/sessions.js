@@ -44,6 +44,31 @@ export function nearestUpcoming(task) {
         .sort((a, b) => new Date(a.at) - new Date(b.at))[0] || null;
 }
 
+/**
+ * ساخت HTML دکمه‌ی هوا با اسلات آیکن.
+ *
+ * این تابع فقط وقتی دکمه را برمی‌گرداند که:
+ *  - task.location وجود داشته باشد
+ *  - نزدیک‌ترین سررسید در بازه ۱۶ روز آینده باشد
+ *
+ * اسلات `data-weather-icon-for` توسط `hydrateWeatherIcons` در `ui.js`
+ * پر می‌شود (به صورت غیرهمزمان).
+ *
+ * @param {object} task
+ * @returns {string} HTML یا ''
+ */
+function weatherButtonHtml(task) {
+    if (!task || !task.location) return '';
+    const next = nearestUpcoming(task);
+    if (!next) return '';
+    const due = new Date(next.at).getTime();
+    if (!Number.isFinite(due)) return '';
+    const daysAhead = (due - Date.now()) / 86400000;
+    if (daysAhead < 0 || daysAhead > 16) return '';
+    const key = `${escapeHtml(String(task.id))}|${escapeHtml(next.at)}`;
+    return `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
+}
+
 export function sessionSummaryHtml(task) {
     const sessions = task.sessions || [];
     if (sessions.length === 0) return '';
@@ -58,11 +83,8 @@ export function sessionSummaryHtml(task) {
         const diffDays = Math.round((startOf(due) - startOf(now)) / 86400000);
         const extra = diffDays === 0 ? ' (امروز)' : diffDays === 1 ? ' (فردا)' : ` (${toFa(diffDays)} روز مانده)`;
         const count = sessions.length > 1 ? ` <span class="sess-count">${toFa(sessions.length)} جلسه</span>` : '';
-        // آیکن هوا اگر وظیفه یا برنامه مکان داشته باشد (بر اساس task.location، نه session.location)
-        const weatherBtn = task.location
-            ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا">🌡️</button>`
-            : '';
-        return `<span class="due-line">📅 جلسه بعد: ${faShort(n.at)}${extra}${n.location ? ' 📍' : ''}${weatherBtn}</span>${count}`;
+        const wBtn = weatherButtonHtml(task);
+        return `<span class="due-line">📅 جلسه بعد: ${faShort(n.at)}${extra}${n.location ? ' 📍' : ''}${wBtn}</span>${count}`;
     }
     const past = [...sessions].sort((a, b) => new Date(b.at) - new Date(a.at))[0];
     return `<span class="due-line overdue">⚠ سررسید گذشته: ${faShort(past.at)}</span>`;
@@ -134,7 +156,18 @@ export function visibleChildren(g) {
 // ═══════════════════════════════════════════════════════════════════════════
 // allSessions (با cache)
 // ═══════════════════════════════════════════════════════════════════════════
-
+//
+// ⚠️ نکته: این cache به state.taskIndexVersion وابسته است که در store.js
+// هنگام هر saveTasks() و moveToTrashById() increment می‌شود. پس cache
+// به‌طور خودکار باطل می‌شود وقتی state.tasks تغییر کند.
+//
+// این طراحی امن‌تر از قبل است چون:
+//  - هر ذخیره‌سازی → version++
+//  - هر بازگشت از سطل زباله → version++
+//  - هر حذف → version++
+//  - اگر مستقیم state.tasks mutate شود (بدون saveTasks) → cache کهنه می‌ماند
+//    (که در کد فعلی این اتفاق نمی‌افتد چون همه تغییرات از طریق saveTasks می‌آید)
+//
 let _allSessionsCache = null;
 let _allSessionsCacheVersion = -1;
 

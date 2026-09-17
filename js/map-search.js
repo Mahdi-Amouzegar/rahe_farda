@@ -10,6 +10,7 @@ import {
     showPickMarker,
     removePickMarker
 } from './map.js';
+import { refreshSavedLocationUI } from './location-ui.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -20,6 +21,10 @@ const MIN_QUERY_LENGTH = 3;
 const DEBOUNCE_MS = 500;
 const MAX_RESULTS = 8;
 
+// TTL برای کش نتایج جستجو — ۵ دقیقه
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 50;
+
 // User-Agent معتبر طبق Usage Policy Nominatim
 const USER_AGENT = 'RaheFarda/1.3 (https://github.com/Mahdi-Amouzegar/rahe_farda)';
 
@@ -29,11 +34,9 @@ const USER_AGENT = 'RaheFarda/1.3 (https://github.com/Mahdi-Amouzegar/rahe_farda
 
 let debounceTimer = null;
 let currentController = null;
-let searchMarker = null;
 
-// کش نتایج: کلید = query، مقدار = آرایه نتایج
+// کش نتایج: کلید = query، مقدار = { results, fetchedAt }
 const resultsCache = new Map();
-const MAX_CACHE_SIZE = 50;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -46,11 +49,17 @@ function escapeHtml(s) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Cache
+// Cache (با TTL)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function getCached(query) {
-    return resultsCache.get(query) || null;
+    const entry = resultsCache.get(query);
+    if (!entry) return null;
+    if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+        resultsCache.delete(query);
+        return null;
+    }
+    return entry.results;
 }
 
 function setCached(query, results) {
@@ -58,7 +67,7 @@ function setCached(query, results) {
         const firstKey = resultsCache.keys().next().value;
         resultsCache.delete(firstKey);
     }
-    resultsCache.set(query, results);
+    resultsCache.set(query, { results, fetchedAt: Date.now() });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -170,12 +179,6 @@ async function selectPlace(place) {
         return;
     }
 
-    // پاک کردن مارکر قبلی
-    if (searchMarker) {
-        map.removeLayer(searchMarker);
-        searchMarker = null;
-    }
-
     // پرواز به مکان
     map.flyTo([place.lat, place.lng], 15, { duration: 1.2 });
 
@@ -191,7 +194,6 @@ async function selectPlace(place) {
     showPickMarker();
 
     // نمایش locChip در فرم افزودن
-    const { refreshSavedLocationUI } = await import('./location-ui.js');
     if (typeof refreshSavedLocationUI === 'function') refreshSavedLocationUI();
 
     // به‌روزرسانی input جستجو با نام
@@ -211,6 +213,7 @@ async function selectPlace(place) {
     mapHint('📍 محل انتخاب شد — عنوان وظیفه را بنویسید');
 
     // دریافت نام شهر برای cityNames (بدون نمایش در loc-chip)
+    // ⚠️ reverse-geocode به صورت dynamic import می‌ماند تا chunk جداگانه بسازد
     (async () => {
         try {
             const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -285,10 +288,6 @@ function clearSearch() {
     if (inputEl) inputEl.value = '';
     if (clearBtnEl) clearBtnEl.style.display = 'none';
     hideResults();
-    if (searchMarker && getMap() && getMapReady()) {
-        getMap().removeLayer(searchMarker);
-        searchMarker = null;
-    }
     if (inputEl) inputEl.focus();
 }
 
@@ -329,8 +328,3 @@ export function initMapSearch() {
         hideResults();
     });
 }
-
-// پاک کردن مارکر جستجو هنگام destroy نقشه
-window.addEventListener('rahe-map-destroy', () => {
-    searchMarker = null;
-});

@@ -115,7 +115,23 @@ function toDateStringOf(isoDate) {
 }
 
 function renderWeatherView() {
-    if (!_currentWeatherData) return;
+    // Guard: اگر داده هواشناسی وجود ندارد
+    if (!_currentWeatherData) {
+        setContent('<div class="weather-error">داده‌ای برای نمایش موجود نیست.</div>');
+        return;
+    }
+
+    // Guard: اگر daily.time وجود ندارد یا آرایه نیست
+    const dailyTime = _currentWeatherData.daily?.time;
+    if (!Array.isArray(dailyTime) || dailyTime.length === 0) {
+        setContent('<div class="weather-error">داده‌ی روزانه از سرور دریافت نشد.</div>');
+        return;
+    }
+
+    // Guard: اگر _currentDayIndex خارج از محدوده است، اصلاح کن
+    const totalDays = dailyTime.length;
+    if (_currentDayIndex < 0) _currentDayIndex = 0;
+    if (_currentDayIndex >= totalDays) _currentDayIndex = totalDays - 1;
 
     const daily = extractDailyByIndex(_currentWeatherData, _currentDayIndex);
     const hourly = extractHourlyAt(_currentWeatherData, _currentSessionDate);
@@ -129,12 +145,11 @@ function renderWeatherView() {
     const taskText = task ? task.task.text : '';
     const placeName = formatPlace(_currentLocation);
 
-    const totalDays = _currentWeatherData.daily.time.length;
     const canPrev = _currentDayIndex > 0;
     const canNext = _currentDayIndex < totalDays - 1;
 
     // تاریخ روز جاری (بر اساس زبان)
-    const currentDayDate = new Date(_currentWeatherData.daily.time[_currentDayIndex]);
+    const currentDayDate = new Date(dailyTime[_currentDayIndex]);
     let dayLabel = '';
     try {
         dayLabel = currentDayDate.toLocaleDateString(
@@ -142,12 +157,11 @@ function renderWeatherView() {
             { weekday: 'long', day: 'numeric', month: 'long' }
         );
     } catch {
-        dayLabel = _currentWeatherData.daily.time[_currentDayIndex];
+        dayLabel = dailyTime[_currentDayIndex];
     }
 
     // آیا روز جاری همان روز سررسید است؟
-    const isTargetDay = _currentWeatherData.daily.time[_currentDayIndex] ===
-                        toDateStringOf(_currentSessionDate);
+    const isTargetDay = dailyTime[_currentDayIndex] === toDateStringOf(_currentSessionDate);
 
     const hourlyHTML = hourly ? `
         <div class="weather-grid">
@@ -252,6 +266,12 @@ export async function showWeatherModal(taskId, sessionId) {
         return;
     }
 
+    // Guard نهایی: اگر data ناقص باشد
+    if (!data.daily || !Array.isArray(data.daily.time) || data.daily.time.length === 0) {
+        setContent('<div class="weather-error">داده‌ی معتبری از سرور دریافت نشد.</div>');
+        return;
+    }
+
     // ذخیره در state مودال
     _currentTaskId = taskId;
     _currentSessionDate = targetSession.at;
@@ -270,7 +290,10 @@ export async function showWeatherModal(taskId, sessionId) {
 
 function navigateDay(direction) {
     if (!_currentWeatherData) return;
+    // Guard: بررسی ایمن برای daily.time
     const total = _currentWeatherData.daily?.time?.length || 0;
+    if (total === 0) return;
+
     if (direction === 'prev' && _currentDayIndex > 0) {
         _currentDayIndex--;
         renderWeatherView();

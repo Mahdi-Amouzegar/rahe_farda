@@ -209,9 +209,18 @@ function askLocationName(defaultValue) {
             cancelBtn.removeEventListener('click', onCancel);
             input.removeEventListener('keydown', onKey);
             overlay.removeEventListener('click', onOverlay);
-            if (trapCleanup) { trapCleanup(); trapCleanup = null; }
+            if (trapCleanup) {
+                try { trapCleanup(); } catch { /* silent */ }
+                trapCleanup = null;
+            }
         };
-        const finish = value => { cleanup(); resolve(value); };
+        const finish = value => {
+            try {
+                cleanup();
+            } finally {
+                resolve(value);
+            }
+        };
         const submit = () => {
             const v = input.value.trim().replace(/\s+/g, ' ').slice(0, 80);
             if (!v) {
@@ -279,9 +288,18 @@ function askConflictResolution(name, conflict) {
             renameBtn.removeEventListener('click', onRename);
             cancelBtn.removeEventListener('click', onCancel);
             overlay.removeEventListener('click', onOverlay);
-            if (trapCleanup) { trapCleanup(); trapCleanup = null; }
+            if (trapCleanup) {
+                try { trapCleanup(); } catch { /* silent */ }
+                trapCleanup = null;
+            }
         };
-        const finish = value => { cleanup(); resolve(value); };
+        const finish = value => {
+            try {
+                cleanup();
+            } finally {
+                resolve(value);
+            }
+        };
         const onReplace = () => finish('replace');
         const onRename = () => finish('rename');
         const onCancel = () => finish(null);
@@ -329,6 +347,7 @@ function renderDetail() {
     const host = changeBtn ? changeBtn.parentElement : line.parentElement;
     if (!host) return;
 
+    // حذف دکمه‌ی قدیمی (اگر وجود دارد)
     const staleSave = line.querySelector('[data-save-detail-location]') || host.querySelector('[data-save-detail-location]');
     if (staleSave) staleSave.remove();
 
@@ -429,19 +448,37 @@ function renderManageList() {
     `).join('')}</div>`;
 }
 
+/**
+ * باز کردن مودال مدیریت مکان‌ها — با try/finally برای اطمینان از cleanup.
+ */
 function openManageModal() {
     renderManageList();
     const modal = document.getElementById('savedLocationsModal');
     if (!modal) return;
+
+    // پاک‌سازی trap قبلی (اگر وجود دارد)
+    if (_savedLocTrapCleanup) {
+        try { _savedLocTrapCleanup(); } catch { /* silent */ }
+        _savedLocTrapCleanup = null;
+    }
+
     modal.style.display = 'flex';
-    if (_savedLocTrapCleanup) _savedLocTrapCleanup();
-    _savedLocTrapCleanup = trapFocus(modal);
+
+    try {
+        _savedLocTrapCleanup = trapFocus(modal);
+    } catch {
+        _savedLocTrapCleanup = null;
+    }
+
     const close = document.getElementById('savedLocationsClose');
     if (close) setTimeout(() => close.focus(), 60);
 }
 
 function closeManageModal() {
-    if (_savedLocTrapCleanup) { _savedLocTrapCleanup(); _savedLocTrapCleanup = null; }
+    if (_savedLocTrapCleanup) {
+        try { _savedLocTrapCleanup(); } catch { /* silent */ }
+        _savedLocTrapCleanup = null;
+    }
     const modal = document.getElementById('savedLocationsModal');
     if (modal) modal.style.display = 'none';
 }
