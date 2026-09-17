@@ -24,6 +24,9 @@ export const state = {
     expandedPlans: new Set(),
     childDrafts: {},
     planDraftKids: [],
+    // تاریخ شروع/پایان موقت برای فرم افزودن برنامه
+    planDraftStart: null,
+    planDraftEnd: null,
     seriesType: 'daily',
     seriesN: 8,
     seriesDays: [],

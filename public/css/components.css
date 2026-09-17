@@ -603,17 +603,44 @@
         gap: 12px;
     }
 
+    /* ═══ Task Item — ساختار جدید (flex-direction: column) ═══ */
     .task-item {
         display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 16px 20px;
-        border-radius: 18px;
-        background: var(--bg-2);
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: var(--surface-raised);
         border: 1.5px solid var(--border-subtle);
-        transition: border-color var(--transition-base), box-shadow var(--transition-base), opacity 0.25s ease, transform 0.25s ease, background-color 0.3s ease;
-        box-shadow: var(--shadow-md);
         border-inline-end-width: 5px;
+        transition: border-color var(--transition-base), box-shadow var(--transition-base), opacity 0.25s ease, background-color 0.3s ease;
+        box-shadow: none;
+    }
+
+    /* ═══ Task Main Row — ردیف اول افقی سه‌ستونه ═══ */
+    .task-main-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+    }
+
+    /* ═══ Task Info Row — ردیف دوم افقی با wrap ═══ */
+    .task-info-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        width: 100%;
+        padding-inline-start: 38px; /* = عرض checkbox (26) + gap (12) — برای هم‌راستایی با متن */
+        font-size: 0.72rem;
+        color: var(--text-faint);
+    }
+
+    .task-info-row .mini-link {
+        min-height: 26px;
+        padding: 2px 8px;
+        font-size: .72rem;
     }
 
     .task-item.just-added {
@@ -666,6 +693,12 @@
     .task-item.prio-medium { border-inline-end-color: var(--accent-yellow); }
     .task-item.prio-low { border-inline-end-color: var(--accent-cyan); }
 
+    /* ⚠️ رفع مشکل operation-list */
+    .task-item:has(.operation-trigger[aria-expanded="true"]) {
+        z-index: 100;
+        position: relative;
+    }
+
     .task-checkbox {
         width: 26px;
         height: 26px;
@@ -714,6 +747,7 @@
         cursor: default;
     }
 
+    /* ⚠️ task-meta همچنان برای plan-meta-row حفظ می‌شود */
     .task-meta {
         display: flex;
         align-items: center;
@@ -937,7 +971,7 @@
         color: var(--accent-cyan);
     }
 
-    /* Modern Persian Planner visual layer — behavior and selectors remain intact. */
+    /* Modern Persian Planner visual layer */
     .task-zone {
         background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent-primary));
         border-radius: 20px;
@@ -1002,7 +1036,6 @@
     .plan-item:hover {
         border-color: var(--accent-primary);
         box-shadow: var(--shadow-sm);
-        transform: translateY(-1px);
     }
 
     .progress-fill {
@@ -1476,6 +1509,30 @@
         border-color: var(--accent-purple);
     }
 
+    /* ═══ Plan Meta Row ═══ */
+    .plan-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 8px;
+        padding-inline: 0;
+    }
+
+    .plan-meta-row .mini-progress {
+        flex: 1;
+        min-width: 80px;
+        max-width: 200px;
+    }
+
+    /* ═══ Plan Session Row ═══ */
+    .plan-session-row {
+        display: block;
+        width: 100%;
+        margin-top: 6px;
+    }
+
     .mini-progress {
         height: 6px;
         border-radius: var(--radius-pill);
@@ -1502,14 +1559,23 @@
         width: 100%;
     }
 
+ /* ═══ Child Item (زیرکار) ═══ */
     .child-item {
         display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         padding: 10px 12px;
         border-radius: var(--radius-md);
         background: var(--bg-4);
         border: 1px solid var(--border-subtle);
+    }
+
+    /* دسکتاپ: با display: contents، فرزندان wrapperها مستقیماً در child-item قرار می‌گیرند */
+    .child-main-row,
+    .child-text-row {
+        display: contents;
     }
 
     .child-item .task-checkbox {
@@ -1539,6 +1605,7 @@
         font-size: 0.72rem;
         color: var(--accent-cyan);
         white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .child-actions {
@@ -1674,10 +1741,23 @@
         padding: 10px 18px;
         font-size: 0.85rem;
     }
+
+    /* ═══ Plan Dates (فرم افزودن) ═══ */
+    #planDatesWrap {
+        margin-top: 10px;
+    }
+
+    #planDatesWrap .due-btn {
+        flex: 1 1 auto;
+    }
+
+    #planDatesWrap .due-clear {
+        flex: 0 0 auto;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LAYER: overrides — Header Refinement, Create Zone, List Zone, Task Mini Link
+   LAYER: overrides
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer overrides {
     /* ═══ Header refinement (Desktop) ═══ */
@@ -1849,6 +1929,7 @@
     .create-zone #seriesRecurWrap,
     .create-zone .more-details,
     .create-zone #planKidsWrap,
+    .create-zone #planDatesWrap,
     .create-zone .template-toggle { margin-top: 10px; }
 
     .create-zone .form-actions { margin-top: 14px; }
@@ -1954,7 +2035,39 @@
     .map-head-actions .map-context-toggle { display: inline-flex; }
     #panelTasks > .task-zone + .task-zone { margin-bottom: 0; }
 
-    /* ═══ Task Item — Mini Link ═══ */
+    /* ═══ Task Info Row — Mini Link ═══ */
+    .task-info-row .mini-link {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        min-height: 26px;
+        margin-inline-start: 2px;
+        padding: 2px 8px;
+        border: 1px solid var(--accent-cyan-border);
+        border-radius: var(--radius-pill);
+        background: var(--accent-cyan-soft);
+        color: var(--accent-cyan);
+        font: inherit;
+        font-size: .72rem;
+        font-weight: 700;
+        line-height: 1.2;
+        cursor: pointer;
+        transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+    }
+
+    .task-info-row .mini-link:hover {
+        background: var(--accent-cyan-soft);
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
+    }
+
+    .task-info-row .mini-link:active {
+        transform: translateY(1px);
+    }
+
+    /* سازگاری با کلاس قدیمی .task-item .mini-link */
     .task-item .mini-link {
         appearance: none;
         display: inline-flex;
@@ -2000,12 +2113,9 @@
     }
 
     /* ═══ Pro Mode — فیلتر و مرتب‌سازی فقط در حالت پیشرفته ═══ */
-    /* در حالت ساده، فیلترها و انتخاب مرتب‌سازی پنهان می‌شوند.
-       دکمه‌های «تقویم» و «سطل» داخل sort-row باقی می‌مانند. */
     body:not(.pro-mode) .list-zone .filters,
     body:not(.pro-mode) .list-zone .sort-row > label,
     body:not(.pro-mode) .list-zone .sort-row > .sort-select {
         display: none;
     }
 }
-

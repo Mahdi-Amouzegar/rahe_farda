@@ -58,7 +58,11 @@ export function sessionSummaryHtml(task) {
         const diffDays = Math.round((startOf(due) - startOf(now)) / 86400000);
         const extra = diffDays === 0 ? ' (امروز)' : diffDays === 1 ? ' (فردا)' : ` (${toFa(diffDays)} روز مانده)`;
         const count = sessions.length > 1 ? ` <span class="sess-count">${toFa(sessions.length)} جلسه</span>` : '';
-        return `<span class="due-line">📅 جلسه بعد: ${faShort(n.at)}${extra}${n.location ? ' 📍' : ''}</span>${count}`;
+        // آیکن هوا اگر وظیفه یا برنامه مکان داشته باشد (بر اساس task.location، نه session.location)
+        const weatherBtn = task.location
+            ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا">🌡️</button>`
+            : '';
+        return `<span class="due-line">📅 جلسه بعد: ${faShort(n.at)}${extra}${n.location ? ' 📍' : ''}${weatherBtn}</span>${count}`;
     }
     const past = [...sessions].sort((a, b) => new Date(b.at) - new Date(a.at))[0];
     return `<span class="due-line overdue">⚠ سررسید گذشته: ${faShort(past.at)}</span>`;

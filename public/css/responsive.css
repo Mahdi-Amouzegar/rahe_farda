@@ -431,10 +431,58 @@
             flex-wrap: wrap;
         }
 
-        .child-item {
-            flex-wrap: wrap;
-            row-gap: 6px;
-        }
+@media (max-width: 900px) {
+    /* ... سایر قواعد موجود ... */
+
+    /* ═══ Child Item در موبایل: ۲ سطری ═══ */
+    .child-item {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    /* wrapperها در موبایل واقعی می‌شوند */
+    .child-main-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .child-text-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+    }
+
+    /* ترتیب فرزندان در سطر اول */
+    .child-main-row .task-checkbox {
+        order: 1;
+        flex: 0 0 auto;
+    }
+
+    .child-main-row .child-due {
+        order: 2;
+        flex: 0 0 auto;
+    }
+
+    .child-main-row .child-actions {
+        order: 3;
+        margin-inline-start: auto;
+        flex: 0 0 auto;
+    }
+
+    /* سطر دوم: متن */
+    .child-text-row .child-text {
+        order: 1;
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+    }
+}
 
         .child-item .child-text {
             flex: 1 1 100%;

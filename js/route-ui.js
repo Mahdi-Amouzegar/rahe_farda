@@ -33,6 +33,7 @@ const AUTO_CLEAR_MS = 5 * 60 * 1000;
 
 let activeRoutes = null;
 let activeTask = null;
+let activeDestination = null;  // ← NEW: مکان مقصد انتخاب‌شده (task.location یا session.location)
 let activeKey = 'car';
 let activeLayer = null;
 let controller = null;
@@ -40,8 +41,8 @@ let clearTimer = null;
 let mapClickBoundTo = null;
 let clearButtonBound = false;
 let mapCaptureBound = false;
-let summaryHidden = false; // آیا پنل route-summary پنهان است؟
-let liveRouteUpdateTimer = null; // debounce برای به‌روزرسانی مسیر در حالت ردیابی آنلاین
+let summaryHidden = false;
+let liveRouteUpdateTimer = null;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -82,6 +83,27 @@ function getFreshOrigin() {
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
     });
+}
+
+/**
+ * انتخاب مکان مقصد از یک وظیفه/زیرکار
+ * اولویت: task.location → نزدیک‌ترین session آینده با location → اولین session با location
+ */
+function pickDestination(task) {
+    if (!task) return null;
+    if (task.location) return task.location;
+
+    const sessionsWithLoc = (task.sessions || []).filter(s => s && s.location);
+    if (sessionsWithLoc.length === 0) return null;
+
+    const now = Date.now();
+    const upcoming = sessionsWithLoc
+        .filter(s => new Date(s.at).getTime() >= now)
+        .sort((a, b) => new Date(a.at) - new Date(b.at))[0];
+    if (upcoming) return upcoming.location;
+
+    // اگر همه گذشته‌اند، اولین session با location را برگردان
+    return sessionsWithLoc[0].location;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -133,6 +155,7 @@ function clearMapRoute() {
     hideActiveLayer();
     activeRoutes = null;
     activeTask = null;
+    activeDestination = null;
     activeKey = 'car';
     summaryHidden = false;
     removeSummary();
@@ -200,7 +223,12 @@ async function fetchRoute(profile, origin, destination, signal) {
 async function showRouteTo(taskId) {
     const found = findTask(taskId);
     const task = found ? found.task : null;
-    if (!task || !task.location) return;
+    if (!task) return;
+
+    // انتخاب مکان مقصد (task.location یا session.location)
+    const destination = pickDestination(task);
+    if (!destination) return;
+
     ensureMapVisible();
     switchToTab('map');
     const ready = await waitForMapReady();
@@ -226,7 +254,7 @@ async function showRouteTo(taskId) {
             if (localController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
             const profile = PROFILES[i];
             try {
-                results[profile.key] = await fetchRoute(profile, origin, task.location, localController.signal);
+                results[profile.key] = await fetchRoute(profile, origin, destination, localController.signal);
             } catch (err) {
                 if (err && err.name === 'AbortError') throw err;
                 results[profile.key] = null;
@@ -236,6 +264,7 @@ async function showRouteTo(taskId) {
         if (localController.signal.aborted || !getMap() || !getMapReady()) return;
         activeRoutes = results;
         activeTask = task;
+        activeDestination = destination;
         summaryHidden = false;
         activeKey = results.car ? 'car' : (results.bike ? 'bike' : 'foot');
         if (!activeRoutes[activeKey]) throw new Error('no-route');
@@ -262,7 +291,7 @@ async function showRouteTo(taskId) {
 
 async function updateActiveRoute() {
     // اگر مسیری فعال نیست، کاری نکن
-    if (!activeRoutes || !activeTask || !activeTask.location) return;
+    if (!activeRoutes || !activeTask || !activeDestination) return;
 
     const map = getMap();
     if (!map || !getMapReady()) return;
@@ -273,13 +302,11 @@ async function updateActiveRoute() {
     const ll = youMarker.getLatLng();
 
     const origin = { lat: ll.lat, lng: ll.lng };
-    const destination = activeTask.location;
+    const destination = activeDestination;
 
-    // ذخیره‌ی حالت فعلی (کدام profile فعال بود)
     const currentKey = activeKey;
-    const currentFit = false;  // در حالت live، نقشه نباید دوباره fit شود
+    const currentFit = false;
 
-    // محاسبه‌ی مجدد مسیرها
     if (controller) {
         controller.abort();
         controller = null;
@@ -313,7 +340,6 @@ async function updateActiveRoute() {
 
     } catch (err) {
         if (err && err.name === 'AbortError') return;
-        // silent fail — مسیر قدیمی روی نقشه می‌ماند
     } finally {
         if (controller === localController) controller = null;
     }
@@ -321,7 +347,6 @@ async function updateActiveRoute() {
 
 // گوش دادن به رویداد موقعیت زنده از map.js
 window.addEventListener('rahe-live-position', () => {
-    // debounce برای جلوگیری از محاسبه‌ی مکرر
     clearTimeout(liveRouteUpdateTimer);
     liveRouteUpdateTimer = setTimeout(() => {
         updateActiveRoute();
@@ -341,7 +366,6 @@ function bindRouteSummary() {
         if (closeButton) {
             event.preventDefault();
             event.stopPropagation();
-            // بستن پنل: فقط UI پنهان می‌شود، مسیر روی نقشه می‌ماند
             hideSummaryOnly();
             return;
         }
@@ -360,7 +384,6 @@ function bindClearButton() {
     btn.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
-        // همیشه حذف کامل مسیر و پنل
         clearMapRoute();
     });
 }
@@ -377,8 +400,6 @@ function bindMapLifecycle() {
             showRouteTo(routeButton.dataset.pproute);
             return;
         }
-        // توجه: کلیک روی نقشه هیچ تأثیری روی مسیر فعال ندارد.
-        // کاربر باید بتواند آزادانه pan/zoom کند.
     }, true);
 }
 
@@ -386,7 +407,6 @@ function bindMapInstance() {
     const map = getMap();
     if (map && map !== mapClickBoundTo) {
         mapClickBoundTo = map;
-        // نکته: هیچ listener کلیکی روی نقشه برای مسیر ثبت نمی‌کنیم.
     }
 }
 
@@ -420,9 +440,9 @@ export { showRouteTo, clearMapRoute };
 
 // برای map.js در چرخه‌ی live tracking
 export function hasActiveRoute() {
-    return Boolean(activeRoutes && activeTask && activeTask.location);
+    return Boolean(activeRoutes && activeTask && activeDestination);
 }
 
 export function getActiveRouteDestination() {
-    return activeTask && activeTask.location ? activeTask.location : null;
+    return activeDestination || null;
 }

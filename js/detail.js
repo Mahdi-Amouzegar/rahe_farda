@@ -65,6 +65,17 @@ function flashSaved(msg) {
     saveHintTimer = setTimeout(() => hint.classList.remove('show'), 1500);
 }
 
+function formatDateShort(iso) {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        return d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+        return '';
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Smart suggest تاریخ (در صفحه‌ی جزئیات)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -137,6 +148,45 @@ function attachDetailSmartSuggest(el, targetId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Plan dates
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderPlanDates() {
+    const task = getDetailTask();
+    if (!task) return;
+    const section = document.querySelector('.detail-section[data-detail-section="plan-dates"]');
+    if (!section) return;
+
+    // فقط برای برنامه نمایش داده شود
+    if (task.kind !== 'plan') {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = '';
+
+    const line = document.getElementById('detailPlanDatesLine');
+    const startBtn = document.getElementById('detailPlanStartBtn');
+    const endBtn = document.getElementById('detailPlanEndBtn');
+    const clearBtn = document.getElementById('detailPlanDatesClear');
+
+    if (startBtn) startBtn.textContent = task.startAt ? `📅 شروع: ${formatDateShort(task.startAt)}` : '📅 تاریخ شروع';
+    if (endBtn) endBtn.textContent = task.endAt ? `📅 پایان: ${formatDateShort(task.endAt)}` : '📅 تاریخ پایان';
+
+    if (line) {
+        const parts = [];
+        if (task.startAt && task.endAt) parts.push(`از ${formatDateShort(task.startAt)} تا ${formatDateShort(task.endAt)}`);
+        else if (task.startAt) parts.push(`از ${formatDateShort(task.startAt)}`);
+        else if (task.endAt) parts.push(`تا ${formatDateShort(task.endAt)}`);
+        line.textContent = parts.length ? parts.join(' ') : '';
+        line.style.display = parts.length ? '' : 'none';
+    }
+
+    if (clearBtn) {
+        clearBtn.style.display = (task.startAt || task.endAt) ? '' : 'none';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Open / Close
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -155,9 +205,10 @@ export function openDetail(id) {
 
     document.getElementById('detailTitle').textContent = (task.kind === 'plan' ? '📁 ' : '') + task.text;
     document.getElementById('fTitle').value = task.text;
-    document.getElementById('fLocField').style.display = task.kind === 'plan' ? 'none' : '';
+    // حالا location برای برنامه هم نمایش داده می‌شود
+    document.getElementById('fLocField').style.display = '';
     const locAccordion = document.querySelector('.detail-accordion.location');
-    if (locAccordion) locAccordion.style.display = task.kind === 'plan' ? 'none' : '';
+    if (locAccordion) locAccordion.style.display = '';
     document.getElementById('fDesc').value = task.description || '';
     document.getElementById('fPhone').value = task.phone || '';
     document.getElementById('fAddr').value = task.address || '';
@@ -167,6 +218,7 @@ export function openDetail(id) {
     document.getElementById('fRecur').value = task.recur || 'none';
     document.getElementById('fRecurN').value = task.recurN || (task.recur === 'hourly' ? 8 : 2);
     renderRecurRows();
+    renderPlanDates();
     document.getElementById('fPhoneError').textContent = '';
     updateUrlLink();
     updateCallBtn();
@@ -189,7 +241,6 @@ export function openDetail(id) {
 }
 
 export function closeDetail() {
-    // قبل از بستن، آخرین تغییرات input‌ها را ذخیره کن
     if (typeof debouncedSaveTitle !== 'undefined') debouncedSaveTitle.flush();
     if (typeof debouncedSaveDesc !== 'undefined') debouncedSaveDesc.flush();
     if (typeof debouncedSavePhone !== 'undefined') debouncedSavePhone.flush();
@@ -214,7 +265,6 @@ function enterLocationPickMode(taskId, mode) {
         state.relocateSess = null;
         state.pendingReturnDetail = state.currentDetailId;
 
-        // روی موبایل: صفحه جزئیات مخفی می‌شود تا کاربر مستقیم نقشه را ببیند.
         if (window.matchMedia('(max-width: 900px)').matches) {
             const pageEl = document.getElementById('detailPage');
             if (pageEl) pageEl.style.display = 'none';
@@ -282,9 +332,13 @@ export function renderDetailSessions() {
     const now = getNow().getTime();
     el.innerHTML = list.map((s, i) => {
         const past = new Date(s.at).getTime() < now;
+        const sessionLoc = s.location || task.location;
+        const weatherBtn = !past && sessionLoc
+            ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" data-weather-session="${escapeHtml(String(s.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا">🌡️</button>`
+            : '';
         return `<div class="session-item ${past ? 'past' : ''}">
             <span class="session-num">${toFa(i + 1)}</span>
-            <span class="session-date">📅 ${faShort(s.at)}${past ? ' (گذشته)' : ''}</span>
+            <span class="session-date">📅 ${faShort(s.at)}${past ? ' (گذشته)' : ''} ${weatherBtn}</span>
             <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="یادآور این جلسه">
                 <option value=""${s.remindMin == null ? ' selected' : ''}>⏰ پیش‌فرض</option>
                 <option value="5"${s.remindMin === 5 ? ' selected' : ''}>۵ دقیقه</option>
@@ -511,7 +565,6 @@ export function bindDetailInputs() {
         debouncedSaveUrl();
     });
 
-    // اتصال smart suggest تاریخ به فیلدهای عنوان و توضیح
     attachDetailSmartSuggest(document.getElementById('fTitle'), 'fTitle');
     attachDetailSmartSuggest(document.getElementById('fDesc'), 'fDesc');
 
@@ -691,6 +744,52 @@ export function bindDetailInputs() {
         if (!t || !t.location) return;
         enterLocationPickMode(t.id, 'route');
     });
+
+    // ─── Plan dates handlers ───
+    const planStartBtn = document.getElementById('detailPlanStartBtn');
+    if (planStartBtn) {
+        planStartBtn.addEventListener('click', () => {
+            const t = getDetailTask();
+            if (!t || t.kind !== 'plan') return;
+            openPicker('tpldate', iso => {
+                t.startAt = iso;
+                // اگر endAt قبل از startAt جدید بود، null شود
+                if (t.endAt && new Date(t.endAt) < new Date(iso)) t.endAt = null;
+                saveTasks();
+                renderPlanDates();
+                call('render');
+                flashSaved('تاریخ شروع ثبت شد');
+            });
+        });
+    }
+    const planEndBtn = document.getElementById('detailPlanEndBtn');
+    if (planEndBtn) {
+        planEndBtn.addEventListener('click', () => {
+            const t = getDetailTask();
+            if (!t || t.kind !== 'plan') return;
+            openPicker('tpldate', iso => {
+                t.endAt = iso;
+                saveTasks();
+                renderPlanDates();
+                call('render');
+                flashSaved('تاریخ پایان ثبت شد');
+            });
+        });
+    }
+    const planDatesClear = document.getElementById('detailPlanDatesClear');
+    if (planDatesClear) {
+        planDatesClear.addEventListener('click', () => {
+            const t = getDetailTask();
+            if (!t || t.kind !== 'plan') return;
+            t.startAt = null;
+            t.endAt = null;
+            saveTasks();
+            renderPlanDates();
+            call('render');
+            flashSaved('تاریخ‌ها حذف شدند');
+        });
+    }
+
     const photoInput = document.getElementById('photoInput');
     photoInput.addEventListener('change', () => {
         const task = getDetailTask();

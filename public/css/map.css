@@ -40,7 +40,7 @@
     .map-search {
         position: relative;
         margin-bottom: 12px;
-        z-index: 500;
+        z-index: 1;
     }
 
     .map-search-row {
@@ -367,6 +367,13 @@
         font-size: 0.78rem;
         color: var(--accent-cyan);
         margin-bottom: 10px;
+    }
+
+    /* ═══ Popup City ═══ */
+    .pp-city {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin: 4px 0 6px;
     }
 
     .pp-btn {
@@ -1061,7 +1068,6 @@
             height: 100%;
             min-width: 0;
         }
-
     }
 
     /* ═══ Responsive — Small Screens ═══ */

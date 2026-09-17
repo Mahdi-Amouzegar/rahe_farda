@@ -8,8 +8,6 @@ import { getNow } from './time.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // Callback registry (به جای shim‌های window.X)
 // ═══════════════════════════════════════════════════════════════════════════
-// از app.js در زمان boot register می‌شود.
-// این الگو circular import را می‌شکند.
 
 const _callbacks = {
     render: null,
@@ -30,7 +28,6 @@ export function registerCallbacks(cbs) {
     Object.assign(_callbacks, cbs);
 }
 
-// helper داخلی
 function call(name, ...args) {
     const fn = _callbacks[name];
     if (typeof fn === 'function') return fn(...args);
@@ -96,6 +93,14 @@ function idbPutAll(storeName, items, opts) {
 // Sanitization
 // ═══════════════════════════════════════════════════════════════════════════
 
+function sanitizeBilingualNames(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const out = {};
+    if (typeof obj.fa === 'string' && obj.fa.trim()) out.fa = obj.fa.trim().replace(/\s+/g, ' ').slice(0, 80);
+    if (typeof obj.en === 'string' && obj.en.trim()) out.en = obj.en.trim().replace(/\s+/g, ' ').slice(0, 80);
+    return Object.keys(out).length ? out : null;
+}
+
 export function validLoc(v) {
     if (!v || !Number.isFinite(+v.lat) || !Number.isFinite(+v.lng) ||
         Math.abs(+v.lat) > 90 || Math.abs(+v.lng) > 180) {
@@ -107,6 +112,12 @@ export function validLoc(v) {
     } else {
         out.name = null;
     }
+    // نام مکان دو زبانه (اختیاری — فقط برای مکان‌های ذخیره‌شده)
+    const names = sanitizeBilingualNames(v.names);
+    if (names) out.names = names;
+    // نام شهر دو زبانه (خودکار — از reverse geocode)
+    const cityNames = sanitizeBilingualNames(v.cityNames);
+    if (cityNames) out.cityNames = cityNames;
     return out;
 }
 
@@ -194,7 +205,8 @@ export function sanitizeTask(t) {
             .slice(0, 8)
             .map(p => ({ id: typeof p.id !== 'undefined' ? p.id : uid(), dataUrl: p.dataUrl, addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString() }))
             : [],
-        location: kind === 'plan' ? null : validLoc(t.location)
+        // حالا برای برنامه‌ها هم location مجاز است
+        location: validLoc(t.location)
     };
 }
 
@@ -530,9 +542,11 @@ export function addTask(forceKind) {
         archived: false,
         timeSpent: 0,
         timerStartedAt: null,
-        sessions,
-        location: !isPlan && state.pendingLoc ? { ...state.pendingLoc } : null,
-        photos: []
+        sessions: sessions,
+        location: state.pendingLoc ? { ...state.pendingLoc } : null,
+        photos: [],
+        startAt: isPlan ? (state.planDraftStart || null) : null,
+        endAt: isPlan ? (state.planDraftEnd || null) : null
     });
     if (isPlan) state.expandedPlans.add(String(state.justAddedId));
     saveTasks();
@@ -541,6 +555,8 @@ export function addTask(forceKind) {
     state.addDraftSessions = [];
     call('updateDueChips');
     state.planDraftKids = [];
+    state.planDraftStart = null;
+    state.planDraftEnd = null;
     call('renderPlanKids');
     document.getElementById('descInput').value = '';
     document.getElementById('prioritySelect').value = 'medium';

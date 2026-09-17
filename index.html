@@ -3,7 +3,7 @@
 <html lang="fa" dir="rtl" data-lang="fa">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://api.open-meteo.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن. بدون حساب کاربری، حتی آفلاین.">
     <meta name="theme-color" content="#f0f3f8">
@@ -136,6 +136,14 @@
                                 <div class="loc-chip" id="locChip" style="display: none;">
                                     <span id="locChipText"></span>
                                     <button type="button" data-locclear aria-label="حذف محل">✕</button>
+                                </div>
+                                <div id="planDatesWrap" style="display: none;">
+                                    <div class="child-add" style="margin-bottom: 8px;">
+                                        <button class="due-btn" id="planStartBtn" type="button">📅 تاریخ شروع</button>
+                                        <button class="due-btn" id="planEndBtn" type="button">📅 تاریخ پایان</button>
+                                        <button class="due-clear" id="planDatesClear" type="button" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
+                                    </div>
+                                    <div class="loc-line" id="planDatesLine" style="display: none;"></div>
                                 </div>
                                 <div id="seriesRecurWrap" style="display: none;">
                                     <div class="field-label" style="margin-bottom: 6px;">تکرار دوره</div>
@@ -304,7 +312,6 @@
         </div>
     </div>
 
-    <!-- صفحه جزئیات و سطل زباله: در body (نه در right-flow) تا از overflow مستقل باشند -->
     <section class="detail-page" id="detailPage" style="display: none;" aria-label="جزئیات وظیفه">
         <div class="detail-inner">
             <div class="detail-header">
@@ -321,6 +328,21 @@
                         <label class="field"><span class="field-label">توضیح بیشتر</span><textarea id="fDesc" rows="3" maxlength="1000" placeholder="مثلاً نام پزشک، علت مراجعه..."></textarea></label>
                     </div>
                 </section>
+
+                <section class="detail-section detail-accordion plan-dates" data-detail-section="plan-dates" aria-labelledby="detailPlanDatesTitle" style="display: none;">
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker">بازه</span><h3 id="detailPlanDatesTitle">تاریخ شروع و پایان</h3></div><span class="detail-section-status">فقط برنامه</span></div>
+                    <div class="detail-section-body detail-accordion-body">
+                        <div class="field">
+                            <div class="loc-btns" style="flex-wrap: wrap;">
+                                <button class="due-btn" id="detailPlanStartBtn" type="button">📅 تاریخ شروع</button>
+                                <button class="due-btn" id="detailPlanEndBtn" type="button">📅 تاریخ پایان</button>
+                                <button class="due-clear" id="detailPlanDatesClear" type="button" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
+                            </div>
+                            <div class="loc-line" id="detailPlanDatesLine" style="margin-top: 8px; display: none;"></div>
+                        </div>
+                    </div>
+                </section>
+
                 <div class="smart-chip detail-smart-chip" id="detailSmartChip" style="display: none;">
                     <span id="detailSmartChipText"></span>
                     <button id="detailSmartAccept" type="button">✓ اضافه کن</button>
@@ -494,6 +516,17 @@
                 <button class="btn-clear" id="savedLocationsClose" type="button">بستن</button>
             </div>
             <div id="savedLocationsBody"></div>
+        </div>
+    </div>
+
+    <div class="picker-overlay" id="weatherModal" style="display: none;">
+        <div class="picker" role="dialog" aria-modal="true" aria-labelledby="weatherModalTitle">
+            <div class="picker-title" id="weatherModalTitle">🌤️ پیش‌بینی هوا</div>
+            <div class="weather-content" id="weatherContent"></div>
+            <div class="picker-actions">
+                <button class="btn-add picker-confirm" id="weatherModalOk" type="button">بستن</button>
+            </div>
+            <div class="weather-attribution">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></div>
         </div>
     </div>
 

@@ -2,7 +2,14 @@
 // map-search.js -- جستجوی مکان با Nominatim (OpenStreetMap)
 
 import { state } from './core.js';
-import { mapHint, getMap, getMapReady, switchToTab } from './map.js';
+import {
+    mapHint,
+    getMap,
+    getMapReady,
+    switchToTab,
+    showPickMarker,
+    removePickMarker
+} from './map.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -14,7 +21,7 @@ const DEBOUNCE_MS = 500;
 const MAX_RESULTS = 8;
 
 // User-Agent معتبر طبق Usage Policy Nominatim
-const USER_AGENT = 'RaheFarda/1.2 (https://github.com/Mahdi-Amouzegar/rahe_farda)';
+const USER_AGENT = 'RaheFarda/1.3 (https://github.com/Mahdi-Amouzegar/rahe_farda)';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -149,7 +156,6 @@ function renderResults(results) {
         </button>`;
     }).join('');
     resultsEl.style.display = '';
-    // ذخیره نتایج فعلی برای انتخاب
     resultsEl._results = results;
 }
 
@@ -157,7 +163,7 @@ function renderResults(results) {
 // Select a place
 // ═══════════════════════════════════════════════════════════════════════════
 
-function selectPlace(place) {
+async function selectPlace(place) {
     const map = getMap();
     if (!map || !getMapReady()) {
         mapHint('نقشه آماده نیست');
@@ -170,26 +176,57 @@ function selectPlace(place) {
         searchMarker = null;
     }
 
-    // افزودن مارکر موقت روی مکان انتخاب‌شده
-    searchMarker = L.marker([place.lat, place.lng], {
-        icon: L.divIcon({
-            className: '',
-            html: '<span class="mk-pick"></span>',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        })
-    }).addTo(map);
-
-    searchMarker.bindPopup(`<div class="pp"><div class="pp-title">${escapeHtml(place.name)}</div></div>`).openPopup();
-
     // پرواز به مکان
     map.flyTo([place.lat, place.lng], 15, { duration: 1.2 });
 
-    // نگه‌داشتن نام مکان در input و بستن نتایج
-    if (inputEl) inputEl.value = place.name;
+    // بستن نتایج
     hideResults();
-    switchToTab('map');
-    mapHint(`📍 ${place.name}`);
+
+    // ذخیره در pendingLoc — فقط مختصات (بدون name)
+    // cityNames بعداً به صورت غیرهمزمان اضافه می‌شود
+    state.pendingLoc = {
+        lat: place.lat,
+        lng: place.lng
+    };
+    showPickMarker();
+
+    // نمایش locChip در فرم افزودن
+    const { refreshSavedLocationUI } = await import('./location-ui.js');
+    if (typeof refreshSavedLocationUI === 'function') refreshSavedLocationUI();
+
+    // به‌روزرسانی input جستجو با نام
+    if (inputEl) inputEl.value = place.name;
+
+    // switch به تب وظایف
+    switchToTab('tasks');
+
+    // اسکرول به فرم افزودن و فوکوس
+    setTimeout(() => {
+        const inp = document.getElementById('taskInput');
+        if (!inp) return;
+        inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        inp.focus({ preventScroll: true });
+    }, 60);
+
+    mapHint('📍 محل انتخاب شد — عنوان وظیفه را بنویسید');
+
+    // دریافت نام شهر برای cityNames (بدون نمایش در loc-chip)
+    (async () => {
+        try {
+            const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+            const names = await reverseGeocodeBilingual(place.lat, place.lng);
+            if (state.pendingLoc &&
+                state.pendingLoc.lat === place.lat &&
+                state.pendingLoc.lng === place.lng) {
+                if (names.fa || names.en) {
+                    const cn = {};
+                    if (names.fa) cn.fa = names.fa;
+                    if (names.en) cn.en = names.en;
+                    state.pendingLoc = { ...state.pendingLoc, cityNames: cn };
+                }
+            }
+        } catch { /* silent */ }
+    })();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -230,19 +267,15 @@ function onInput() {
 
     const query = inputEl.value.trim();
 
-    // نمایش/پنهان کردن دکمه پاک کردن
     if (clearBtnEl) clearBtnEl.style.display = query ? '' : 'none';
 
-    // پاک کردن debounce قبلی
     clearTimeout(debounceTimer);
 
-    // اگر کوئری کوتاه است، نتایج را پنهان کن
     if (query.length < MIN_QUERY_LENGTH) {
         hideResults();
         return;
     }
 
-    // Debounce طولانی (طبق Usage Policy Nominatim، auto-complete ممنوع است)
     debounceTimer = setTimeout(() => {
         performSearch(query);
     }, DEBOUNCE_MS);
@@ -281,7 +314,6 @@ export function initMapSearch() {
 
     clearBtnEl?.addEventListener('click', clearSearch);
 
-    // انتخاب آیتم از لیست
     resultsEl.addEventListener('click', e => {
         const btn = e.target.closest('[data-search-idx]');
         if (!btn) return;
@@ -291,7 +323,6 @@ export function initMapSearch() {
         if (place) selectPlace(place);
     });
 
-    // بستن نتایج با کلیک بیرون
     document.addEventListener('click', e => {
         if (!resultsEl || resultsEl.style.display === 'none') return;
         if (e.target.closest('.map-search')) return;

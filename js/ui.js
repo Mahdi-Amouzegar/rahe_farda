@@ -50,6 +50,21 @@ let _calTrapCleanup = null;
 let snackTimer = null;
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * آیا این وظیفه (کار/برنامه/زیرکار) مکان دارد؟
+ * مکان می‌تواند روی خود وظیفه یا روی یکی از sessionها باشد.
+ */
+function hasAnyLocation(t) {
+    if (!t) return false;
+    if (t.location) return true;
+    if (Array.isArray(t.sessions) && t.sessions.some(s => s && s.location)) return true;
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // ویرایش
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -178,7 +193,7 @@ export function renderStats(total, done) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Template Modal
-// ════════════════════════����══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function renderTemplateList() {
     const el = document.getElementById('tplList');
@@ -380,26 +395,31 @@ function childHtml(c) {
     }
     const n = nearestUpcoming(c);
     return `<div class="child-item ${c.completed ? 'completed' : ''} ${String(c.id) === String(state.justAddedId) ? 'just-added' : ''}" data-id="${escapeHtml(String(c.id))}">
-        <button class="task-checkbox ${c.completed ? 'checked' : ''}" data-action="toggle"
-            aria-label="${c.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
-            aria-pressed="${c.completed}"></button>
-        <span class="child-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید">${escapeHtml(c.text)}</span>
-        ${n ? `<span class="child-due">📅 ${faShort(n.at)}</span>` : ''}
-        ${(c.location || (c.sessions || []).some(s => s.location)) ? '<span class="child-due">📍</span>' : ''}
-        ${(c.photos || []).length ? '<span class="child-due">📷</span>' : ''}
-        ${recurBadge(c, 'child-due')}
-        <div class="child-actions">
-            ${operationMenu(state.currentFilter === 'archived'
-                ? [
-                    { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                    { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
-                ]
-                : [
-                    { action: 'pick-loc', label: c.location ? 'نمایش محل روی نقشه' : 'ثبت محل روی نقشه', icon: '📍' },
-                    { action: 'detail', label: 'جزئیات زیرکار', icon: '📋' },
-                    { action: 'archive', label: 'بایگانی زیرکار', icon: '📦' },
-                    { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
-                ], 'عملیات زیرکار')}
+        <div class="child-main-row">
+            <button class="task-checkbox ${c.completed ? 'checked' : ''}" data-action="toggle"
+                aria-label="${c.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
+                aria-pressed="${c.completed}"></button>
+            ${n ? `<span class="child-due">📅 ${faShort(n.at)}</span>` : ''}
+            ${(c.location || (c.sessions || []).some(s => s.location)) ? '<span class="child-due">📍</span>' : ''}
+            ${(c.photos || []).length ? '<span class="child-due">📷</span>' : ''}
+            ${recurBadge(c, 'child-due')}
+            <div class="child-actions">
+                ${operationMenu(state.currentFilter === 'archived'
+                    ? [
+                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                        { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
+                    ]
+                    : [
+                        { action: 'pick-loc', label: c.location ? 'نمایش محل روی نقشه' : 'ثبت محل روی نقشه', icon: '📍' },
+                        ...(hasAnyLocation(c) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
+                        { action: 'detail', label: 'جزئیات زیرکار', icon: '📋' },
+                        { action: 'archive', label: 'بایگانی زیرکار', icon: '📦' },
+                        { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
+                    ], 'عملیات زیرکار')}
+            </div>
+        </div>
+        <div class="child-text-row">
+            <span class="child-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید">${escapeHtml(c.text)}</span>
         </div>
     </div>`;
 }
@@ -411,35 +431,38 @@ function planHtml(task) {
     const kids = visibleChildren(task);
     const drafts = state.childDrafts[task.id] || [];
     const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
+    const hasLoc = hasAnyLocation(task);
     return `<div class="task-item plan-item prio-${task.priority}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="plan-head">
             <button class="plan-caret" data-action="expand" aria-label="باز و بسته کردن برنامه">${open ? '▾' : '◂'}</button>
             <div class="plan-head-main">
                 <div class="task-text">📁 ${escapeHtml(task.text)}</div>
-                <div class="task-meta">
-                    <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>${recurBadge(task)}
-                    <span>زیرکار: ${toFa(st.done)} از ${toFa(st.total)}</span>
-                    ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
-                    ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
-                    <div class="mini-progress"><div class="mini-progress-fill" style="width: ${pct}%;"></div></div>
-                    ${st.total > 0 && st.done < st.total ? '<button class="mini-link" data-action="check-all" aria-label="انجام شدن همه زیرکارها">✓ همه انجام شد</button>' : ''}
-                </div>
-                ${(task.sessions && task.sessions.length) ? sessionSummaryHtml(task) : ''}
             </div>
-<div class="task-actions">
-            ${operationMenu(state.currentFilter === 'archived'
-                ? [
-                    { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                    { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
-                ]
-                : [
-                    { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
-                    { action: 'detail', label: 'جزئیات برنامه', icon: '📋' },
-                    { action: 'archive', label: 'بایگانی برنامه', icon: '📦' },
-                    { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
-                ], 'عملیات برنامه')}
+            <div class="task-actions">
+                ${operationMenu(state.currentFilter === 'archived'
+                    ? [
+                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                        { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
+                    ]
+                    : [
+                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
+                        ...(hasLoc ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
+                        { action: 'detail', label: 'جزئیات برنامه', icon: '📋' },
+                        { action: 'archive', label: 'بایگانی برنامه', icon: '📦' },
+                        { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
+                    ], 'عملیات برنامه')}
+            </div>
         </div>
+        <div class="task-meta plan-meta-row">
+            <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>${recurBadge(task)}
+            <span>زیرکار: ${toFa(st.done)} از ${toFa(st.total)}</span>
+            ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
+            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
+            ${hasLoc ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
+            <div class="mini-progress"><div class="mini-progress-fill" style="width: ${pct}%;"></div></div>
+            ${st.total > 0 && st.done < st.total ? '<button class="mini-link" data-action="check-all" aria-label="انجام شدن همه زیرکارها">✓ همه انجام شد</button>' : ''}
         </div>
+        ${(task.sessions && task.sessions.length) ? `<div class="plan-session-row">${sessionSummaryHtml(task)}</div>` : ''}
         ${open ? `<div class="plan-body">
             ${kids.length ? kids.map(c => childHtml(c)).join('') : '<div class="session-empty">هنوز زیرکاری ثبت نشده است.</div>'}
             ${drafts.length ? `<div class="due-chips" style="display: flex; margin: 0;">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="حذف">✕</button></span>`).join('')}</div>` : ''}
@@ -463,7 +486,7 @@ function taskTypeIcon(task) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Snackbar / Undo
-// ══════════════════════════════���════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 function buildTrashMessage(ids) {
     if (!ids || ids.length === 0) return 'به سطل زباله منتقل شد';
@@ -599,44 +622,50 @@ export function render() {
         if (String(task.id) === String(state.editingId)) {
             return `
             <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${escapeHtml(String(task.id))}">
-                <div class="task-content">
-                    <div class="edit-wrap">
-                        <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش وظیفه">
-                        <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
-                        <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف از ویرایش">✕</button>
+                <div class="task-main-row">
+                    <div class="task-content">
+                        <div class="edit-wrap">
+                            <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش وظیفه">
+                            <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
+                            <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف از ویرایش">✕</button>
+                        </div>
                     </div>
                 </div>
             </div>`;
         }
         return `
         <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
-            <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
-                aria-label="${task.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
-                aria-pressed="${task.completed}"></button>
-            <div class="task-content">
-                <div class="task-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
-                <div class="task-meta">
-                    <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>${recurBadge(task)}
-                    <span class="created-date">${faDate(task.createdAt)}</span>
-                    ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
-                    ${task.location ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
+            <div class="task-main-row">
+                <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
+                    aria-label="${task.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
+                    aria-pressed="${task.completed}"></button>
+                <div class="task-content">
+                    <div class="task-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
                 </div>
-                ${sessionSummaryHtml(task)}
+                <div class="task-actions">
+                    ${operationMenu(state.currentFilter === 'archived'
+                        ? [
+                            { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                            { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                        ]
+                        : [
+                            { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
+                            ...(hasAnyLocation(task) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
+                            { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
+                            { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
+                            { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
+                            { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                        ], 'عملیات وظیفه')}
+                </div>
             </div>
-            <div class="task-actions">
-                ${operationMenu(state.currentFilter === 'archived'
-                    ? [
-                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                    ]
-                    : [
-                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
-                        { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
-                        { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
-                        { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
-                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                    ], 'عملیات وظیفه')}
+            <div class="task-info-row">
+                <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
+                ${recurBadge(task)}
+                <span class="created-date">${faDate(task.createdAt)}</span>
+                ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
+                ${task.location ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
             </div>
+            ${sessionSummaryHtml(task)}
         </div>`;
     }).join('');
 

@@ -130,11 +130,47 @@ function coords(loc) {
     return `${toFa(a)}، ${toFa(b)}`;
 }
 
+/**
+ * نام نمایشی مکان بر اساس زبان فعلی
+ * اولویت: mکان ذخیره‌شده → نام ذخیره‌شده → مختصات
+ */
 function label(loc) {
     if (!loc) return '';
-    if (typeof loc.name === 'string' && loc.name.trim()) return loc.name.trim();
-    const x = savedFor(loc);
-    return x ? x.name : coords(loc);
+    const saved = savedFor(loc);
+    if (saved) {
+        if (saved.names) {
+            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            const preferred = saved.names[lang] || saved.names.fa || saved.names.en;
+            if (preferred) return preferred;
+        }
+        if (saved.name) return saved.name;
+    }
+    // مکان ذخیره نشده → مختصات
+    const n = normalize(loc);
+    return n ? coords(n) : '';
+}
+
+/**
+ * نمایش با آیکن مناسب — فقط مکان‌های ذخیره‌شده نام نمایش می‌دهند
+ */
+function displayFor(loc) {
+    if (!loc) return { icon: '📍', name: '', cls: 'location-display-coords', isSaved: false };
+    const n = normalize(loc);
+    if (!n) return { icon: '📍', name: '', cls: 'location-display-coords', isSaved: false };
+
+    // ⚠️ فقط اگر در لیست مکان‌های ذخیره‌شده باشد، نام نمایش داده می‌شود
+    const saved = savedFor(n);
+    if (saved) {
+        let name = saved.name;
+        if (saved.names) {
+            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            name = saved.names[lang] || saved.names.fa || saved.names.en || saved.name;
+        }
+        return { icon: '📌', name, cls: 'location-display-name', isSaved: true };
+    }
+
+    // مکان ذخیره نشده → فقط مختصات
+    return { icon: '📍', name: coords(n), cls: 'location-display-coords', isSaved: false };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -268,14 +304,14 @@ function renderAdd() {
     if (!chip || !text) return;
     if (!state.pendingLoc) { chip.style.display = 'none'; return; }
     chip.style.display = '';
-    const saved = savedFor(state.pendingLoc);
-    const displayName = (state.pendingLoc.name && state.pendingLoc.name.trim()) || (saved ? saved.name : null);
-    const isSaved = Boolean(displayName);
-    const html = `<span class="location-display"><span>${isSaved ? '📌' : '📍'}</span><span class="${isSaved ? 'location-display-name' : 'location-display-coords'}">${escapeHtml(displayName || coords(state.pendingLoc))}</span></span>`;
+    const d = displayFor(state.pendingLoc);
+    const html = `<span class="location-display"><span>${d.icon}</span><span class="${d.cls}">${escapeHtml(d.name)}</span></span>`;
     if (text.innerHTML !== html) text.innerHTML = html;
     let actions = chip.querySelector('.loc-chip-actions');
     if (!actions) { actions = document.createElement('span'); actions.className = 'loc-chip-actions'; chip.appendChild(actions); }
-    const ah = isSaved ? '' : '<button type="button" class="loc-chip-save" data-save-pending-location>📌 ذخیره نام</button>';
+    // دکمه «ذخیره نام» یا «تغییر نام» — همیشه نمایش داده می‌شود
+    const label = d.isSaved ? '✏️ تغییر نام' : '📌 ذخیره نام';
+    const ah = `<button type="button" class="loc-chip-save" data-save-pending-location>${label}</button>`;
     if (actions.innerHTML !== ah) actions.innerHTML = ah;
 }
 
@@ -310,12 +346,9 @@ function renderDetail() {
         return;
     }
 
-    const snap = (task.location.name && task.location.name.trim()) || null;
-    const saved = savedFor(task.location);
-    const displayName = snap || (saved ? saved.name : null);
-    const isSaved = Boolean(displayName);
+    const d = displayFor(task.location);
 
-    const html = `<span class="location-display"><span>${isSaved ? '📌' : '📍'}</span><span class="${isSaved ? 'location-display-name' : 'location-display-coords'}">${escapeHtml(displayName || coords(task.location))}</span></span>`;
+    const html = `<span class="location-display"><span>${d.icon}</span><span class="${d.cls}">${escapeHtml(d.name)}</span></span>`;
     if (line.innerHTML !== html) line.innerHTML = html;
 
     if (showBtn) showBtn.style.display = '';
@@ -326,15 +359,14 @@ function renderDetail() {
         changeBtn.style.display = '';
     }
 
-    if (!isSaved) {
-        const save = document.createElement('button');
-        save.type = 'button';
-        save.className = 'location-save-btn';
-        save.dataset.saveDetailLocation = '';
-        save.textContent = '📌 ذخیره نام مکان';
-        save.setAttribute('aria-label', 'ذخیره نام این مکان');
-        line.appendChild(save);
-    }
+    // دکمه «ذخیره نام» یا «تغییر نام» — همیشه نمایش داده می‌شود
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'location-save-btn';
+    save.dataset.saveDetailLocation = '';
+    save.textContent = d.isSaved ? '✏️ تغییر نام' : '📌 ذخیره نام مکان';
+    save.setAttribute('aria-label', 'ذخیره یا تغییر نام این مکان');
+    line.appendChild(save);
 }
 
 function ensureList() {
@@ -429,13 +461,15 @@ async function reload() {
     renderList();
 }
 
-function applyNameToTasksAt(loc, name) {
+function applyNameToTasksAt(loc, name, names, cityNames) {
     if (!Array.isArray(state.tasks)) return false;
     const n = normalize(loc);
     if (!n) return false;
     const touch = t => {
         if (t && t.location && same(t.location, n)) {
             t.location = { lat: t.location.lat, lng: t.location.lng, name };
+            if (names) t.location.names = names;
+            if (cityNames) t.location.cityNames = cityNames;
             return true;
         }
         return false;
@@ -450,6 +484,8 @@ function applyNameToTasksAt(loc, name) {
         (t.sessions || []).forEach(s => {
             if (s && s.location && same(s.location, n)) {
                 s.location = { lat: s.location.lat, lng: s.location.lng, name };
+                if (names) s.location.names = names;
+                if (cityNames) s.location.cityNames = cityNames;
                 changed = true;
             }
         });
@@ -458,6 +494,8 @@ function applyNameToTasksAt(loc, name) {
                 (c.sessions || []).forEach(s => {
                     if (s && s.location && same(s.location, n)) {
                         s.location = { lat: s.location.lat, lng: s.location.lng, name };
+                        if (names) s.location.names = names;
+                        if (cityNames) s.location.cityNames = cityNames;
                         changed = true;
                     }
                 });
@@ -500,11 +538,26 @@ async function saveLocationWithName(loc, name) {
     item.name = cleanName;
     item.lat = n.lat;
     item.lng = n.lng;
+    // حفظ نام دو زبانه‌ی مکان (اگر قبلاً ذخیره شده)
+    if (loc.names && typeof loc.names === 'object') {
+        const names = {};
+        if (typeof loc.names.fa === 'string' && loc.names.fa.trim()) names.fa = loc.names.fa.trim().slice(0, 80);
+        if (typeof loc.names.en === 'string' && loc.names.en.trim()) names.en = loc.names.en.trim().slice(0, 80);
+        if (Object.keys(names).length) item.names = names;
+    }
+    // ذخیره‌ی نام شهر (cityNames) — اول از loc، اگر نبود از existing
+    const cityNames = loc.cityNames || existing?.cityNames;
+    if (cityNames && typeof cityNames === 'object') {
+        const cn = {};
+        if (typeof cityNames.fa === 'string' && cityNames.fa.trim()) cn.fa = cityNames.fa.trim().slice(0, 80);
+        if (typeof cityNames.en === 'string' && cityNames.en.trim()) cn.en = cityNames.en.trim().slice(0, 80);
+        if (Object.keys(cn).length) item.cityNames = cn;
+    }
     item.updatedAt = new Date().toISOString();
     try {
         await put(item);
         await reload();
-        applyNameToTasksAt(n, cleanName);
+        applyNameToTasksAt(n, cleanName, item.names, item.cityNames);
         sync();
         refreshMarkers();
         mapHint(`مکان «${cleanName}» ذخیره شد ✓`);
@@ -539,7 +592,7 @@ export function saveLocationFromPopup(loc) {
     });
 }
 
-// ═══════════════════════��═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // حالت تغییر مکان
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -575,6 +628,21 @@ function bindMapRelocate() {
                 map.flyTo([loc.lat, loc.lng], Math.max(map.getZoom(), 15), { duration: 0.9 });
             }
             mapHint(`مکان «${item.name}» به‌روزرسانی شد ✓`);
+
+            // دریافت نام شهر جدید (cityNames) برای مکان تغییر یافته
+            (async () => {
+                try {
+                    const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+                    const names = await reverseGeocodeBilingual(loc.lat, loc.lng);
+                    if (names.fa || names.en) {
+                        const cn = {};
+                        if (names.fa) cn.fa = names.fa;
+                        if (names.en) cn.en = names.en;
+                        item.cityNames = cn;
+                        put(item).then(reload).then(sync);
+                    }
+                } catch { /* silent */ }
+            })();
         });
     });
 }
@@ -608,6 +676,8 @@ export function hideMobileBanner() {
 function selectLocation(item) {
     if (!item) return;
     const loc = { lat: +item.lat, lng: +item.lng, name: item.name };
+    if (item.names) loc.names = item.names;
+    if (item.cityNames) loc.cityNames = item.cityNames;
     ensureMapVisible();
     switchToTab('map');
     const map = getMap();
@@ -672,7 +742,14 @@ function bind() {
             if (!savePending) return;
             e.preventDefault();
             e.stopPropagation();
-            saveLocation(state.pendingLoc);
+            // اگر مکان ذخیره شده، نامش را پیشنهاد بده
+            const saved = savedFor(state.pendingLoc);
+            const suggested = saved ? saved.name : '';
+            const name = askLocationName(suggested);
+            name.then(v => {
+                if (!v) return;
+                saveLocationWithName(state.pendingLoc, v);
+            });
         });
     }
 
@@ -683,7 +760,15 @@ function bind() {
             e.stopPropagation();
             const found = findTask(state.currentDetailId);
             const t = found ? found.task : null;
-            if (t && t.location) saveLocation(t.location);
+            if (t && t.location) {
+                const saved = savedFor(t.location);
+                const suggested = saved ? saved.name : '';
+                const name = askLocationName(suggested);
+                name.then(v => {
+                    if (!v) return;
+                    saveLocationWithName(t.location, v);
+                });
+            }
         }
     });
 
@@ -842,10 +927,23 @@ function bindNewLocationFromMap() {
         const loc = { lat: +e.latlng.lat.toFixed(5), lng: +e.latlng.lng.toFixed(5) };
         askLocationName('').then(name => {
             if (!name) return;
-            saveLocationWithName(loc, name).then(() => {
-                renderManageList();
-                openManageModal();
-            });
+            // دریافت cityNames به صورت موازی
+            (async () => {
+                try {
+                    const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+                    const names = await reverseGeocodeBilingual(loc.lat, loc.lng);
+                    if (names.fa || names.en) {
+                        const cn = {};
+                        if (names.fa) cn.fa = names.fa;
+                        if (names.en) cn.en = names.en;
+                        loc.cityNames = cn;
+                    }
+                } catch { /* silent */ }
+                saveLocationWithName(loc, name).then(() => {
+                    renderManageList();
+                    openManageModal();
+                });
+            })();
         });
     });
 }

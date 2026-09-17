@@ -54,9 +54,9 @@ let mapInitTimers = [];
 // Live tracking state
 let liveWatchId = null;
 let lastAcceptedTime = 0;
-const LIVE_TRACK_MIN_INTERVAL_MS = 2500;  // حداقل فاصله بین دو آپدیت پذیرفته‌شده
+const LIVE_TRACK_MIN_INTERVAL_MS = 2500;
 let liveTrackActive = false;
-let liveTrackingFirstFix = true;  // فلگ اولین fix برای تصمیم‌گیری zoom/fit
+let liveTrackingFirstFix = true;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Public getters/setters
@@ -255,14 +255,12 @@ export function setYouMarker(ll, options) {
         }).addTo(map).bindPopup('<div class="pp"><div class="pp-title">موقعیت شما</div></div>');
     }
 
-    // fitBounds: اگر آرایه‌ای از نقاط داده شد، روی همه‌ی آن‌ها fit کن
     if (Array.isArray(fitBounds) && fitBounds.length >= 2) {
         const bounds = L.latLngBounds(fitBounds);
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
         return;
     }
 
-    // pan و zoom دلخواه
     if (zoom !== null) {
         map.setView(ll, zoom, { animate: true, duration: 0.8 });
     } else if (pan) {
@@ -270,15 +268,11 @@ export function setYouMarker(ll, options) {
     }
 }
 
-// چک می‌کند که آیا یک نقطه در محدوده‌ی دید فعلی نقشه است (با حاشیه‌ی اختیاری)
 function isLatLngInView(ll, marginRatio) {
     if (!mapReady || !map) return false;
     const bounds = map.getBounds();
     if (!marginRatio) return bounds.contains(ll);
-    const size = map.getSize();
-    const maxDim = Math.max(size.x, size.y);
-    const pad = marginRatio;
-    const inner = bounds.pad(-pad);
+    const inner = bounds.pad(-marginRatio);
     return inner.contains(ll);
 }
 
@@ -382,7 +376,15 @@ export function refreshMarkers() {
             locRow = `<div class="pp-loc pp-loc-unsaved"><span>📍</span><span class="pp-coords">${escapeHtml(latTxt)}، ${escapeHtml(lngTxt)}</span><button class="pp-save-btn" type="button" data-save-popup-location data-lat="${loc.lat}" data-lng="${loc.lng}">📌 ذخیره نام</button></div>`;
         }
 
-        m.bindPopup(`<div class="pp pp-${t.priority}"><div class="pp-title">${escapeHtml(t.text)}</div><div class="pp-date">📅 ${dateLine}</div>${locRow}<div class="pp-row"><button class="pp-btn" data-ppdetail="${escapeHtml(String(t.id))}">نمایش جزئیات</button><button class="pp-btn" data-pproute="${escapeHtml(String(t.id))}">🧭 مسیر</button></div></div>`);
+        // خط شهر از cityNames
+        let cityRow = '';
+        if (loc.cityNames) {
+            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            const city = loc.cityNames[lang] || loc.cityNames.fa || loc.cityNames.en;
+            if (city) cityRow = `<div class="pp-city">🌆 ${escapeHtml(city)}</div>`;
+        }
+
+        m.bindPopup(`<div class="pp pp-${t.priority}"><div class="pp-title">${escapeHtml(t.text)}</div><div class="pp-date">📅 ${dateLine}</div>${cityRow}${locRow}<div class="pp-row"><button class="pp-btn" data-ppdetail="${escapeHtml(String(t.id))}">نمایش جزئیات</button><button class="pp-btn" data-pproute="${escapeHtml(String(t.id))}">🧭 مسیر</button></div></div>`);
         m._taskId = t.id;
         markersLayer.addLayer(m);
     };
@@ -390,6 +392,8 @@ export function refreshMarkers() {
     state.tasks.forEach(t => {
         if (t.kind === 'plan') (t.children || []).forEach(c => { const l = displayLoc(c); if (l) pts.push({ t: c, loc: l }); });
         else { const l = displayLoc(t); if (l) pts.push({ t, loc: l }); }
+        // خود برنامه هم اگر location دارد
+        if (t.kind === 'plan' && t.location) pts.push({ t, loc: t.location });
     });
     const CELL = 64;
     const cells = new Map();
@@ -500,6 +504,20 @@ export function onMapClick(e) {
                 refreshMarkers();
                 call('refreshSavedLocationUI');
                 mapHint('محل جلسه ذخیره شد ✓');
+                // دریافت cityNames
+                (async () => {
+                    try {
+                        const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+                        const names = await reverseGeocodeBilingual(loc.lat, loc.lng);
+                        if (names.fa || names.en) {
+                            const cn = {};
+                            if (names.fa) cn.fa = names.fa;
+                            if (names.en) cn.en = names.en;
+                            s.location = { ...s.location, cityNames: cn };
+                            saveTasks();
+                        }
+                    } catch { /* silent */ }
+                })();
             }
             call('hideMobilePickBanner');
             if (ret) {
@@ -522,6 +540,21 @@ export function onMapClick(e) {
             call('refreshSavedLocationUI');
             mapHint('محل جدید ذخیره شد ✓');
             flyToTask(found.task.id);
+            // دریافت cityNames
+            (async () => {
+                try {
+                    const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+                    const names = await reverseGeocodeBilingual(loc.lat, loc.lng);
+                    if (names.fa || names.en) {
+                        const cn = {};
+                        if (names.fa) cn.fa = names.fa;
+                        if (names.en) cn.en = names.en;
+                        found.task.location = { ...found.task.location, cityNames: cn };
+                        saveTasks();
+                        refreshMarkers();
+                    }
+                } catch { /* silent */ }
+            })();
         }
         call('hideMobilePickBanner');
         if (ret) {
@@ -536,6 +569,26 @@ export function onMapClick(e) {
     call('updateLocChip');
     switchToTab('tasks');
     mapHint('📍 محل انتخاب شد — عنوان وظیفه را بنویسید');
+
+    // دریافت نام شهر برای cityNames (بدون نمایش در loc-chip)
+    (async () => {
+        try {
+            const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
+            const names = await reverseGeocodeBilingual(loc.lat, loc.lng);
+            if (state.pendingLoc &&
+                state.pendingLoc.lat === loc.lat &&
+                state.pendingLoc.lng === loc.lng) {
+                if (names.fa || names.en) {
+                    const cn = {};
+                    if (names.fa) cn.fa = names.fa;
+                    if (names.en) cn.en = names.en;
+                    state.pendingLoc = { ...state.pendingLoc, cityNames: cn };
+                    // loc-chip فقط مختصات نمایش می‌دهد، پس updateLocChip لازم نیست
+                }
+            }
+        } catch { /* silent */ }
+    })();
+
     setTimeout(() => {
         const inp = document.getElementById('taskInput');
         if (!inp) return;
@@ -580,7 +633,7 @@ export function startLiveTracking() {
         btn.textContent = '⏹ توقف ردیابی';
     }
 
-    mapHint('ردیابی آنلاین فعال شد — موقعیت هر ۵ ثانیه به‌روز می‌شود', 4000);
+    mapHint('ردیابی آنلاین فعال شد — موقعیت هر ۲.۵ ثانیه به‌روز می‌شود', 4000);
 
     liveWatchId = navigator.geolocation.watchPosition(
         position => {
@@ -597,7 +650,6 @@ export function startLiveTracking() {
             if (liveTrackingFirstFix) {
                 liveTrackingFirstFix = false;
 
-                // اگر مسیر فعال است، هم موقعیت و هم مقصد را در دید بگیر
                 if (call('hasActiveRoute')) {
                     const dest = call('getActiveRouteDestination');
                     if (dest && Number.isFinite(dest.lat) && Number.isFinite(dest.lng)) {
@@ -611,7 +663,6 @@ export function startLiveTracking() {
                     setYouMarker(ll, { zoom: 15 });
                 }
             } else {
-                // آپدیت‌های بعدی: فقط اگر موقعیت خارج از دید است، pan کن
                 if (!isLatLngInView(ll, 0.15)) {
                     setYouMarker(ll, { pan: true });
                 } else {
@@ -619,7 +670,6 @@ export function startLiveTracking() {
                 }
             }
 
-            // اطلاع به سایر ماژول‌ها (route-ui برای به‌روزرسانی مسیر)
             const event = new CustomEvent('rahe-live-position', {
                 detail: { lat: ll[0], lng: ll[1] }
             });
@@ -668,7 +718,6 @@ export function isLiveTrackingActive() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function updateLocChip() {
-    // این تابع در location-ui.js مدیریت می‌شود؛ اینجا فقط delegating می‌کنیم.
     call('updateLocChip');
 }
 

@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "com.mahdiamouzegar.rahefarda",
-        "sha256_cert_fingerprints": ["CC:11:24:4D:4C:81:B6:9F:C4:AA:3C:D5:73:86:A8:BB:17:8D:2F:FB:A4:55:D8:BB:6A:69:B3:8E:DB:CD:85:27"]
-      }
-    }]
