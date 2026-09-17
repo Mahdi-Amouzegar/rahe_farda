@@ -744,6 +744,69 @@ document.getElementById('mapToggle').addEventListener('click', () => {
     if (state.prefs.mapVisible) initMap();
 });
 
+/* ---------- Bottom Action Bar (فاز ۳) ---------- */
+
+document.querySelector('.bottom-actions')?.addEventListener('click', e => {
+    const btn = e.target.closest('.bottom-action');
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    if (action === 'new-task' || action === 'new-plan' || action === 'new-series') {
+        // ۱. سوئیچ به تب وظایف (اگر در تب نقشه هستیم)
+        switchToTab('tasks');
+
+        // ۲. تنظیم نوع
+        const kind = action === 'new-task' ? 'task'
+                   : action === 'new-plan' ? 'plan'
+                   : 'series';
+        setKind(kind);
+
+        // ۳. اسکرول نرم به create-zone
+        const createZone = document.querySelector('.create-zone');
+        if (createZone) {
+            createZone.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ۴. focus روی input بعد از اسکرول
+        setTimeout(() => {
+            const ti = document.getElementById('taskInput');
+            if (ti) ti.focus({ preventScroll: true });
+        }, 400);
+        return;
+    }
+
+    if (action === 'open-settings') {
+        toggleSettings(true);
+        return;
+    }
+});
+
+/* ---------- Photo Camera Input (فاز ۳) ---------- */
+// اتصال photoCameraInput به همان logic photoInput (در detail.js)
+
+(function initPhotoCameraInput() {
+    const photoCameraInput = document.getElementById('photoCameraInput');
+    const photoInput = document.getElementById('photoInput');
+    if (!photoCameraInput || !photoInput) return;
+
+    photoCameraInput.addEventListener('change', () => {
+        if (!photoCameraInput.files || photoCameraInput.files.length === 0) return;
+        try {
+            const dt = new DataTransfer();
+            for (const f of photoCameraInput.files) dt.items.add(f);
+            photoInput.files = dt.files;
+            photoInput.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch {
+            // fallback برای مرورگرهای قدیمی — فقط رویداد را dispatch می‌کنیم
+            photoInput.dispatchEvent(new Event('change', { bubbles: true }));
+        } finally {
+            photoCameraInput.value = '';
+        }
+    });
+})();
+
+/* ---------- initSettings ---------- */
+
 function initSettings() {
     const on = document.getElementById('setRemindOn');
     const mins = document.getElementById('setRemindMin');

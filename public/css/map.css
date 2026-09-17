@@ -883,10 +883,12 @@
         }
     }
 
-    /* ═══ Map Divider Toggle ═══ */
+    /* ═══ B3: Map Divider Toggle — با text-indent برای دسترس‌پذیری ═══ */
     .map-divider-toggle {
-        color: transparent;
-        font-size: 0;
+        /* B3: به جای color: transparent + font-size: 0، از text-indent استفاده می‌کنیم
+           تا متن اصلی (اگر وجود داشته باشد) برای screen reader باقی بماند */
+        text-indent: -9999px;
+        overflow: hidden;
         background: linear-gradient(145deg, #6b55df 0%, #5138c9 48%, #35248d 100%);
         border: 1px solid rgba(255, 255, 255, .34);
         box-shadow:
@@ -895,13 +897,13 @@
             0 4px 0 rgba(23, 15, 70, .72),
             0 7px 16px rgba(0, 0, 0, .38),
             0 0 12px rgba(81, 56, 201, .22);
-        text-shadow: none;
         transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
     }
 
     .map-divider-toggle::before {
         content: '📍';
         display: block;
+        text-indent: 0;
         color: var(--text-white);
         font-size: 18px;
         font-family: "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
@@ -1132,7 +1134,7 @@
         .task-item .mini-link {
             min-height: 27px;
             padding-inline: 8px;
-            font-size: .72rem;
+            font-size: .76rem;
         }
 
         .detail-page .detail-accordion-body {

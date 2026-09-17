@@ -277,6 +277,25 @@
                         </div>
                         <div class="app-footer__small">© <span id="copyYear">۱۴۰۵</span> — همه حقوق محفوظ است · 🔒 اطلاعات شما فقط روی همین دستگاه می‌ماند</div>
                     </footer>
+
+                    <nav class="bottom-actions" aria-label="دسترسی سریع">
+                        <button class="bottom-action" type="button" data-action="new-task" aria-label="کار جدید">
+                            <span class="bottom-action-icon" aria-hidden="true">➕</span>
+                            <span class="bottom-action-label">کار جدید</span>
+                        </button>
+                        <button class="bottom-action" type="button" data-action="new-plan" aria-label="برنامه جدید">
+                            <span class="bottom-action-icon" aria-hidden="true">📂</span>
+                            <span class="bottom-action-label">برنامه جدید</span>
+                        </button>
+                        <button class="bottom-action" type="button" data-action="new-series" aria-label="دوره جدید">
+                            <span class="bottom-action-icon" aria-hidden="true">📅</span>
+                            <span class="bottom-action-label">دوره جدید</span>
+                        </button>
+                        <button class="bottom-action" type="button" data-action="open-settings" aria-label="تنظیمات">
+                            <span class="bottom-action-icon" aria-hidden="true">⚙</span>
+                            <span class="bottom-action-label">تنظیمات</span>
+                        </button>
+                    </nav>
                 </div>
             </div>
 
@@ -387,7 +406,15 @@
                 <section class="detail-section detail-accordion photos" data-detail-section="photos" aria-labelledby="detailPhotosTitle">
                     <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک <span class="count-badge" id="photoCount" aria-label="تعداد تصاویر"></span></h3></div><span class="detail-section-status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><div class="photo-grid" id="photoGrid"></div><label class="due-btn" for="photoInput" style="cursor: pointer;">＋ افزودن عکس</label><input type="file" id="photoInput" accept="image/*" multiple hidden></div>
+                        <div class="field">
+                            <div class="photo-grid" id="photoGrid"></div>
+                            <div class="photo-actions">
+                                <label class="due-btn photo-upload-btn" for="photoInput" style="cursor: pointer;">📁 افزودن از گالری</label>
+                                <input type="file" id="photoInput" accept="image/*" multiple hidden>
+                                <label class="due-btn photo-upload-btn photo-camera-btn" for="photoCameraInput" style="cursor: pointer;">📷 گرفتن عکس</label>
+                                <input type="file" id="photoCameraInput" accept="image/*" capture="environment" hidden>
+                            </div>
+                        </div>
                     </div>
                 </section>
                 <div class="detail-actions"><button class="btn-clear" id="detailDelete" type="button">حذف این وظیفه</button></div>
@@ -410,7 +437,7 @@
     </section>
 
     <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردانی</button></div>
-    <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="نمایش تصویر"><img id="lightboxImg" alt="تصویر وظیفه"></div>
+    <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="نمایش تصویر" tabindex="-1"><img id="lightboxImg" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-label="خوش آمدید">

@@ -102,6 +102,9 @@ html {
     --transition-base: 0.3s ease;
     --transition-slow: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
+    /* ── Bottom Action Bar ── */
+    --bottom-bar-height: 64px;
+
     /* ── Visual Fixes Variables ── */
     --rf-primary: #5138C9;
     --rf-primary-soft: rgba(81, 56, 201, .14);
@@ -207,6 +210,9 @@ html.theme-light {
     --shadow-lg: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -1px rgba(15, 23, 42, 0.04);
     --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 10px 10px -5px rgba(15, 23, 42, 0.04);
 
+    /* ── Bottom Action Bar ── */
+    --bottom-bar-height: 64px;
+
     /* ── Visual Fixes (Light) ── */
     --rf-primary: #6d28d9;
     --rf-primary-soft: rgba(109, 40, 217, .10);
@@ -227,7 +233,7 @@ html.theme-light {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    راهنمای لایه‌ها (Cascade Layers)
-   ══════════════════════════════════��════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 @layer reset, base, layout, components, utilities, overrides;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -270,7 +276,7 @@ html.theme-light {
         color: var(--text-primary);
         display: flex;
         justify-content: center;
-        padding: 40px 20px;
+        /* ⚠️ padding حذف شد — مسئولیت padding به containerهای داخلی سپرده شد */
         overflow-x: hidden;
         position: relative;
         -webkit-user-select: none;

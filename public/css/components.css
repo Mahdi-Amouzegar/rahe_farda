@@ -384,6 +384,79 @@
         margin: 0;
     }
 
+    /* ═══ Bottom Action Bar ═══ */
+    .bottom-actions {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        background: var(--bg-2);
+        border-block-start: 1px solid var(--border-medium);
+        box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.12);
+        /* position و z-index در responsive.css تنظیم می‌شوند */
+    }
+
+    .bottom-action {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 8px 4px;
+        min-height: var(--bottom-bar-height);
+        border: 0;
+        background: transparent;
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 0.7rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: color .16s ease, background .16s ease;
+        position: relative;
+    }
+
+    .bottom-action:hover {
+        color: var(--accent-cyan);
+        background: var(--accent-cyan-soft);
+    }
+
+    .bottom-action:active {
+        background: var(--accent-cyan-soft);
+    }
+
+    .bottom-action:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: -3px;
+        z-index: 1;
+    }
+
+    .bottom-action-icon {
+        font-size: 1.35rem;
+        line-height: 1;
+        display: inline-block;
+    }
+
+    .bottom-action-label {
+        display: block;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* جداکننده بین دکمه‌ها */
+    .bottom-action + .bottom-action::before {
+        content: '';
+        position: absolute;
+        inset-block: 12px;
+        inset-inline-start: 0;
+        width: 1px;
+        background: var(--border-subtle);
+        opacity: 0.5;
+    }
+
     /* ═══ Input Section ═══ */
     .text-input-with-mic {
         display: flex;
@@ -570,9 +643,15 @@
         height: 100%;
         width: 0;
         border-radius: var(--radius-pill);
-        background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
+        /* A3: RTL-aware gradient — از سمت start شروع به پر شدن می‌کند */
+        background: linear-gradient(270deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
         box-shadow: 0 0 12px var(--accent-cyan-glow);
         transition: width 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* در حالت LTR، جهت gradient معکوس می‌شود */
+    html[dir="ltr"] .progress-fill {
+        background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
     }
 
     .stats {
@@ -625,7 +704,7 @@
         width: 100%;
     }
 
-    /* ═══ Task Info Row ═══ */
+    /* ═══ Task Info Row — B1: font-size به 0.8rem افزایش یافت ═══ */
     .task-info-row {
         display: flex;
         align-items: center;
@@ -633,14 +712,14 @@
         flex-wrap: wrap;
         width: 100%;
         padding-inline-start: 38px;
-        font-size: 0.72rem;
+        font-size: 0.8rem;
         color: var(--text-faint);
     }
 
     .task-info-row .mini-link {
         min-height: 26px;
         padding: 2px 8px;
-        font-size: .72rem;
+        font-size: .76rem;
     }
 
     .task-item.just-added {
@@ -764,7 +843,7 @@
     /* ═══ Created Date ═══ */
     .created-date {
         color: var(--text-faintest);
-        font-size: 0.72rem;
+        font-size: 0.76rem;
     }
 
     .task-meta {
@@ -772,14 +851,14 @@
         align-items: center;
         gap: 8px;
         margin-top: 6px;
-        font-size: 0.72rem;
+        font-size: 0.76rem;
         color: var(--text-faint);
     }
 
     .priority-badge {
         padding: 2px 10px;
         border-radius: var(--radius-pill);
-        font-size: 0.7rem;
+        font-size: 0.72rem;
         font-weight: 700;
         border: 1px solid;
     }
@@ -830,6 +909,7 @@
         z-index: 50;
     }
 
+    /* ═══ B5: Operation Trigger — آیکن‌محور در دسکتاپ ═══ */
     .operation-trigger {
         min-width: 78px;
         min-height: 42px;
@@ -858,6 +938,56 @@
     .operation-trigger:first-letter {
         font-size: 1.35rem;
         line-height: 1;
+    }
+
+    /* در دسکتاپ: آیکن‌محور با tooltip (از aria-label) */
+    @media (min-width: 901px) {
+        .operation-trigger {
+            min-width: 42px;
+            width: 42px;
+            padding: 8px 4px;
+            position: relative;
+        }
+
+        .operation-trigger span {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* tooltip ساده با استفاده از data-tooltip */
+        .operation-trigger::after {
+            content: attr(aria-label);
+            position: absolute;
+            inset-block-end: calc(100% + 6px);
+            inset-inline-end: 50%;
+            transform: translateX(50%) translateY(4px);
+            padding: 6px 10px;
+            background: var(--bg-3);
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            font-weight: 600;
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-xs);
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .15s ease, transform .15s ease;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+
+        .operation-trigger:hover::after,
+        .operation-trigger:focus-visible::after {
+            opacity: 1;
+            transform: translateX(50%) translateY(0);
+        }
     }
 
     .operation-list {
@@ -912,6 +1042,16 @@
         padding: 6px 9px;
     }
 
+    /* در دسکتاپ: child-actions هم آیکن‌محور */
+    @media (min-width: 901px) {
+        .child-actions .operation-trigger {
+            min-width: 36px;
+            width: 36px;
+            min-height: 36px;
+            padding: 6px;
+        }
+    }
+
     .btn-icon.has-loc,
     .btn-detail.has-loc {
         border-color: var(--accent-yellow-border);
@@ -956,7 +1096,6 @@
     }
 
     /* ═══ Session Empty (shared) ═══ */
-    /* این کلاس در detail.css هم هست ولی برای استقلال components.css اینجا هم تعریف شده */
     .session-empty {
         font-size: 0.8rem;
         color: var(--text-faintest);
@@ -1071,6 +1210,14 @@
         box-shadow: none;
     }
 
+    /* ⚠️ بازگرداندن gradient برای RTL */
+    html[dir="rtl"] .progress-fill {
+        background: linear-gradient(270deg, var(--accent-primary), var(--accent-teal));
+    }
+    html[dir="ltr"] .progress-fill {
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-teal));
+    }
+
     .settings-zone {
         background: transparent;
         border-style: dashed;
@@ -1182,7 +1329,7 @@
     .due-line {
         display: inline-block;
         margin-top: 4px;
-        font-size: 0.75rem;
+        font-size: 0.78rem;
         color: var(--accent-cyan);
     }
 
@@ -1639,13 +1786,14 @@
         margin-inline-start: auto;
     }
 
+    /* ═══ B1: child-meta-row با font-size بزرگ‌تر ═══ */
     .child-meta-row {
         display: flex;
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
         padding-inline-start: 32px;
-        font-size: 0.72rem;
+        font-size: 0.8rem;
         color: var(--text-faint);
         min-height: 1.6em;
     }
@@ -1658,7 +1806,7 @@
         display: inline-flex;
         align-items: center;
         gap: 3px;
-        font-size: 0.72rem;
+        font-size: 0.8rem;
         color: var(--text-muted);
         white-space: nowrap;
     }
@@ -1666,14 +1814,14 @@
     .child-meta-badge {
         display: inline-flex;
         align-items: center;
-        font-size: 0.8rem;
+        font-size: 0.86rem;
         line-height: 1;
         color: var(--text-muted);
     }
 
     .child-meta-row .priority-badge {
         padding: 1px 8px;
-        font-size: 0.66rem;
+        font-size: 0.72rem;
     }
 
     /* ═══ Child Add Row (فرم افزودن زیرکار) ═══ */
@@ -1784,6 +1932,38 @@
         font-size: 1em;
         line-height: 1;
         text-align: center;
+    }
+
+    /* ═══ Photo Actions (detail page) ═══ */
+    .photo-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .photo-upload-btn {
+        flex: 1 1 auto;
+        min-width: min(180px, 100%);
+        justify-content: center;
+        border-style: solid;
+        border-color: var(--accent-cyan-border);
+        color: var(--accent-cyan);
+    }
+
+    .photo-upload-btn:hover {
+        border-color: var(--accent-cyan);
+        background: var(--accent-cyan-soft);
+    }
+
+    .photo-camera-btn {
+        border-color: var(--accent-purple-border);
+        color: var(--text-secondary);
+    }
+
+    .photo-camera-btn:hover {
+        border-color: var(--accent-purple);
+        background: var(--accent-purple-soft);
     }
 
     /* ═══ Plan Dates (فرم افزودن) ═══ */
@@ -2107,7 +2287,7 @@
         background: var(--accent-cyan-soft);
         color: var(--accent-cyan);
         font: inherit;
-        font-size: .72rem;
+        font-size: .76rem;
         font-weight: 700;
         line-height: 1.2;
         cursor: pointer;
