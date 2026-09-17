@@ -205,11 +205,22 @@ describe('store — sanitizeTask', () => {
         expect(r.location.lng).toBe(51.5);
     });
 
-    it('kind plan — location را همیشه null می‌کند', () => {
+    it('kind plan — location معتبر را حفظ می‌کند', () => {
         const r = sanitizeTask({
             ...baseTask,
             kind: 'plan',
             location: { lat: 35.5, lng: 51.5 }
+        });
+        expect(r.location).not.toBe(null);
+        expect(r.location.lat).toBe(35.5);
+        expect(r.location.lng).toBe(51.5);
+    });
+
+    it('kind plan — location نامعتبر را به null تبدیل می‌کند', () => {
+        const r = sanitizeTask({
+            ...baseTask,
+            kind: 'plan',
+            location: { lat: 100, lng: 51 }
         });
         expect(r.location).toBe(null);
     });
