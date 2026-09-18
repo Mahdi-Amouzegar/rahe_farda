@@ -1,0 +1,228 @@
+/* © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است */
+/* status.css — نشانگر وضعیت آنلاین/آفلاین + اصلاح رنگ time-source-icon */
+
+@layer components, overrides;
+
+@layer components {
+    /* ═══ Status Indicator ═══ */
+    .status-indicator {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+
+        appearance: none;
+        -webkit-appearance: none;
+
+        padding: 0;
+        margin-inline-start: 2px;
+        border: 0;
+        border-radius: var(--radius-pill);
+        background: transparent;
+
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 1rem;
+        line-height: 1;
+
+        cursor: pointer;
+        vertical-align: middle;
+        text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+
+        transition: color 0.16s ease, opacity 0.16s ease;
+
+        min-height: 1em;
+        min-width: 1em;
+    }
+
+    .status-indicator:focus {
+        outline: none;
+    }
+
+    .status-indicator .status-icon {
+        display: inline-block;
+        font-size: 2.2rem;
+        line-height: 1;
+        color: inherit;
+        font-family: 'Vazirmatn', Tahoma, sans-serif;
+        font-variant-emoji: text;
+        transform-origin: center center;
+    }
+
+    .status-indicator[data-status="syncing"] .status-icon {
+        animation: status-spin 1.4s linear infinite;
+    }
+
+    @keyframes status-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .status-indicator .status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 16px;
+        padding: 0 5px;
+        border-radius: var(--radius-pill);
+        background: var(--accent-cyan-soft);
+        border: 1px solid var(--accent-cyan-border);
+        color: var(--accent-cyan);
+        font-size: 0.62rem;
+        font-weight: 800;
+        line-height: 1;
+        font-variant-numeric: normal;
+        font-family: inherit;
+    }
+
+    .status-indicator .status-badge[hidden] {
+        display: none;
+    }
+
+    /* ═══ وضعیت‌ها ═══ */
+    .status-indicator[data-status="online"] {
+        color: var(--accent-green);
+        opacity: 1;
+    }
+
+    .status-indicator[data-status="online"]:hover {
+        color: var(--accent-green);
+        opacity: 1;
+    }
+
+    .status-indicator[data-status="offline"] {
+        color: var(--accent-yellow);
+        opacity: 1;
+    }
+
+    .status-indicator[data-status="offline"] .status-badge {
+        background: var(--accent-yellow-soft);
+        border-color: var(--accent-yellow-border);
+        color: var(--accent-yellow);
+    }
+
+    .status-indicator[data-status="pending"] {
+        color: var(--accent-cyan);
+        opacity: 1;
+    }
+
+    .status-indicator[data-status="syncing"] {
+        color: var(--accent-cyan);
+        opacity: 1;
+    }
+
+    .status-indicator[data-status="unknown"] {
+        color: var(--text-faintest);
+        opacity: 0.5;
+    }
+
+    .status-indicator:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+        opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .status-indicator[data-status="syncing"] .status-icon {
+            animation: none;
+        }
+    }
+
+    .today-line .status-indicator {
+        margin-inline-start: 2px;
+        flex-shrink: 0;
+    }
+
+    /* ═══ time-source-icon (🕐) ═══ */
+    .time-source-icon {
+        display: inline-block;
+        position: relative;
+        font-size: 1.4rem;
+        line-height: 1;
+        vertical-align: middle;
+        font-variant-emoji: text;
+        font-family: 'Vazirmatn', Tahoma, sans-serif;
+        color: var(--text-muted);
+        opacity: 0.7;
+        cursor: help;
+        transition: color 0.2s ease, opacity 0.2s ease;
+        padding: 0;
+        margin: 0;
+    }
+
+    .time-source-icon.online {
+        color: var(--accent-green);
+        opacity: 1;
+    }
+
+    .time-source-icon.offline {
+        color: var(--accent-yellow);
+        opacity: 1;
+    }
+
+    .time-source-icon:not(.online):not(.offline) {
+        color: var(--text-muted);
+        opacity: 0.7;
+    }
+}
+
+@layer overrides {
+    @media (max-width: 600px) {
+        .status-indicator {
+            margin-inline-start: 2px;
+        }
+
+        .status-indicator .status-icon {
+            font-size: 2rem;
+        }
+
+        .status-indicator .status-badge {
+            min-width: 16px;
+            height: 14px;
+            padding: 0 4px;
+            font-size: 0.58rem;
+        }
+
+        .time-source-icon {
+            font-size: 1.2rem;
+        }
+    }
+
+    @media (min-width: 901px) {
+        .status-indicator .status-icon {
+            font-size: 2.2rem;
+        }
+
+        .time-source-icon {
+            font-size: 1.4rem;
+        }
+    }
+
+    html.theme-light .status-indicator[data-status="online"] {
+        color: var(--accent-green);
+    }
+
+    html.theme-light .status-indicator[data-status="offline"] {
+        color: var(--accent-yellow);
+    }
+
+    html.theme-light .status-indicator[data-status="pending"],
+    html.theme-light .status-indicator[data-status="syncing"] {
+        color: var(--accent-cyan);
+    }
+
+    html.theme-dark .status-indicator[data-status="online"] {
+        color: var(--accent-green);
+    }
+
+    html.theme-dark .status-indicator[data-status="offline"] {
+        color: var(--accent-yellow);
+    }
+
+    .status-indicator[hidden] {
+        display: none;
+    }
+}

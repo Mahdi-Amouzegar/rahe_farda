@@ -1,10 +1,10 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// store.js -- IndexedDB + CRUD actions (ESM) — گام ۱ فاز ۵، فایل ۲ از ۷
+// store.js -- IndexedDB + CRUD actions (ESM) — فاز ۵ گام ۵
 //
 // ⚠️ این نسخه:
-//   - exportTasks() و importTasks() را اضافه می‌کند
-//   - صف تغییرات (pendingChanges) را برای آینده‌نگری Cloudflare اضافه می‌کند
-//   - saveTask/deleteTaskFromStore به صف entry اضافه می‌کنند
+//   - exportTasks() و importTasks() را دارد
+//   - صف تغییرات از syncQueue استفاده می‌کند (نه صف داخلی)
+//   - سازگاری کامل با loadPendingChanges / getPendingChanges
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -19,6 +19,11 @@ import {
 import { sameMinute, nearestUpcoming, allSessions, hasSessionAt, visibleChildren } from './sessions.js';
 import { getNow } from './time.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+import {
+    enqueue as syncEnqueue,
+    getQueue as getSyncQueue,
+    clearQueue as clearSyncQueue
+} from './sync-queue.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Map helpers — set by app.js during boot
@@ -40,13 +45,12 @@ export function setMapHelpers(helpers) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// call() / invoke() — جایگزین _callbacks[name](...args)
+// call() / invoke()
 // ═══════════════════════════════════════════════════════════════════════════
 
 function call(name, ...args) {
     const eventName = CALLBACK_TO_EVENT[name];
     if (!eventName) {
-        // eslint-disable-next-line no-console
         console.warn(`store.call: unknown callback "${name}"`);
         return;
     }
@@ -56,7 +60,6 @@ function call(name, ...args) {
 function invoke(name, ...args) {
     const eventName = CALLBACK_TO_EVENT[name];
     if (!eventName) {
-        // eslint-disable-next-line no-console
         console.warn(`store.invoke: unknown callback "${name}"`);
         return undefined;
     }
@@ -71,7 +74,6 @@ function invoke(name, ...args) {
                 break;
             }
         } catch (err) {
-            // eslint-disable-next-line no-console
             console.error(`store.invoke: listener for "${eventName}" threw:`, err);
         }
     }
@@ -146,15 +148,6 @@ function idbDelete(storeName, id) {
     return idbOpen().then(db => new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(id);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    }));
-}
-
-function idbClear(storeName) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     }));
@@ -279,88 +272,70 @@ export function sanitizeTask(t) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ جدید: صف تغییرات (pendingChanges)
+// ⚠️ صف تغییرات — از syncQueue استفاده می‌کند
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// این صف برای آینده‌نگری Cloudflare (فاز ۶) است.
-// هر تغییر (save/delete/restore) یک entry به صف اضافه می‌کند.
-// در این گام، صف فقط در localStorage ذخیره می‌شود و sync نمی‌شود.
-//
-// ساختار entry:
-//   { type: 'save' | 'delete' | 'trash-add' | 'trash-delete',
-//     id: string,
-//     data: object (برای save),
-//     parentId: string | null,
-//     timestamp: string }
-
-const PENDING_KEY = 'spaceTodoPendingChanges';
-const MAX_PENDING_CHANGES = 500;
 
 /**
- * افزودن یک تغییر به صف.
+ * افزودن یک تغییر به صف sync (با adapter به فرمت syncQueue).
+ *
  * @param {object} entry
  */
 function enqueueChange(entry) {
     if (!entry || !entry.type) return;
     try {
-        state.pendingChanges = state.pendingChanges || [];
-        state.pendingChanges.push({
-            ...entry,
-            timestamp: new Date().toISOString()
+        // انطباق با فرمت syncQueue: id → entityId
+        syncEnqueue({
+            type: entry.type,
+            entityId: String(entry.id ?? entry.entityId ?? ''),
+            entityType: entry.parentId ? 'child' : 'task',
+            data: entry.data || null,
+            parentId: entry.parentId ? String(entry.parentId) : null
         });
-        // اگر صف پر شد، قدیمی‌ترین‌ها را حذف کن
-        if (state.pendingChanges.length > MAX_PENDING_CHANGES) {
-            state.pendingChanges = state.pendingChanges.slice(-MAX_PENDING_CHANGES);
-        }
-        // ذخیره در localStorage (سبک — فقط برای sync آینده)
-        try {
-            localStorage.setItem(PENDING_KEY, JSON.stringify(state.pendingChanges));
-        } catch {
-            // اگر localStorage پر بود، فقط در حافظه نگه دار
-        }
     } catch (err) {
         console.error('enqueueChange failed:', err);
     }
 }
 
 /**
- * پاک کردن صف (برای بعد از sync موفق).
+ * پاک کردن صف (برای بعد از import موفق).
  */
 export function clearPendingChanges() {
-    state.pendingChanges = [];
     try {
-        localStorage.removeItem(PENDING_KEY);
+        clearSyncQueue();
     } catch { /* silent */ }
+    state.pendingChanges = [];
     events.emit('sync:queue-cleared');
 }
 
 /**
- * خواندن صف از localStorage (در boot).
+ * خواندن صف (برای دیباگ).
+ * @returns {object[]}
+ */
+export function getPendingChanges() {
+    try {
+        return getSyncQueue();
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * بارگذاری صف از localStorage.
+ * ⚠️ در فاز ۵ گام ۵، این کار توسط initSyncQueue() انجام می‌شود.
+ * این تابع فقط برای سازگاری نگه داشته شده.
  */
 export function loadPendingChanges() {
+    // no-op — initSyncQueue این کار را انجام می‌دهد
+    // اما اگر state.pendingChanges مورد نیاز باشد، از syncQueue کپی می‌کنیم
     try {
-        const raw = localStorage.getItem(PENDING_KEY);
-        if (!raw) {
-            state.pendingChanges = [];
-            return;
-        }
-        const parsed = JSON.parse(raw);
-        state.pendingChanges = Array.isArray(parsed) ? parsed : [];
+        state.pendingChanges = getSyncQueue();
     } catch {
         state.pendingChanges = [];
     }
 }
 
-/**
- * گرفتن snapshot از صف (برای دیباگ یا sync).
- * @returns {object[]}
- */
-export function getPendingChanges() {
-    return [...(state.pendingChanges || [])];
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
-// Load / Save — Incremental
+// Load / Save
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function loadTasks() {
@@ -377,9 +352,6 @@ export async function loadTasks() {
         .map(sanitizeTask);
 }
 
-/**
- * ذخیره‌ی یک task تکی در IndexedDB.
- */
 export function saveTask(task, parent) {
     if (!task || typeof task.id === 'undefined') {
         return Promise.reject(new Error('saveTask: invalid task'));
@@ -400,7 +372,6 @@ export function saveTask(task, parent) {
         })();
 
     p.then(() => {
-        // ⚠️ جدید: افزودن به صف
         enqueueChange({
             type: 'save',
             id: target.id,
@@ -423,9 +394,6 @@ export function saveTask(task, parent) {
     return p;
 }
 
-/**
- * حذف یک task تکی از IndexedDB.
- */
 export function deleteTaskFromStore(id) {
     invalidateTaskIndex();
     const p = useIDB
@@ -440,7 +408,6 @@ export function deleteTaskFromStore(id) {
         })();
 
     p.then(() => {
-        // ⚠️ جدید: افزودن به صف
         enqueueChange({ type: 'delete', id });
     }).catch(err => {
         console.error('deleteTaskFromStore failed', err);
@@ -448,9 +415,6 @@ export function deleteTaskFromStore(id) {
     return p;
 }
 
-/**
- * ذخیره‌ی کل state.tasks (bulk) — برای import/migration.
- */
 export function saveTasks() {
     const snapshot = state.tasks;
     invalidateTaskIndex();
@@ -477,23 +441,14 @@ export function saveTasks() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ جدید: Export / Import
+// Export / Import
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * ساخت ساختار JSON برای export.
- *
- * @param {object} options
- * @param {boolean} [options.includePhotos=false]
- * @param {boolean} [options.includeSettings=false]
- * @returns {Promise<object>}
- */
 export async function exportTasks(options) {
     const opts = options || {};
     const includePhotos = Boolean(opts.includePhotos);
     const includeSettings = Boolean(opts.includeSettings);
 
-    // snapshot از taskها
     const tasksSnapshot = state.tasks.map(t => {
         const copy = { ...t };
         if (!includePhotos) {
@@ -527,7 +482,6 @@ export async function exportTasks(options) {
         trash: trashSnapshot
     };
 
-    // checksum از data
     let checksum = '';
     try {
         checksum = await computeChecksum(JSON.stringify(data));
@@ -537,7 +491,7 @@ export async function exportTasks(options) {
 
     const backup = {
         schemaVersion: SCHEMA_VERSION,
-        appVersion: '1.3.1.0',
+        appVersion: '1.4.0.2',
         exportedAt: new Date().toISOString(),
         options: {
             includePhotos,
@@ -548,7 +502,6 @@ export async function exportTasks(options) {
     };
 
     if (includeSettings) {
-        // فقط فیلدهای امن prefs (بدون lastDigest که وابسته به دستگاه است)
         backup.settings = {
             theme: state.prefs.theme,
             lang: state.prefs.lang,
@@ -569,28 +522,19 @@ export async function exportTasks(options) {
     return backup;
 }
 
-/**
- * بررسی سازگاری نسخه.
- *
- * @param {string} backupVersion
- * @param {string} currentVersion
- * @returns {{ ok: boolean, warning?: string, error?: string }}
- */
 export function checkVersionCompatibility(backupVersion, currentVersion) {
     const bv = String(backupVersion || '0.0.0');
     const cv = String(currentVersion || SCHEMA_VERSION);
 
-    // اگر backup version ندارد (نسخه‌ی خیلی قدیمی)، به عنوان 0.0.0 در نظر بگیر
     const parseVersion = v => {
         const parts = v.split('.').map(n => parseInt(n, 10) || 0);
         while (parts.length < 3) parts.push(0);
         return parts.slice(0, 3);
     };
 
-    const [bMajor, bMinor, bPatch] = parseVersion(bv);
-    const [cMajor, cMinor, cPatch] = parseVersion(cv);
+    const [bMajor, bMinor] = parseVersion(bv);
+    const [cMajor, cMinor] = parseVersion(cv);
 
-    // backup از نسخه‌ی major جدیدتر
     if (bMajor > cMajor) {
         return {
             ok: false,
@@ -598,7 +542,6 @@ export function checkVersionCompatibility(backupVersion, currentVersion) {
         };
     }
 
-    // backup از نسخه‌ی minor جدیدتر (سازگار اما با هشدار)
     if (bMajor === cMajor && bMinor > cMinor) {
         return {
             ok: true,
@@ -609,24 +552,9 @@ export function checkVersionCompatibility(backupVersion, currentVersion) {
     return { ok: true };
 }
 
-/**
- * Merge یک task از backup با ساختار فعلی.
- *
- * برای هر فیلد در `sanitizeTask({})`، اگر در backup بود، از backup استفاده می‌شود.
- * اگر نبود، مقدار پیش‌فرض (خالی) می‌ماند.
- *
- * این تضمین می‌کند:
- *   - فیلدهای جدید (که در backup نیستند) → خالی می‌مانند
- *   - فیلدهای حذف‌شده (که در backup هستند) → نادیده گرفته می‌شوند
- *   - فیلدهای موجود → از backup کپی می‌شوند
- *
- * @param {object} backupTask
- * @returns {object} task ادغام‌شده
- */
 function mergeTaskFields(backupTask) {
     if (!backupTask || typeof backupTask !== 'object') return null;
 
-    // task خالی با همه‌ی فیلدهای پیش‌فرض فعلی
     const template = sanitizeTask({
         id: backupTask.id || uid(),
         text: backupTask.text || 'بدون عنوان'
@@ -637,29 +565,18 @@ function mergeTaskFields(backupTask) {
         if (field in backupTask) {
             merged[field] = backupTask[field];
         } else {
-            merged[field] = template[field];  // فیلد جدید → پیش‌فرض
+            merged[field] = template[field];
         }
     }
 
-    // حالا merged را از sanitizeTask عبور بده تا نوع‌ها تأیید شوند
     return sanitizeTask(merged);
 }
 
-/**
- * Import داده‌ها از backup.
- *
- * @param {object} backup - ساختار JSON خوانده‌شده
- * @param {object} options
- * @param {'merge'|'replace'} [options.mode='merge']
- * @param {boolean} [options.importSettings=false]
- * @returns {Promise<{ ok: boolean, imported: number, skipped: number, warning?: string, error?: string }>}
- */
 export async function importTasks(backup, options) {
     const opts = options || {};
     const mode = opts.mode === 'replace' ? 'replace' : 'merge';
     const importSettings = Boolean(opts.importSettings);
 
-    // ۱. اعتبارسنجی ساختار
     if (!backup || typeof backup !== 'object') {
         return { ok: false, error: 'ساختار فایل نامعتبر است.', imported: 0, skipped: 0 };
     }
@@ -670,13 +587,11 @@ export async function importTasks(backup, options) {
         return { ok: false, error: 'لیست وظایف در فایل نامعتبر است.', imported: 0, skipped: 0 };
     }
 
-    // ۲. بررسی نسخه
     const versionCheck = checkVersionCompatibility(backup.schemaVersion, SCHEMA_VERSION);
     if (!versionCheck.ok) {
         return { ok: false, error: versionCheck.error, imported: 0, skipped: 0 };
     }
 
-    // ۳. بررسی checksum (اگر وجود دارد)
     let checksumWarning = '';
     if (backup.checksum && backup.data) {
         try {
@@ -685,22 +600,19 @@ export async function importTasks(backup, options) {
                 checksumWarning = 'هشدار: checksum فایل مطابقت ندارد. ممکن است فایل دست‌کاری شده باشد.';
             }
         } catch {
-            // اگر checksum قابل محاسبه نبود، نادیده بگیر
+            // silent
         }
     }
 
-    // ۴. ذخیره‌ی وضعیت فعلی برای rollback در صورت خطا
     const previousTasks = state.tasks.slice();
     const previousTrash = state.trash.slice();
 
     try {
-        // ۵. حالت replace
         if (mode === 'replace') {
             state.tasks = [];
             state.trash = [];
         }
 
-        // ۶. import taskها
         let imported = 0;
         let skipped = 0;
         const existingIds = new Set(state.tasks.map(t => String(t.id)));
@@ -712,9 +624,7 @@ export async function importTasks(backup, options) {
                     skipped++;
                     continue;
                 }
-                // در حالت merge، اگر ID تکراری بود، نسخه‌ی backup را نگه دار
                 if (mode === 'merge' && existingIds.has(String(merged.id))) {
-                    // جایگزینی: task قدیمی را حذف کن
                     state.tasks = state.tasks.filter(t => String(t.id) !== String(merged.id));
                 }
                 state.tasks.push(merged);
@@ -726,7 +636,6 @@ export async function importTasks(backup, options) {
             }
         }
 
-        // ۷. import trash (اختیاری)
         if (Array.isArray(backup.data.trash)) {
             const trashIds = new Set(state.trash.map(t => String(t.id)));
             for (const rawTrash of backup.data.trash) {
@@ -734,25 +643,22 @@ export async function importTasks(backup, options) {
                     const merged = mergeTaskFields(rawTrash);
                     if (!merged || !merged.id) continue;
                     if (trashIds.has(String(merged.id))) continue;
-                    // اضافه کردن deletedAt و parentId
                     merged.deletedAt = rawTrash.deletedAt || new Date().toISOString();
                     merged.parentId = rawTrash.parentId || null;
                     state.trash.push(merged);
                     trashIds.add(String(merged.id));
                 } catch {
-                    // نادیده
+                    // silent
                 }
             }
         }
 
-        // ۸. ذخیره‌سازی bulk (چون داده‌های زیادی ممکن است تغییر کرده باشند)
         invalidateTaskIndex();
         if (useIDB) {
             await idbPutAll(IDB_STORE, state.tasks, { allowEmptyClear: true });
             await idbPutAll(IDB_TRASH, state.trash, { allowEmptyClear: true });
         }
 
-        // ۹. import تنظیمات (اختیاری)
         if (importSettings && backup.settings && typeof backup.settings === 'object') {
             const safeFields = [
                 'theme', 'lang', 'remindOn', 'remindMin', 'digestOn',
@@ -764,16 +670,13 @@ export async function importTasks(backup, options) {
                     state.prefs[field] = backup.settings[field];
                 }
             }
-            // ذخیره‌ی prefs
             try {
                 localStorage.setItem('spaceTodoPrefs', JSON.stringify(state.prefs));
             } catch { /* silent */ }
         }
 
-        // ۱۰. پاک کردن صف (چون کل state بازنویسی شد)
         clearPendingChanges();
 
-        // ۱۱. render و اعلام موفقیت
         call('render');
         events.emit('import:completed', { imported, skipped, mode });
 
@@ -786,7 +689,6 @@ export async function importTasks(backup, options) {
         };
 
     } catch (err) {
-        // rollback
         state.tasks = previousTasks;
         state.trash = previousTrash;
         console.error('importTasks failed:', err);
@@ -1348,7 +1250,3 @@ export function addChild(gid) {
     const ni = taskList ? taskList.querySelector(`.task-item[data-id="${gid}"] .child-input`) : null;
     if (ni) ni.focus();
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ گام ۱۵: SHIM‌ها حذف شدند
-// ═══════════════════════════════════════════════════════════════════════════

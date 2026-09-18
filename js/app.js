@@ -1,12 +1,12 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// app.js -- event wiring + boot (ESM entry point) — فاز ۴ گام ۵ + فاز ۵ گام ۱
+// app.js -- event wiring + boot (ESM entry point) — فاز ۵ گام ۵
 //
 // ⚠️ این نسخه:
-//   - registerCallbacksها را با events.on مستقیم جایگزین می‌کند
-//   - _dueHome را با DueChipsManager جایگزین می‌کند
-//   - setMapHelpers را صدا می‌زند (رفع circular import)
-//   - Export/Import را به UI وصل می‌کند
-//   - loadPendingChanges را در boot صدا می‌زند
+//   - wireEvents() مستقیم برای همه listenerها
+//   - DueChipsManager جایگزین _dueHome
+//   - setMapHelpers (رفع circular import)
+//   - Export/Import
+//   - ⚠️ جدید: initNetworkMonitor, initSyncQueue, initHeaderStatus, initPWA
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -142,8 +142,14 @@ import { initMapSearch } from './map-search.js';
 import { bindWeatherModal } from './weather-modal.js';
 import { events, EV } from './events.js';
 
+// ⚠️ فاز ۵ گام ۵ — ماژول‌های جدید
+import { startNetworkMonitor } from './net.js';
+import { initSyncQueue, getQueueSize as getSyncQueueSize } from './sync-queue.js';
+import { initPWA, updateBadge } from './pwa.js';
+import { initHeaderStatus, updateHeaderStatus } from './header-status.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
-// DueChipsManager — جایگزین _dueHome سراسری
+// DueChipsManager — جایگزین _dueHome
 // ═══════════════════════════════════════════════════════════════════════════
 
 class DueChipsManager {
@@ -204,21 +210,17 @@ class DueChipsManager {
 const dueChipsManager = new DueChipsManager();
 
 // ═══════════════════════════════════════════════════════════════════════════
-// wireEvents — اتصال مستقیم همه‌ی listenerها
+// wireEvents
 // ═══════════════════════════════════════════════════════════════════════════
 
 function wireEvents() {
-    // ─── UI render (از store، map، detail، location-ui) ───
     events.on(EV.UI_RENDER_REQUESTED, render);
     events.on('ui:update-due-chips', updateDueChips);
     events.on('ui:render-plan-kids', renderPlanKids);
     events.on('ui:render-trash', renderTrash);
     events.on(EV.UI_SNACKBAR, showUndoFor);
-
-    // ─── UI open detail ───
     events.on(EV.UI_OPEN_DETAIL, openDetail);
 
-    // ─── Location ───
     events.on(EV.LOCATION_UPDATED, refreshSavedLocationUI);
     events.on(EV.LOCATION_PENDING_CHANGED, updateLocChip);
     events.on('location:save-from-popup', saveLocationFromPopup);
@@ -227,22 +229,31 @@ function wireEvents() {
     events.on('location:hide-mobile-banner', hideMobileBanner);
     events.on('location:is-relocate-active', isRelocateActive);
 
-    // ─── Route ───
     events.on(EV.ROUTE_SHOW, showRouteTo);
     events.on(EV.ROUTE_CLEAR, clearMapRoute);
     events.on('route:has-active', hasActiveRoute);
     events.on('route:get-destination', getActiveRouteDestination);
 
-    // ─── Modals ───
-    // ⚠️ از store.invoke('showConfirmModal') استفاده می‌شود — مقدار Promise برگردانده می‌شود
     events.on(EV.MODAL_CONFIRM, showConfirmModal);
+
+    // ⚠️ فاز ۵: هندلر shortcut از pwa.js
+    events.on('pwa:shortcut-action', ({ action }) => {
+        if (action === 'new-task') setKind('task');
+        else if (action === 'new-plan') setKind('plan');
+        else if (action === 'new-series') setKind('series');
+    });
+
+    // ⚠️ فاز ۵: کلیک روی نشانگر (فاز ۶ modal باز می‌کند)
+    events.on('header-status:clicked', () => {
+        // فعلاً: هیچ‌کاری — در فاز ۶ می‌تواند modal باز کند
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // setKind + helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-function setKind(kind) {
+export function setKind(kind) {
     state.pendingKind = kind;
     state.prefs.pendingKind = kind;
     savePrefs();
@@ -671,11 +682,10 @@ const exportModal = document.getElementById('exportModal');
 const importModal = document.getElementById('importModal');
 let _exportTrapCleanup = null;
 let _importTrapCleanup = null;
-let _importFileData = null;   // backup خوانده‌شده
+let _importFileData = null;
 
 function openExportModal() {
     if (!exportModal) return;
-    // پیش‌فرض: photos خاموش، settings خاموش
     document.getElementById('exportIncludePhotos').checked = false;
     document.getElementById('exportIncludeSettings').checked = false;
     updateExportMeta();
@@ -697,7 +707,6 @@ function updateExportMeta() {
     const includePhotos = document.getElementById('exportIncludePhotos')?.checked;
     const taskCount = state.tasks.length;
     const trashCount = state.trash.length;
-    // تخمین حجم
     const baseSize = JSON.stringify({ tasks: state.tasks, trash: state.trash }).length;
     const photosSize = includePhotos
         ? state.tasks.reduce((sum, t) => sum + (t.photos || []).reduce((s, p) => s + (p.dataUrl?.length || 0), 0), 0)
@@ -744,7 +753,6 @@ function openImportModal() {
     document.getElementById('importModeWrap').style.display = 'none';
     document.getElementById('importMeta').innerHTML = '';
     document.getElementById('importConfirm').disabled = true;
-    // ریست radio
     const mergeRadio = document.querySelector('input[name="importMode"][value="merge"]');
     if (mergeRadio) mergeRadio.checked = true;
     document.getElementById('importSettingsCheck').checked = false;
@@ -778,14 +786,12 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
         const data = await readJSONFile(file);
         _importFileData = data;
 
-        // بررسی ساختار
         if (!data || !data.data || !Array.isArray(data.data.tasks)) {
             if (metaEl) metaEl.innerHTML = '<div class="import-error">ساختار فایل نامعتبر است.</div>';
             document.getElementById('importConfirm').disabled = true;
             return;
         }
 
-        // نمایش اطلاعات
         const schemaVersion = data.schemaVersion || 'نامشخص';
         const taskCount = data.data.tasks.length;
         const trashCount = Array.isArray(data.data.trash) ? data.data.trash.length : 0;
@@ -805,7 +811,6 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
 
         document.getElementById('importModeWrap').style.display = '';
 
-        // فعال کردن checkbox تنظیمات اگر فایل شامل تنظیمات است
         const settingsWrap = document.getElementById('importSettingsWrap');
         const settingsCheck = document.getElementById('importSettingsCheck');
         if (settingsWrap) settingsWrap.style.display = hasSettings ? '' : 'none';
@@ -827,7 +832,6 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
     const mode = document.querySelector('input[name="importMode"]:checked')?.value || 'merge';
     const importSettings = document.getElementById('importSettingsCheck')?.checked || false;
 
-    // تأیید نهایی برای replace
     if (mode === 'replace') {
         const ok = await showConfirmModal({
             title: 'جایگزینی کامل',
@@ -844,11 +848,9 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
         closeImportModal();
 
         if (result.ok) {
-            // ⚠️ مهم: reset امضای رندر
             resetRenderSignature();
             render();
             renderTrash();
-            // اعمال تنظیمات اگر import شده
             if (importSettings) {
                 applyDisplaySettings();
                 applyMapVisibility();
@@ -867,7 +869,7 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
     }
 });
 
-/* ---------- Theme (حالت نمایش) و Lang (زبان) ---------- */
+/* ---------- Theme / Lang ---------- */
 
 function applyTheme(theme) {
     const html = document.documentElement;
@@ -941,13 +943,13 @@ function updateWelcomeOpts() {
 }
 
 function applyDisplaySettings() {
-  applyTheme(state.prefs.theme);
-  const dir = state.prefs.lang === 'en' ? 'ltr' : 'rtl';
-  document.documentElement.setAttribute('data-lang', state.prefs.lang);
-  document.documentElement.setAttribute('lang', state.prefs.lang);
-  document.documentElement.setAttribute('dir', dir);
-  document.querySelector('.app-shell')?.setAttribute('dir', dir);
-  updateThemeBtn();
+    applyTheme(state.prefs.theme);
+    const dir = state.prefs.lang === 'en' ? 'ltr' : 'rtl';
+    document.documentElement.setAttribute('data-lang', state.prefs.lang);
+    document.documentElement.setAttribute('lang', state.prefs.lang);
+    document.documentElement.setAttribute('dir', dir);
+    document.querySelector('.app-shell')?.setAttribute('dir', dir);
+    updateThemeBtn();
     updateLangBtn();
     updateWelcomeOpts();
 }
@@ -1085,18 +1087,11 @@ function initSettings() {
     mins.addEventListener('change', () => { state.prefs.remindMin = parseInt(mins.value, 10) || 60; savePrefs(); });
     dig.addEventListener('change', () => { state.prefs.digestOn = dig.checked; savePrefs(); });
 
-    // ⚠️ فاز ۵ گام ۳: تنظیمات صدای یادآور سه‌حالته
     initSoundSettings();
-
     initSystemPermissions();
 }
 
-/**
- * راه‌اندازی تنظیمات صدای یادآور سه‌حالته.
- * این تابع از initSettings صدا زده می‌شود.
- */
 function initSoundSettings() {
-    // ─── master switch ───
     const master = document.getElementById('setSoundOn');
     const modesWrap = document.getElementById('soundModesWrap');
     const syncDisabledState = () => {
@@ -1113,7 +1108,6 @@ function initSoundSettings() {
     }
     syncDisabledState();
 
-    // ─── حالت ۱: ریتم پیش‌فرض ───
     const defCb = document.getElementById('setSoundDefault');
     if (defCb) {
         defCb.checked = state.prefs.soundDefault !== false;
@@ -1141,7 +1135,6 @@ function initSoundSettings() {
         });
     }
 
-    // ─── حالت ۲: ریتم آماده ───
     const presetCb = document.getElementById('setSoundPresetOn');
     const presetSel = document.getElementById('setSoundPreset');
     if (presetSel) {
@@ -1184,13 +1177,11 @@ function initSoundSettings() {
         });
     }
 
-    // ─── حالت ۳: TTS ───
     const ttsCb = document.getElementById('setSoundTtsOn');
     const ttsVoiceRow = document.getElementById('soundTtsVoiceRow');
     const ttsVoiceSel = document.getElementById('setSoundTtsVoice');
     const ttsSupportedNow = ttsSupported();
 
-    // تعریف populateTtsVoices (function declaration → hoisted)
     function populateTtsVoices(sel) {
         if (!sel) return;
         const voices = getVoicesForLang(state.prefs.lang);
@@ -1203,7 +1194,6 @@ function initSoundSettings() {
             }).join('');
     }
 
-    // هشدار نبود voice فارسی
     function updateTtsWarning() {
         const label = document.querySelector('#setSoundTtsOn')
             ?.closest('.sound-mode')
@@ -1220,7 +1210,6 @@ function initSoundSettings() {
             label.textContent = 'با speechSynthesis مرورگر';
         }
     }
-    // اگه TTS پشتیبانی نمی‌شه، غیرفعال کن
     if (!ttsSupportedNow) {
         if (ttsCb) {
             ttsCb.disabled = true;
@@ -1239,7 +1228,7 @@ function initSoundSettings() {
             state.prefs.soundTtsOn = ttsCb.checked;
             savePrefs();
             if (!ttsCb.checked) {
-                stopTts();  // ⬅️ توقف فوری TTS
+                stopTts();
             }
             if (ttsCb.checked) {
                 if (!state.prefs.soundTtsVoice) {
@@ -1262,10 +1251,8 @@ function initSoundSettings() {
         });
     }
 
-    // به‌روزرسانی هشدار (اولیه)
     updateTtsWarning();
 
-    // در Chrome، voiceها async لود می‌شن
     if (ttsSupportedNow && typeof window.speechSynthesis !== 'undefined') {
         try {
             window.speechSynthesis.onvoiceschanged = () => {
@@ -1275,7 +1262,6 @@ function initSoundSettings() {
         } catch { /* silent */ }
     }
 
-    // نمایش/پنهان کردن سطر انتخاب voice بر اساس چک‌باکس
     const syncVoiceRowVisibility = () => {
         if (!ttsVoiceRow || !ttsCb) return;
         ttsVoiceRow.style.display = ttsCb.checked ? '' : 'none';
@@ -1468,7 +1454,6 @@ document.getElementById('pickerOverlay').addEventListener('click', e => {
     if (e.target.id === 'pickerOverlay') closePicker();
 });
 
-// مدیریت متمرکز Escape
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
 
@@ -1739,7 +1724,6 @@ document.getElementById('archiveDone').addEventListener('click', archiveDone);
     }));
 })();
 
-// میان‌برهای کیبورد
 const anyOverlayOpen = () =>
     document.getElementById('pickerOverlay').style.display === 'flex' ||
     document.getElementById('calOverlay').style.display === 'flex' ||
@@ -1762,7 +1746,6 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// مرتب‌سازی دستی با درگ
 let dragId = null;
 taskList.addEventListener('dragstart', e => {
     const item = e.target.closest('.task-item');
@@ -1807,10 +1790,7 @@ taskList.addEventListener('dragend', () => {
     taskList.querySelectorAll('.drop-target,.dragging').forEach(el => el.classList.remove('drop-target', 'dragging'));
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
 // پیشنهاد هوشمند تاریخ
-// ═══════════════════════════════════════════════════════════════════════════
-
 let smartTimer = null;
 let smartDismissedFor = { taskInput: '', descInput: '' };
 let smartTargetId = null;
@@ -1860,7 +1840,6 @@ function attachSmartSuggest(el, targetId) {
     });
 }
 
-// پر کردن انتخاب‌های ساعت و دقیقه
 (function initTimeSelects() {
     const hourSel = document.getElementById('pickerHour');
     const minSel = document.getElementById('pickerMinute');
@@ -1878,7 +1857,6 @@ function attachSmartSuggest(el, targetId) {
     }
 })();
 
-// تاریخ امروز شمسی در هدر + سال کپی‌رایت فوتر
 try {
     document.getElementById('todayLine').textContent =
         'امروز: ' + new Date().toLocaleDateString('fa-IR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -1893,18 +1871,22 @@ try {
 bindDetailInputs();
 loadPrefs();
 
-// ─── رفع circular import: map helpers به store ───
 setMapHelpers({ getMap, getMapReady, getPickMarker, setPickMarker });
 
-// ─── ثبت listenerهای EventEmitter ───
 wireEvents();
 
-// ─── مقداردهی DueChipsManager ───
 (function initDueChips() {
     dueChipsManager.init();
 })();
 
-// ─── خواندن صف تغییرات ───
+// ⚠️ فاز ۵ گام ۵: راه‌اندازی شبکه، صف sync، PWA، نشانگر وضعیت
+startNetworkMonitor();
+initSyncQueue();
+initHeaderStatus();
+initPWA();
+
+// ⚠️ loadPendingChanges دیگر لازم نیست — initSyncQueue کار می‌کند
+// اما برای سازگاری نگه داشته شده:
 loadPendingChanges();
 
 setKind(state.prefs.pendingKind || 'task');
@@ -1943,11 +1925,12 @@ loadTasks().then(async () => {
     syncServerTime();
     startReminderLoop();
     bindWeatherModal();
+
+    // ⚠️ فاز ۵: به‌روزرسانی badge بعد از load
+    updateBadge({ immediate: true });
+    updateHeaderStatus({ immediate: true });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Debug-only global
-// ═══════════════════════════════════════════════════════════════════════════
 if (import.meta.env.DEV) {
     window.TodoApp = {
         getState: () => state,

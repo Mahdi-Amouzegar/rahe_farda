@@ -38,6 +38,7 @@
 <link rel="stylesheet" href="/css/modals.css">
 <link rel="stylesheet" href="/css/detail.css">
 <link rel="stylesheet" href="/css/map.css">
+<link rel="stylesheet" href="/css/status.css">
 <link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body>
@@ -56,6 +57,13 @@
                             <p class="today-line">
                                 <span id="todayLine"></span>
                                 <span class="time-source-icon" id="timeSourceIcon" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
+                                <!-- ═══════════════════════════════════════════════════════════
+                                     ⚠️ فاز ۵ گام ۵: نشانگر وضعیت آنلاین/آفلاین + صف sync
+                                     ═══════════════════════════════════════════════════════════ -->
+                                <button class="status-indicator" id="headerStatusIndicator" type="button" data-status="unknown" aria-label="در حال بررسی اتصال" title="در حال بررسی…">
+                                    <span class="status-icon" aria-hidden="true">○</span>
+                                    <span class="status-badge" hidden></span>
+                                </button>
                             </p>
                             <div class="header-actions">
                                 <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
@@ -636,7 +644,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         ⚠️ جدید: مودال Export (پشتیبان‌گیری)
+         ⚠️ مودال Export (پشتیبان‌گیری)
          ═══════════════════════════════════════════════════════════════════ -->
     <div class="picker-overlay" id="exportModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
@@ -673,7 +681,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         ⚠️ جدید: مودال Import (بازیابی از پشتیبان)
+         ⚠️ مودال Import (بازیابی از پشتیبان)
          ═══════════════════════════════════════════════════════════════════ -->
     <div class="picker-overlay" id="importModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">

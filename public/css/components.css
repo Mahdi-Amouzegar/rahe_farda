@@ -98,11 +98,11 @@
 
     .settings-trigger {
         position: absolute;
-        inset-block-start: -8px;
-        inset-inline-end: -8px;
+        inset-block-start: -16px;
+        inset-inline-end: -16px;
         z-index: 2;
-        width: 44px;
-        height: 44px;
+        width: 40px;
+        height: 40px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -2658,6 +2658,19 @@
     }
 
     /* ═══ Mobile ═══ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ تنظیمات settings-trigger در موبایل
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+    @media (max-width: 900px) {
+        .settings-trigger {
+            inset-block-start: 4px;
+            inset-inline-end: 4px;
+            width: 40px;
+            height: 40px;
+        }
+}
+
     @media (max-width: 600px) {
         .sound-mode {
             flex-wrap: wrap;

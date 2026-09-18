@@ -18,6 +18,11 @@
 //   ui:render-requested   — درخواست رندر از هر ماژول
 //   ui:snackbar           — نمایش snackbar با undo
 //   modal:confirm         — درخواست confirm modal
+//
+// ⚠️ فاز ۵ گام ۵ (PWA + Sync Queue):
+//   - net:*   — رویدادهای شبکه (آنلاین/آفلاین)
+//   - sync:*  — رویدادهای صف sync
+//   - pwa:*   — رویدادهای PWA (badge)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -214,7 +219,7 @@ export const events = new EventEmitter();
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const EV = {
-    // Store
+    // ─── Store ───
     TASK_SAVED: 'task:saved',
     TASK_DELETED: 'task:deleted',
     TASK_RESTORED: 'task:restored',
@@ -222,47 +227,94 @@ export const EV = {
     TRASH_PURGED: 'trash:purged',
     STORAGE_ERROR: 'storage:error',
 
-    // Map
+    // ─── Map ───
     MAP_READY: 'map:ready',
     MAP_DESTROYED: 'map:destroyed',
     MAP_MARKERS_REFRESHED: 'map:markers-refreshed',
     MAP_LOCATION_PICKED: 'map:location-picked',
     MAP_HINT: 'map:hint',
 
-    // Detail
+    // ─── Detail ───
     DETAIL_OPENED: 'detail:opened',
     DETAIL_CLOSED: 'detail:closed',
 
-    // Location UI
+    // ─── Location UI ───
     LOCATION_UPDATED: 'location:updated',
     LOCATION_PENDING_CHANGED: 'location:pending-changed',
 
-    // UI
+    // ─── UI ───
     UI_RENDER_REQUESTED: 'ui:render-requested',
     UI_SNACKBAR: 'ui:snackbar',
     UI_HIDE_SNACKBAR: 'ui:hide-snackbar',
     UI_OPEN_DETAIL: 'ui:open-detail',
     UI_SWITCH_TAB: 'ui:switch-tab',
 
-    // Modals
+    // ─── Modals ───
     MODAL_CONFIRM: 'modal:confirm',
     MODAL_INFO: 'modal:info',
 
-    // Route
+    // ─── Route ───
     ROUTE_SHOW: 'route:show',
     ROUTE_CLEAR: 'route:clear',
 
-    // Notifications
-    NOTIF_CHIME: 'notif:chime'
+    // ─── Notifications ───
+    NOTIF_CHIME: 'notif:chime',
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠️ فاز ۵ گام ۵: رویدادهای شبکه (net)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // NET_ONLINE   — دستگاه آنلاین شد (از navigator.onLine یا probe)
+    // NET_OFFLINE  — دستگاه آفلاین شد (از navigator.onLine)
+    // NET_CHANGE   — هر تغییر وضعیت شبکه (شامل init)
+    //
+    // payload:
+    //   { online: boolean, source: 'init'|'browser-event'|'probe',
+    //     effectiveType: string|null }
+    NET_ONLINE: 'net:online',
+    NET_OFFLINE: 'net:offline',
+    NET_CHANGE: 'net:change',
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠️ فاز ۵ گام ۵: رویدادهای صف sync
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // SYNC_ENQUEUED       — یک op جدید به صف اضافه شد
+    //   payload: { op: {...} }
+    //
+    // SYNC_QUEUE_CHANGED  — صف تغییر کرد (افزودن/حذف/پاک‌سازی)
+    //   payload: { size: number }
+    //
+    // SYNC_FLUSHED        — flush موفق (حداقل یک op پردازش شد)
+    //   payload: { processed: number, remaining: number }
+    //
+    // SYNC_ERROR          — خطا در flush
+    //   payload: { failed: number, lastError: string }
+    //
+    // SYNC_AUTH_EXPIRED   — توکن منقضی (فاز ۶ — Cloudflare)
+    //   payload: {}
+    SYNC_ENQUEUED: 'sync:enqueued',
+    SYNC_QUEUE_CHANGED: 'sync:queue-changed',
+    SYNC_FLUSHED: 'sync:flushed',
+    SYNC_ERROR: 'sync:error',
+    SYNC_AUTH_EXPIRED: 'sync:auth-expired',
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠️ فاز ۵ گام ۴: رویدادهای PWA
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // PWA_BADGE_UPDATED  — badge به‌روزرسانی شد
+    //   payload: { count: number }
+    //
+    // PWA_BADGE_CLEARED  — badge پاک شد
+    //   payload: {}
+    PWA_BADGE_UPDATED: 'pwa:badge-updated',
+    PWA_BADGE_CLEARED: 'pwa:badge-cleared'
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// نام‌های callback — برای سازگاری با کد فعلی در گام ۱
+// نام‌های callback — برای سازگاری با کد فعلی
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// در گام‌های بعدی (۲ تا ۷)، این نام‌ها از store.js, map.js, detail.js,
-// location-ui.js و app.js حذف می‌شوند. اما در گام ۱، برای اینکه
-// registerCallbacks همچنان کار کند، این ثابت‌ها را نگه می‌داریم.
 //
 // نگاشت نام callback قبلی → نام رویداد جدید:
 export const CALLBACK_TO_EVENT = {
@@ -296,19 +348,16 @@ export const CALLBACK_TO_EVENT = {
     showMobilePickBannerDetail: 'location:show-mobile-banner',
     hideMobilePickBannerDetail: 'location:hide-mobile-banner',
 
-    // از location-ui.js
-    // (همان‌هایی که قبلاً در store و map آمدند)
+    // ⚠️ فاز ۵ گام ۵: نگاشت‌های جدید (برای آینده)
+    // — این‌ها فعلاً استفاده نمی‌شوند اما در فاز ۶ ممکن است لازم شوند
+    flushSyncQueue: 'sync:flush-requested',
+    getSyncQueue: 'sync:get-queue',
+    getNetStatus: 'net:get-status'
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ سازگاری با کد فعلی — پل موقت بین registerCallbacks و EventEmitter
+// bridgeCallbacks — آداپتور موقت (بدون تغییر، سازگاری حفظ شده)
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// در گام ۱، ماژول‌ها همچنان registerCallbacks دارند اما به جای _callbacks
-// از events استفاده می‌کنند. این تابع یک آداپتور است که یک آبجکت
-// callback-map را به رویدادهای EventEmitter وصل می‌کند.
-//
-// در گام‌های ۲ تا ۷ این تابع حذف می‌شود.
 
 /**
  * اتصال یک آبجکت callback-map به EventEmitter.

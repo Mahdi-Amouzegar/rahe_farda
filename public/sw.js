@@ -7,7 +7,7 @@
 // ساختار: rahefarda-v<MAJOR>.<API>.<FEATURE>.<PHASE>-<DATE>
 //
 // تاریخچه:
-//   v1.0.0.0-2026-09-11 — نقطه شروع (baseline) قبل از برنامه ارتقا
+//   v1.0.0.0-2026-09-11 — نقطه شروع (baseline)
 //   v1.0.0.1-2026-09-11 — فاز ۱: رفع باگ‌های بحرانی
 //   v1.0.0.2-2026-09-11 — فاز ۲: امنیت
 //   v1.0.0.3-2026-09-11 — فاز ۳: عملکرد
@@ -26,10 +26,13 @@
 //   v1.4.0.0-2026-09-18 — فاز ۴ + فاز ۵ گام ۱
 //   v1.4.0.1-2026-09-18 — فاز ۵ گام ۳: یادآور صوتی سه‌حالته
 //   v1.4.0.2-2026-09-18 — فاز ۵ گام ۳-الف: انتقال فایل‌های صوتی به runtime cache
-//                          - حذف ogg از ASSETS اولیه (جلوگیری از باز شدن IDM در load)
-//                          - افزودن isAudioAsset + cache-first برای صداها
+//   v1.5.0.0-2026-09-18 — فاز ۵ گام ۴+۵: PWA Enhancement + Sync Queue
+//                          - افزودن status.css به ASSETS
+//                          - handler برای periodicsync
+//                          - handler برای sync (Background Sync)
+//                          - پیام‌های SW ↔ main thread (شروع)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.4.0.2-2026-09-18';
+const CACHE = 'rahefarda-v1.5.0.0-2026-09-18';
 
 const ASSETS = [
   './',
@@ -39,6 +42,7 @@ const ASSETS = [
   './css/modals.css',
   './css/detail.css',
   './css/map.css',
+  './css/status.css',
   './css/responsive.css',
   './manifest.webmanifest',
   './fonts/vazirmatn-arabic.woff2',
@@ -52,6 +56,10 @@ const ASSETS = [
   // ⚠️ فایل‌های صوتی اینجا نیستن — در runtime cache می‌آن
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Notification click
+// ═══════════════════════════════════════════════════════════════════════════
+
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
@@ -62,6 +70,10 @@ self.addEventListener('notificationclick', e => {
     })
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Install
+// ═══════════════════════════════════════════════════════════════════════════
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -82,6 +94,10 @@ self.addEventListener('install', e => {
   );
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Activate
+// ═══════════════════════════════════════════════════════════════════════════
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -90,11 +106,75 @@ self.addEventListener('activate', e => {
   );
 });
 
-function isCodeAsset(request) {
-  return request.destination === 'script' || request.destination === 'style' || /\.(?:js|css)$/i.test(new URL(request.url).pathname);
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ فاز ۵ گام ۵: Periodic Background Sync
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// این رویداد فقط در Chrome/Edge (نصب‌شده PWA) فعال می‌شود.
+// در فاز ۶، این handler صف sync را از IndexedDB می‌خواند و به Cloudflare می‌فرستد.
+//
+// ⚠️ فعلاً: فقط یک پیام به کلاینت‌ها می‌فرستد تا main thread flushQueue را اجرا کند.
+// (چون صف در localStorage نگهداری می‌شود، نه IndexedDB.)
+
+self.addEventListener('periodicsync', e => {
+  if (e.tag === 'rahe-periodic-sync') {
+    e.waitUntil(notifyClientsToSync('periodic'));
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ فاز ۵ گام ۵: Background Sync (یکی‌باره)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// وقتی main thread آفلاین می‌شود و op جدیدی به صف اضافه می‌کند،
+// می‌تواند این sync را ثبت کند. وقتی آنلاین شد، SW بیدار می‌شود.
+
+self.addEventListener('sync', e => {
+  if (e.tag === 'rahe-sync-one-shot') {
+    e.waitUntil(notifyClientsToSync('one-shot'));
+  }
+});
+
+/**
+ * اطلاع‌دادن به همه‌ی کلاینت‌ها برای flush کردن صف sync.
+ *
+ * @param {'periodic'|'one-shot'} source
+ */
+async function notifyClientsToSync(source) {
+  try {
+    const allClients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    for (const client of allClients) {
+      try {
+        client.postMessage({
+          type: 'rahe-sw-sync-request',
+          source,
+          timestamp: new Date().toISOString()
+        });
+      } catch { /* silent */ }
+    }
+
+    // اگر هیچ کلاینتی باز نبود، نمی‌توانیم کاری کنیم
+    // (چون صف در localStorage کلاینت است، نه IndexedDB SW)
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// ⚠️ فاز ۵ گام ۳-الف: تشخیص فایل صوتی
+// ═══════════════════════════════════════════════════════════════════════════
+// Fetch strategies
+// ═══════════════════════════════════════════════════════════════════════════
+
+function isCodeAsset(request) {
+  return request.destination === 'script' ||
+         request.destination === 'style' ||
+         /\.(?:js|css)$/i.test(new URL(request.url).pathname);
+}
+
 function isAudioAsset(request) {
   return /\.(?:ogg|mp3|wav|m4a)$/i.test(new URL(request.url).pathname);
 }
@@ -114,11 +194,17 @@ function networkFirst(request) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Fetch
+// ═══════════════════════════════════════════════════════════════════════════
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+
   const isDocument = e.request.mode === 'navigate' || e.request.destination === 'document';
+
   if (isDocument) {
     e.respondWith(
       fetch(e.request).then(res => {
@@ -129,11 +215,13 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+
   if (isCodeAsset(e.request)) {
     e.respondWith(networkFirst(e.request));
     return;
   }
-  // ⚠️ فایل‌های صوتی: cache-first
+
+  // فایل‌های صوتی: cache-first
   if (isAudioAsset(e.request)) {
     e.respondWith(
       caches.match(e.request).then(hit => {
@@ -149,6 +237,8 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+
+  // بقیه: cache-first با network fallback
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true })
       .then(hit => hit || fetch(e.request).then(res => {
@@ -157,4 +247,22 @@ self.addEventListener('fetch', e => {
         return res;
       }))
   );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ فاز ۵ گام ۵: پیام از main thread
+// ═══════════════════════════════════════════════════════════════════════════
+
+self.addEventListener('message', e => {
+  const data = e.data || {};
+  if (data.type === 'rahe-skip-waiting') {
+    self.skipWaiting();
+    return;
+  }
+  if (data.type === 'rahe-request-sync-registration') {
+    // main thread می‌تواند register یک sync یک‌باره درخواست کند
+    if ('registration' in self && 'sync' in self.registration) {
+      self.registration.sync.register('rahe-sync-one-shot').catch(() => {});
+    }
+  }
 });

@@ -2,7 +2,6 @@
 // core.js -- shared state + tiny helpers (ESM) — گام ۱ فاز ۵
 //
 // ⚠️ این نسخه helperهای export/import را اضافه کرده است.
-// ⚠️ فاز ۵ گام ۵: state.net و state.sync برای شبکه و صف sync
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -12,10 +11,10 @@ export const STORAGE_KEY = 'spaceTodoTasks';
 export const MAX_LENGTH = 200;
 export const PREFS_KEY = 'spaceTodoPrefs';
 
-// ⚠️ schema version برای export/import
+// ⚠️ جدید: schema version برای export/import
 export const SCHEMA_VERSION = '1.0.0';
 
-// ⚠️ نام فایل backup پیش‌فرض
+// ⚠️ جدید: نام فایل backup پیش‌فرض
 export const BACKUP_FILENAME_PREFIX = 'rahe-farda-backup';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -50,12 +49,12 @@ export const state = {
         proMode: false,
         pendingKind: 'task',
         soundOn: true,
-        // ⚠️ تنظیمات صدا
-        soundDefault: true,
-        soundPreset: null,
-        soundPresetOn: false,
-        soundTtsOn: false,
-        soundTtsVoice: null,
+        // ⚠️ جدید: تنظیمات صدا
+        soundDefault: true,        // ریتم پیش‌فرض
+        soundPreset: null,          // نام فایل از assets/sounds/ (مثل 'gentle-bell')
+        soundPresetOn: false,       // آیا ریتم آماده فعال است؟
+        soundTtsOn: false,          // آیا خواندن متن عنوان فعال است؟
+        soundTtsVoice: null,        // نام voice انتخابی (مثل 'fa-IR')
         theme: 'auto',
         lang: 'fa'
     },
@@ -75,48 +74,11 @@ export const state = {
     taskIndexVersion: 0,
     taskIndex: null,
     trash: [],
-    // ⚠️ صف تغییرات معلق (برای فاز ۶ — Cloudflare)
+    // ⚠️ جدید: صف تغییرات معلق (برای فاز ۶ — Cloudflare)
     pendingChanges: [],
 
-    // ⚠️ فاز ۵ گام ۵: وضعیت شبکه (توسط net.js مقداردهی می‌شود)
-    net: {
-        /** @type {boolean} آیا دستگاه آنلاین است؟ */
-        online: typeof navigator !== 'undefined' ? navigator.onLine !== false : true,
-        /** @type {number} زمان آخرین تغییر وضعیت (ms) */
-        lastChangeAt: 0,
-        /** @type {string|null} نوع اتصال (4g, 3g, ...) — Chrome/Edge فقط */
-        effectiveType: null,
-        /** @type {number|null} سرعت دانلود (Mbps) — Chrome/Edge فقط */
-        downlink: null,
-        /** @type {string|null} شناسه‌ی دستگاه (برای conflict resolution فاز ۶) */
-        deviceId: null
-    },
-
-    // ⚠️ فاز ۵ گام ۵ + پایه‌ریزی فاز ۶: صف sync
-    sync: {
-        /** @type {object[]} ops در انتظار sync */
-        queue: [],
-        /** @type {boolean} آیا flush در حال اجراست؟ */
-        inFlight: false,
-        /** @type {number} شمارش کلی retry */
-        retries: 0,
-        /** @type {string|null} آخرین flush موفق (ISO) */
-        lastFlushAt: null,
-        /** @type {string|null} آخرین خطا */
-        lastError: null,
-
-        // ⚠️ فاز ۶: Cloudflare Worker + D1 + Telegram Login
-        /** @type {boolean} آیا sync ابری فعال است؟ (پیش‌فرض: خیر — Offline-First) */
-        enabled: false,
-        /** @type {string|null} Cloudflare Worker endpoint */
-        endpoint: null,
-        /** @type {string|null} Telegram auth token */
-        authToken: null,
-        /** @type {string|null} Telegram user ID */
-        userId: null,
-        /** @type {string|null} شناسه‌ی دستگاه (از state.net.deviceId) */
-        deviceId: null
-    }
+    // ⚠️ جدید: نشانگر آنلاین/آفلاین
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -192,9 +154,14 @@ export function debounce(fn, ms) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Export/Import helpers
+// ⚠️ جدید: Export/Import helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * نمایش حجم فایل به فارسی.
+ * @param {number} bytes
+ * @returns {string}
+ */
 export function formatBytes(bytes) {
     if (!Number.isFinite(bytes) || bytes < 0) return '—';
     if (bytes < 1024) return `${toFa(Math.round(bytes))} بایت`;
@@ -203,6 +170,13 @@ export function formatBytes(bytes) {
     return `${toFa((bytes / (1024 * 1024 * 1024)).toFixed(2))} گیگابایت`;
 }
 
+/**
+ * دانلود یک آبجکت به صورت فایل JSON.
+ *
+ * @param {object} data
+ * @param {string} filename
+ * @returns {boolean} آیا موفق بود؟
+ */
 export function downloadJSON(data, filename) {
     try {
         const json = JSON.stringify(data, null, 2);
@@ -214,6 +188,7 @@ export function downloadJSON(data, filename) {
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
+        // پاک‌سازی بعد از یک tick
         setTimeout(() => {
             a.remove();
             URL.revokeObjectURL(url);
@@ -225,12 +200,19 @@ export function downloadJSON(data, filename) {
     }
 }
 
+/**
+ * خواندن محتوای یک فایل JSON.
+ *
+ * @param {File} file
+ * @returns {Promise<object>}
+ */
 export function readJSONFile(file) {
     return new Promise((resolve, reject) => {
         if (!file) {
             reject(new Error('no-file'));
             return;
         }
+        // بررسی حجم (حداکثر ۵۰ مگابایت)
         const MAX_SIZE = 50 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
             reject(new Error('file-too-large'));
@@ -251,6 +233,13 @@ export function readJSONFile(file) {
     });
 }
 
+/**
+ * محاسبه‌ی SHA-256 از یک رشته.
+ * اگر crypto.subtle در دسترس نبود (مثلاً HTTP غیرامن)، یک hash ساده برمی‌گرداند.
+ *
+ * @param {string} str
+ * @returns {Promise<string>}
+ */
 export async function computeChecksum(str) {
     try {
         if (window.crypto && crypto.subtle && crypto.subtle.digest) {
@@ -263,6 +252,7 @@ export async function computeChecksum(str) {
     } catch {
         // fallback
     }
+    // fallback: hash ساده (برای HTTP غیرامن)
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
@@ -272,6 +262,10 @@ export async function computeChecksum(str) {
     return 'fallback-' + Math.abs(hash).toString(16);
 }
 
+/**
+ * ساخت نام فایل backup با تاریخ شمسی.
+ * @returns {string}
+ */
 export function buildBackupFilename() {
     try {
         const d = new Date();
@@ -459,3 +453,7 @@ export function showInfoModal(options) {
         setTimeout(() => okBtn.focus(), 60);
     });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ گام ۱۵: SHIM‌ها حذف شدند
+// ═══════════════════════════════════════════════════════════════════════════
