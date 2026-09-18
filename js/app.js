@@ -1,5 +1,11 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// app.js -- event wiring + boot (ESM entry point)
+// app.js -- event wiring + boot (ESM entry point) — گام ۵ فاز ۴
+//
+// ⚠️ این نسخه:
+//   - registerCallbacksها را با events.on مستقیم جایگزین می‌کند
+//   - _dueHome را با DueChipsManager جایگزین می‌کند
+//   - setMapHelpers را صدا می‌زند (رفع circular import)
+// ═══════════════════════════════════════════════════════════════════════════
 
 import {
     state,
@@ -38,7 +44,7 @@ import {
     deleteTask,
     clearCompleted,
     archiveDone,
-    registerCallbacks as registerStoreCallbacks
+    setMapHelpers
 } from './store.js';
 import {
     openPicker,
@@ -66,7 +72,6 @@ import {
     setPickMarker,
     removePickMarker,
     flyToTask,
-    registerMapCallbacks,
     startLiveTracking,
     stopLiveTracking,
     isLiveTrackingActive
@@ -80,7 +85,7 @@ import {
     openDetail,
     closeDetail,
     bindDetailInputs,
-    registerDetailCallbacks
+    getDetailTask
 } from './detail.js';
 import {
     render,
@@ -109,8 +114,7 @@ import {
     saveLocationFromPopup,
     showMobileBanner,
     hideMobileBanner,
-    isRelocateActive,
-    registerLocationCallbacks
+    isRelocateActive
 } from './location-ui.js';
 import {
     showRouteTo,
@@ -120,103 +124,143 @@ import {
 } from './route-ui.js';
 import { initMapSearch } from './map-search.js';
 import { bindWeatherModal } from './weather-modal.js';
+import { events, EV } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// State داخلی ماژول (جایگزین window.__dueHome)
+// DueChipsManager — جایگزین _dueHome سراسری
 // ═══════════════════════════════════════════════════════════════════════════
-const _dueHome = { p: null, n: null };
+//
+// مسئولیت: جابه‌جایی `#dueChips` بین دو والد مختلف:
+//   - حالت عادی: داخل `.create-zone` بعد از `#locChip` (یا محل اصلی)
+//   - حالت series dates: داخل `#dueChipsSlot` (داخل `#seriesRecurWrap`)
+//
+// این کلاس state سراسری `_dueHome` را حذف می‌کند.
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Register callbacks (به جای shim‌های window.X)
-// ═══════════════════════════════════════════════════════════════════════════
-
-registerStoreCallbacks({
-    render,
-    updateDueChips,
-    renderPlanKids,
-    updateLocChip,
-    openDetail,
-    showUndoFor,
-    showConfirmModal,
-    renderTrash,
-    getMap,
-    getMapReady,
-    getPickMarker,
-    setPickMarker,
-});
-
-registerMapCallbacks({
-    render,
-    openDetail,
-    showRouteTo,
-    saveLocationFromPopup,
-    updateLocChip,
-    refreshSavedLocationUI,
-    locationLabelFor,
-    showMobilePickBanner: showMobileBanner,
-    hideMobilePickBanner: hideMobileBanner,
-    isRelocateLocationActive: isRelocateActive,
-    clearMapRoute,
-    hasActiveRoute,
-    getActiveRouteDestination,
-});
-
-registerDetailCallbacks({
-    render,
-    refreshSavedLocationUI,
-    showUndoFor,
-    showMobilePickBanner: showMobileBanner,
-    hideMobilePickBanner: hideMobileBanner,
-    showRouteTo,
-});
-
-registerLocationCallbacks({
-    render,
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Event wiring
-// ═══════════════════════════════════════════════════════════════════════════
-
-addBtn.addEventListener('click', () => addTask(state.pendingKind));
-input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(state.pendingKind); });
-
-document.getElementById('dueBtn').addEventListener('click', () => openPicker('add'));
-document.getElementById('dueChips').addEventListener('click', e => {
-    const b = e.target.closest('[data-dchip]');
-    if (!b) return;
-    state.addDraftSessions = state.addDraftSessions.filter(s => String(s.id) !== b.dataset.dchip);
-    updateDueChips();
-});
-document.getElementById('locBtn').addEventListener('click', () => {
-    ensureMapVisible();
-    switchToTab('map');
-    document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
-    mapHint('روی نقشه کلیک کنید تا محل وظیفه جدید انتخاب شود');
-});
-document.getElementById('locChip').addEventListener('click', e => {
-    if (!e.target.closest('[data-locclear]')) return;
-    state.pendingLoc = null;
-    removePickMarker();
-    refreshSavedLocationUI();
-});
-document.getElementById('myLocBtn').addEventListener('click', () => { ensureMapVisible(); locateUser(true); });
-document.getElementById('liveTrackBtn').addEventListener('click', () => {
-    ensureMapVisible();
-    if (isLiveTrackingActive()) {
-        stopLiveTracking();
-    } else {
-        startLiveTracking();
+class DueChipsManager {
+    constructor() {
+        this.chips = null;
+        this.originalParent = null;
+        this.originalNext = null;
+        this.mountedAt = null;
     }
-});
-document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
-document.getElementById('fsExit').addEventListener('click', toggleFullscreen);
-document.getElementById('routeClearBtn').addEventListener('click', clearRoute);
 
-document.getElementById('sortSelect').addEventListener('change', e => {
-    state.currentSort = e.target.value;
-    render();
-});
+    /**
+     * مقداردهی اولیه — باید یک بار در بوت صدا زده شود.
+     */
+    init() {
+        this.chips = document.getElementById('dueChips');
+        if (!this.chips) return;
+        this.originalParent = this.chips.parentElement;
+        this.originalNext = this.chips.nextElementSibling;
+        this.mountedAt = this.originalParent;
+    }
+
+    /**
+     * جابه‌جایی chips به والد مشخص.
+     * @param {HTMLElement|null} parent - والد مقصد (اگر null باشد، به والد اصلی برمی‌گردد)
+     * @param {HTMLElement|null} [before] - المانی که chips قبل از آن قرار می‌گیرد
+     */
+    mountAt(parent, before = null) {
+        if (!this.chips) return;
+        if (!parent) {
+            this.restore();
+            return;
+        }
+        if (this.mountedAt === parent && this.chips.parentElement === parent) {
+            // اگر قبلاً همان‌جا هست، فقط ترتیب را چک کن
+            if (before && this.chips.nextElementSibling !== before) {
+                parent.insertBefore(this.chips, before);
+            }
+            return;
+        }
+        if (before) {
+            parent.insertBefore(this.chips, before);
+        } else {
+            parent.appendChild(this.chips);
+        }
+        this.mountedAt = parent;
+    }
+
+    /**
+     * بازگرداندن chips به والد اصلی.
+     */
+    restore() {
+        if (!this.chips || !this.originalParent) return;
+        if (this.chips.parentElement === this.originalParent) {
+            this.mountedAt = this.originalParent;
+            return;
+        }
+        if (this.originalNext && this.originalNext.parentElement === this.originalParent) {
+            this.originalParent.insertBefore(this.chips, this.originalNext);
+        } else {
+            this.originalParent.appendChild(this.chips);
+        }
+        this.mountedAt = this.originalParent;
+    }
+
+    /**
+     * آیا chips داخل والد مشخص است؟
+     * @param {HTMLElement} parent
+     * @returns {boolean}
+     */
+    isMountedAt(parent) {
+        return this.chips && this.chips.parentElement === parent;
+    }
+}
+
+const dueChipsManager = new DueChipsManager();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Register event listeners — جایگزین registerCallbacks
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// در گام ۵، ما مستقیماً events.on می‌گذاریم. این کار:
+//   - وابستگی دوطرفه را حذف می‌کند
+//   - به جای ۵ نقطه‌ی ثبت جداگانه، یک نقطه‌ی مرکزی دارد
+//   - دیباگ آسان‌تر است (eventNames())
+
+function wireEvents() {
+    // ─── UI render (از store، map، detail، location-ui) ───
+    events.on(EV.UI_RENDER_REQUESTED, render);
+    events.on('ui:update-due-chips', updateDueChips);
+    events.on('ui:render-plan-kids', renderPlanKids);
+    events.on('ui:render-trash', renderTrash);
+    events.on(EV.UI_SNACKBAR, showUndoFor);
+
+    // ─── UI open detail ───
+    events.on(EV.UI_OPEN_DETAIL, openDetail);
+
+    // ─── Location ───
+    events.on(EV.LOCATION_UPDATED, refreshSavedLocationUI);
+    events.on(EV.LOCATION_PENDING_CHANGED, updateLocChip);
+    events.on('location:save-from-popup', saveLocationFromPopup);
+    events.on('location:label-for', locationLabelFor);
+    events.on('location:show-mobile-banner', showMobileBanner);
+    events.on('location:hide-mobile-banner', hideMobileBanner);
+    events.on('location:is-relocate-active', isRelocateActive);
+
+    // ─── Route ───
+    events.on(EV.ROUTE_SHOW, showRouteTo);
+    events.on(EV.ROUTE_CLEAR, clearMapRoute);
+    events.on('route:has-active', hasActiveRoute);
+    events.on('route:get-destination', getActiveRouteDestination);
+
+    // ─── Map helpers (getter/setter برای store) ───
+    events.on('map:get-instance', getMap);
+    events.on('map:get-ready', getMapReady);
+    events.on('map:get-pick-marker', getPickMarker);
+    events.on('map:set-pick-marker', setPickMarker);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// State داخلی ماژول
+// ═══════════════════════════════════════════════════════════════════════════
+
+// (حذف شد: _dueHome — جایش را DueChipsManager گرفت)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// setKind + helpers
+// ═══════════════════════════════════════════════════════════════════════════
 
 function setKind(kind) {
     state.pendingKind = kind;
@@ -291,14 +335,13 @@ function updateDueRow() {
     if (dueB) dueB.style.display = (state.pendingKind === 'series' && !isDates) ? 'none' : '';
     const sad = document.getElementById('seriesAddDate');
     if (sad) sad.style.display = isDates ? '' : 'none';
-    const dc = document.getElementById('dueChips');
-    const slot = document.getElementById('dueChipsSlot');
-    if (dc && slot) {
-        if (isDates) {
-            slot.appendChild(dc);
-        } else if (_dueHome.p && dc.parentElement !== _dueHome.p) {
-            _dueHome.p.insertBefore(dc, _dueHome.n);
-        }
+
+    // استفاده از DueChipsManager به جای _dueHome
+    if (isDates) {
+        const slot = document.getElementById('dueChipsSlot');
+        if (slot) dueChipsManager.mountAt(slot);
+    } else {
+        dueChipsManager.restore();
     }
 }
 
@@ -306,6 +349,50 @@ function syncDisclosure() {
     const md = document.getElementById('moreDetails');
     if (md) md.open = state.prefs.proMode === true;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Event wiring — kind buttons, series, etc.
+// ═══════════════════════════════════════════════════════════════════════════
+
+addBtn.addEventListener('click', () => addTask(state.pendingKind));
+input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(state.pendingKind); });
+
+document.getElementById('dueBtn').addEventListener('click', () => openPicker('add'));
+document.getElementById('dueChips').addEventListener('click', e => {
+    const b = e.target.closest('[data-dchip]');
+    if (!b) return;
+    state.addDraftSessions = state.addDraftSessions.filter(s => String(s.id) !== b.dataset.dchip);
+    updateDueChips();
+});
+document.getElementById('locBtn').addEventListener('click', () => {
+    ensureMapVisible();
+    switchToTab('map');
+    document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
+    mapHint('روی نقشه کلیک کنید تا محل وظیفه جدید انتخاب شود');
+});
+document.getElementById('locChip').addEventListener('click', e => {
+    if (!e.target.closest('[data-locclear]')) return;
+    state.pendingLoc = null;
+    removePickMarker();
+    refreshSavedLocationUI();
+});
+document.getElementById('myLocBtn').addEventListener('click', () => { ensureMapVisible(); locateUser(true); });
+document.getElementById('liveTrackBtn').addEventListener('click', () => {
+    ensureMapVisible();
+    if (isLiveTrackingActive()) {
+        stopLiveTracking();
+    } else {
+        startLiveTracking();
+    }
+});
+document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
+document.getElementById('fsExit').addEventListener('click', toggleFullscreen);
+document.getElementById('routeClearBtn').addEventListener('click', clearRoute);
+
+document.getElementById('sortSelect').addEventListener('change', e => {
+    state.currentSort = e.target.value;
+    render();
+});
 
 document.querySelectorAll('.kind3-btn').forEach(b => {
     b.addEventListener('click', () => {
@@ -752,22 +839,18 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     const action = btn.dataset.action;
 
     if (action === 'new-task' || action === 'new-plan' || action === 'new-series') {
-        // ۱. سوئیچ به تب وظایف (اگر در تب نقشه هستیم)
         switchToTab('tasks');
 
-        // ۲. تنظیم نوع
         const kind = action === 'new-task' ? 'task'
                    : action === 'new-plan' ? 'plan'
                    : 'series';
         setKind(kind);
 
-        // ۳. اسکرول نرم به create-zone
         const createZone = document.querySelector('.create-zone');
         if (createZone) {
             createZone.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        // ۴. focus روی input بعد از اسکرول
         setTimeout(() => {
             const ti = document.getElementById('taskInput');
             if (ti) ti.focus({ preventScroll: true });
@@ -782,7 +865,6 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
 });
 
 /* ---------- Photo Camera Input (فاز ۳) ---------- */
-// اتصال photoCameraInput به همان logic photoInput (در detail.js)
 
 (function initPhotoCameraInput() {
     const photoCameraInput = document.getElementById('photoCameraInput');
@@ -797,7 +879,6 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
             photoInput.files = dt.files;
             photoInput.dispatchEvent(new Event('change', { bubbles: true }));
         } catch {
-            // fallback برای مرورگرهای قدیمی — فقط رویداد را dispatch می‌کنیم
             photoInput.dispatchEvent(new Event('change', { bubbles: true }));
         } finally {
             photoCameraInput.value = '';
@@ -1416,13 +1497,18 @@ try {
 
 bindDetailInputs();
 loadPrefs();
-(function initDueHome() {
-    const dc = document.getElementById('dueChips');
-    if (dc) {
-        _dueHome.p = dc.parentElement;
-        _dueHome.n = dc.nextElementSibling;
-    }
+
+// ─── رفع circular import: map helpers به store ───
+setMapHelpers({ getMap, getMapReady, getPickMarker, setPickMarker });
+
+// ─── ثبت listenerهای EventEmitter ───
+wireEvents();
+
+// ─── مقداردهی DueChipsManager ───
+(function initDueChips() {
+    dueChipsManager.init();
 })();
+
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
     document.getElementById('welcomeOverlay').style.display = 'flex';
@@ -1469,6 +1555,7 @@ if (import.meta.env.DEV) {
         getState: () => state,
         findTask,
         saveTasks,
-        render
+        render,
+        events
     };
 }

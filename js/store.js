@@ -1,37 +1,78 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// store.js -- IndexedDB + CRUD actions (ESM)
+// store.js -- IndexedDB + CRUD actions (ESM) — گام ۶ فاز ۴ (نسخه‌ی نهایی)
+//
+// ⚠️ این نسخه incremental save دارد:
+//   - saveTask(task) برای ذخیره‌ی یک task
+//   - deleteTaskFromStore(id) برای حذف یک task
+//   - saveTasks() فقط برای bulk (import/migration) نگه داشته شده
+//   - structuredClone حذف شد (IndexedDB خودش کپی می‌کند)
+// ═══════════════════════════════════════════════════════════════════════════
 
 import { state, MAX_LENGTH, toFa, uid, escapeHtml } from './core.js';
 import { sameMinute, nearestUpcoming, allSessions, hasSessionAt, visibleChildren } from './sessions.js';
 import { getNow } from './time.js';
+import { events, EV, CALLBACK_TO_EVENT } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Callback registry (به جای shim‌های window.X)
+// Map helpers — set by app.js during boot
 // ═══════════════════════════════════════════════════════════════════════════
 
-const _callbacks = {
-    render: null,
-    updateDueChips: null,
-    renderPlanKids: null,
-    updateLocChip: null,
-    openDetail: null,
-    showUndoFor: null,
-    showConfirmModal: null,
-    renderTrash: null,
-    getMap: null,
-    getMapReady: null,
-    getPickMarker: null,
-    setPickMarker: null,
+const _mapHelpers = {
+    getMap: () => null,
+    getMapReady: () => false,
+    getPickMarker: () => null,
+    setPickMarker: () => {}
 };
 
-export function registerCallbacks(cbs) {
-    Object.assign(_callbacks, cbs);
+/**
+ * تنظیم helperهای map — فقط از app.js در بوت فراخوانی می‌شود.
+ * @param {Partial<typeof _mapHelpers>} helpers
+ */
+export function setMapHelpers(helpers) {
+    if (!helpers || typeof helpers !== 'object') return;
+    if (typeof helpers.getMap === 'function') _mapHelpers.getMap = helpers.getMap;
+    if (typeof helpers.getMapReady === 'function') _mapHelpers.getMapReady = helpers.getMapReady;
+    if (typeof helpers.getPickMarker === 'function') _mapHelpers.getPickMarker = helpers.getPickMarker;
+    if (typeof helpers.setPickMarker === 'function') _mapHelpers.setPickMarker = helpers.setPickMarker;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// call() / invoke() — جایگزین _callbacks[name](...args)
+// ═══════════════════════════════════════════════════════════════════════════
+
 function call(name, ...args) {
-    const fn = _callbacks[name];
-    if (typeof fn === 'function') return fn(...args);
-    return undefined;
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`store.call: unknown callback "${name}"`);
+        return;
+    }
+    events.emit(eventName, ...args);
+}
+
+function invoke(name, ...args) {
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`store.invoke: unknown callback "${name}"`);
+        return undefined;
+    }
+    const listeners = events._listeners.get(eventName);
+    if (!listeners || listeners.size === 0) return undefined;
+    let result;
+    for (const listener of listeners) {
+        try {
+            const r = listener(...args);
+            if (r !== undefined) {
+                result = r;
+                break;
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`store.invoke: listener for "${eventName}" threw:`, err);
+        }
+    }
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -75,6 +116,7 @@ function idbGetAll(storeName) {
     }));
 }
 
+// ⚠️ idbPutAll فقط برای bulk (import/migration) — نه برای هر تغییر
 function idbPutAll(storeName, items, opts) {
     const options = opts || {};
     return idbOpen().then(db => new Promise((resolve, reject) => {
@@ -84,6 +126,36 @@ function idbPutAll(storeName, items, opts) {
             store.clear();
             items.forEach(item => store.put(item));
         }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+// ⚠️ جدید: idbPut تکی — فقط یک رکورد را ذخیره می‌کند
+function idbPut(storeName, item) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(item);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+// ⚠️ جدید: idbDelete تکی — فقط یک رکورد را حذف می‌کند
+function idbDelete(storeName, id) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+// ⚠️ جدید: idbClear — کل store را پاک می‌کند (برای import)
+function idbClear(storeName) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     }));
@@ -112,10 +184,8 @@ export function validLoc(v) {
     } else {
         out.name = null;
     }
-    // نام مکان دو زبانه (اختیاری — فقط برای مکان‌های ذخیره‌شده)
     const names = sanitizeBilingualNames(v.names);
     if (names) out.names = names;
-    // نام شهر دو زبانه (خودکار — از reverse geocode)
     const cityNames = sanitizeBilingualNames(v.cityNames);
     if (cityNames) out.cityNames = cityNames;
     return out;
@@ -205,13 +275,12 @@ export function sanitizeTask(t) {
             .slice(0, 8)
             .map(p => ({ id: typeof p.id !== 'undefined' ? p.id : uid(), dataUrl: p.dataUrl, addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString() }))
             : [],
-        // حالا برای برنامه‌ها هم location مجاز است
         location: validLoc(t.location)
     };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Load / Save
+// Load / Save — Incremental
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function loadTasks() {
@@ -229,29 +298,92 @@ export async function loadTasks() {
 }
 
 /**
- * کپی عمیق از داده‌ها با fallback برای مرورگرهای قدیمی.
- * structuredClone در Safari < 15.4 و برخی WebViewها در دسترس نیست.
+ * ذخیره‌ی یک task تکی در IndexedDB.
+ *
+ * ⚠️ این تابع جایگزین saveTasks برای تغییرات تکی است.
+ * بدون structuredClone — IndexedDB خودش داده را کپی می‌کند.
+ *
+ * @param {object} task
+ * @param {object} [parent] - اگر task یک فرزند است، والد آن را هم ذخیره می‌کند
+ * @returns {Promise<void>}
  */
-function deepClone(value) {
-    if (typeof structuredClone === 'function') {
-        try {
-            return structuredClone(value);
-        } catch {
-            // اگر structuredClone با داده‌های غیرقابل clone برخورد کرد، به JSON برمی‌گردیم
-        }
+export function saveTask(task, parent) {
+    if (!task || typeof task.id === 'undefined') {
+        return Promise.reject(new Error('saveTask: invalid task'));
     }
-    return JSON.parse(JSON.stringify(value));
+    invalidateTaskIndex();
+
+    // اگر فرزند است، والد را ذخیره کن (چون فرزندان درون والد ذخیره می‌شوند)
+    const target = parent || task;
+
+    const p = useIDB
+        ? idbPut(IDB_STORE, target)
+        : (function () {
+            try {
+                // fallback: localStorage (bulk)
+                localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        })();
+
+    p.then(() => {
+        events.emit(EV.TASK_SAVED, { task, parent: parent || null });
+    }).catch(err => {
+        console.error('saveTask failed', err);
+        events.emit(EV.STORAGE_ERROR, {
+            message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
+        });
+        if (!saveTask._warned) {
+            saveTask._warned = true;
+            window.dispatchEvent(new CustomEvent('rahe-storage-error', {
+                detail: { message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.' }
+            }));
+        }
+    });
+    return p;
 }
 
-export function saveTasks() {
-    let snapshot;
-    try {
-        snapshot = deepClone(state.tasks);
-    } catch (e) {
-        console.error('saveTasks: deepClone failed', e);
-        return Promise.reject(e);
-    }
+/**
+ * حذف یک task تکی از IndexedDB.
+ * @param {string|number} id
+ * @returns {Promise<void>}
+ */
+export function deleteTaskFromStore(id) {
+    invalidateTaskIndex();
+    const p = useIDB
+        ? idbDelete(IDB_STORE, id)
+        : (function () {
+            try {
+                localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        })();
 
+    p.catch(err => {
+        console.error('deleteTaskFromStore failed', err);
+    });
+    return p;
+}
+
+/**
+ * ذخیره‌ی کل state.tasks در IndexedDB (bulk).
+ *
+ * ⚠️ این تابع فقط برای موارد خاص استفاده می‌شود:
+ *   - import از JSON
+ *   - migration
+ *   - bulk operations (مثل archiveDone)
+ *
+ * برای تغییرات تکی، از saveTask استفاده کنید.
+ *
+ * @deprecated برای تغییرات تکی از saveTask استفاده کنید
+ * @returns {Promise<void>}
+ */
+export function saveTasks() {
+    const snapshot = state.tasks;
     invalidateTaskIndex();
 
     const p = useIDB
@@ -264,14 +396,13 @@ export function saveTasks() {
                 return Promise.reject(e);
             }
         })();
-    p.catch(() => {
-        console.error('storage save failed');
-        if (!saveTasks._warned) {
-            saveTasks._warned = true;
-            window.dispatchEvent(new CustomEvent('rahe-storage-error', {
-                detail: { message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.' }
-            }));
-        }
+    p.then(() => {
+        events.emit(EV.TASK_SAVED, { bulk: true });
+    }).catch(() => {
+        console.error('storage save failed (bulk)');
+        events.emit(EV.STORAGE_ERROR, {
+            message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
+        });
     });
     return p;
 }
@@ -279,12 +410,7 @@ export function saveTasks() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Cache Invalidation
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// ⚠️ نکته: قبلاً این ماژول یک Map به نام `taskIndex` می‌ساخت که هیچ‌وقت
-// استفاده نمی‌شد (findTask همیشه روی state.tasks لوپ می‌زد). حالا حذف شده.
-// اما `state.taskIndexVersion` را نگه می‌داریم چون `sessions.js` برای
-// invalidate کردن cache خودش به آن وابسته است.
-//
+
 export function invalidateTaskIndex() {
     state.taskIndex = null;
     state.taskIndexVersion++;
@@ -434,18 +560,48 @@ export function saveTrash() {
     return p;
 }
 
+/**
+ * ذخیره‌ی یک آیتم تکی در سطل زباله.
+ * @param {object} item
+ * @returns {Promise<void>}
+ */
+export function saveTrashItem(item) {
+    if (!item || typeof item.id === 'undefined') return Promise.resolve();
+    const p = useIDB ? idbPut(IDB_TRASH, item) : Promise.resolve();
+    p.catch(() => {});
+    return p;
+}
+
+/**
+ * حذف یک آیتم تکی از سطل زباله.
+ * @param {string|number} id
+ * @returns {Promise<void>}
+ */
+export function deleteTrashItem(id) {
+    const p = useIDB ? idbDelete(IDB_TRASH, id) : Promise.resolve();
+    p.catch(() => {});
+    return p;
+}
+
 export function purgeTrash(renderAfter) {
     const cut = Date.now() - 30 * 86400000;
     const before = state.trash.length;
+    const removed = [];
     state.trash = state.trash.filter(x => {
         try {
-            return new Date(x.deletedAt).getTime() > cut;
+            const keep = new Date(x.deletedAt).getTime() > cut;
+            if (!keep) removed.push(x.id);
+            return keep;
         } catch {
+            removed.push(x.id);
             return false;
         }
     });
     if (state.trash.length !== before) {
-        saveTrash();
+        // حذف تکی موارد منقضی
+        if (useIDB) {
+            removed.forEach(id => deleteTrashItem(id));
+        }
         if (renderAfter !== false) call('render');
     }
 }
@@ -453,12 +609,29 @@ export function purgeTrash(renderAfter) {
 export function moveToTrashById(id) {
     const found = findTask(id);
     if (!found) return false;
-    if (found.parent) found.parent.children = found.parent.children.filter(c => String(c.id) !== String(id));
-    else state.tasks = state.tasks.filter(t => String(t.id) !== String(id));
-    state.trash.unshift({ ...found.task, parentId: found.parent ? found.parent.id : null, deletedAt: new Date().toISOString() });
+    const trashItem = {
+        ...found.task,
+        parentId: found.parent ? found.parent.id : null,
+        deletedAt: new Date().toISOString()
+    };
+    if (found.parent) {
+        found.parent.children = found.parent.children.filter(c => String(c.id) !== String(id));
+    } else {
+        state.tasks = state.tasks.filter(t => String(t.id) !== String(id));
+    }
+    state.trash.unshift(trashItem);
     invalidateTaskIndex();
-    saveTrash();
-    saveTasks();
+
+    // ✅ incremental: ذخیره‌ی trashItem تکی + حذف task تکی
+    if (useIDB) {
+        saveTrashItem(trashItem);
+        deleteTaskFromStore(id);
+    } else {
+        saveTrash();
+        saveTasks();
+    }
+
+    events.emit(EV.TASK_DELETED, { id, task: found.task, parentId: found.parent ? found.parent.id : null });
     return true;
 }
 
@@ -468,12 +641,26 @@ export function restoreTrash(id) {
     const [item] = state.trash.splice(i, 1);
     const { parentId, deletedAt, ...rest } = item;
     const g = parentId ? state.tasks.find(t => String(t.id) === String(parentId) && t.kind === 'plan') : null;
-    if (g) (g.children = g.children || []).unshift(rest);
-    else state.tasks.unshift(rest);
-    saveTrash();
-    saveTasks();
+    if (g) {
+        (g.children = g.children || []).unshift(rest);
+    } else {
+        state.tasks.unshift(rest);
+    }
+    invalidateTaskIndex();
+
+    // ✅ incremental: ذخیره‌ی task تکی + حذف trashItem تکی
+    if (useIDB) {
+        if (g) saveTask(rest, g);
+        else saveTask(rest);
+        deleteTrashItem(id);
+    } else {
+        saveTrash();
+        saveTasks();
+    }
+
     call('render');
     call('renderTrash');
+    events.emit(EV.TASK_RESTORED, { id, task: rest });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -528,7 +715,7 @@ export function addTask(forceKind) {
         }
     }
     state.justAddedId = uid();
-    state.tasks.unshift({
+    const newTask = {
         id: state.justAddedId,
         text: text.slice(0, MAX_LENGTH),
         completed: false,
@@ -553,9 +740,13 @@ export function addTask(forceKind) {
         photos: [],
         startAt: isPlan ? (state.planDraftStart || null) : null,
         endAt: isPlan ? (state.planDraftEnd || null) : null
-    });
+    };
+    state.tasks.unshift(newTask);
     if (isPlan) state.expandedPlans.add(String(state.justAddedId));
-    saveTasks();
+
+    // ✅ incremental: ذخیره‌ی task تکی
+    saveTask(newTask);
+
     input.value = '';
     input.classList.remove('input-error');
     state.addDraftSessions = [];
@@ -569,11 +760,11 @@ export function addTask(forceKind) {
     const sErr = document.getElementById('seriesError');
     if (sErr) sErr.textContent = '';
     state.pendingLoc = null;
-    const map = call('getMap');
-    const pm = call('getPickMarker');
-    if (pm && map && call('getMapReady')) {
+    const map = _mapHelpers.getMap();
+    const pm = _mapHelpers.getPickMarker();
+    if (pm && map && _mapHelpers.getMapReady()) {
         map.removeLayer(pm);
-        call('setPickMarker', null);
+        _mapHelpers.setPickMarker(null);
     }
     call('updateLocChip');
     input.focus();
@@ -590,10 +781,13 @@ export function toggleTask(id) {
     if (!found) return;
     found.task.completed = !found.task.completed;
     found.task.completedAt = found.task.completed ? new Date().toISOString() : null;
+    let recurred = false;
     if (found.task.completed && found.task.recur && found.task.recur !== 'none' && advanceRecur(found.task)) {
         found.task.completed = false;
+        recurred = true;
     }
-    saveTasks();
+    // ✅ incremental: ذخیره‌ی task تکی
+    saveTask(found.task, found.parent);
     call('render');
 }
 
@@ -601,7 +795,7 @@ export async function deleteTask(id, el) {
     const pre = findTask(id);
     if (!pre) return;
     if (!pre.parent && pre.task.kind === 'plan' && (pre.task.children || []).length > 0) {
-        const ok = await call('showConfirmModal', {
+        const ok = await invoke('showConfirmModal', {
             title: 'حذف برنامه',
             message: `این برنامه ${toFa(pre.task.children.length)} کار دارد. همه با هم به سطل زباله منتقل شوند؟`,
             confirmText: 'بله، منتقل کن',
@@ -629,14 +823,32 @@ export async function deleteTask(id, el) {
 
 export function archiveDone() {
     let n = 0;
+    const changedParents = new Set();
     state.tasks.forEach(t => {
-        if (t.kind === 'plan') (t.children || []).forEach(c => {
-            if (c.completed && !c.archived) { c.archived = true; n++; }
-        });
-        else if (t.completed && !t.archived) { t.archived = true; n++; }
+        if (t.kind === 'plan') {
+            let planChanged = false;
+            (t.children || []).forEach(c => {
+                if (c.completed && !c.archived) {
+                    c.archived = true;
+                    n++;
+                    planChanged = true;
+                }
+            });
+            if (planChanged) changedParents.add(t);
+        } else if (t.completed && !t.archived) {
+            t.archived = true;
+            n++;
+            changedParents.add(t);
+        }
     });
     if (!n) return;
-    saveTasks();
+
+    // ✅ incremental: فقط والدهای تغییر یافته ذخیره می‌شوند
+    if (useIDB) {
+        changedParents.forEach(t => saveTask(t));
+    } else {
+        saveTasks();
+    }
     call('render');
 }
 
@@ -647,7 +859,7 @@ export async function clearCompleted() {
         else if (t.completed && !t.archived) ids.push(t.id);
     });
     if (ids.length === 0) return;
-    const ok = await call('showConfirmModal', {
+    const ok = await invoke('showConfirmModal', {
         title: 'پاک کردن انجام‌شده‌ها',
         message: `${toFa(ids.length)} وظیفه انجام‌شده به سطل زباله منتقل شود؟`,
         confirmText: 'بله، منتقل کن',
@@ -655,6 +867,7 @@ export async function clearCompleted() {
         danger: true
     });
     if (!ok) return;
+    // moveToTrashById خودش deleteTaskFromStore می‌کند
     ids.forEach(moveToTrashById);
     call('render');
     call('showUndoFor', ids);
@@ -710,7 +923,10 @@ export function createPlanCustom(name, kids, opts) {
     state.tasks.unshift(g);
     state.expandedPlans.add(String(g.id));
     state.justAddedId = g.id;
-    saveTasks();
+
+    // ✅ incremental: ذخیره‌ی برنامه‌ی جدید (شامل فرزندان)
+    saveTask(g);
+
     call('render');
     return g.id;
 }
@@ -749,7 +965,10 @@ export function addChild(gid) {
         location: null
     });
     state.childDrafts[gid] = [];
-    saveTasks();
+
+    // ✅ incremental: ذخیره‌ی والد (که فرزند جدید را در خود دارد)
+    saveTask(g);
+
     call('render');
     const ni = taskList ? taskList.querySelector(`.task-item[data-id="${gid}"] .child-input`) : null;
     if (ni) ni.focus();

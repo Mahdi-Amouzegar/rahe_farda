@@ -1,5 +1,12 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// ui.js -- main list render + filters (ESM)
+// ui.js -- main list render + filters (ESM) — گام ۷ فاز ۴
+//
+// ⚠️ این نسخه:
+//   - render() را به renderFull + renderDiff تقسیم می‌کند
+//   - از render-diff.js برای تشخیص تغییرات استفاده می‌کند
+//   - برای تغییرات ساختاری (filter/sort/search)، همچنان innerHTML می‌سازد
+//   - برای toggle/pin/archive (تغییرات تکی)، فقط DOM را patch می‌کند
+// ═══════════════════════════════════════════════════════════════════════════
 
 import {
     state,
@@ -39,6 +46,11 @@ import {
 } from './jalali.js';
 import { scheduleMarkerRefresh } from './map.js';
 import { getWeatherIcon } from './weather.js';
+import {
+    buildRenderSignature,
+    diffTasks,
+    isSafeForDiff
+} from './render-diff.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -50,13 +62,17 @@ let _trashTrapCleanup = null;
 let _calTrapCleanup = null;
 let snackTimer = null;
 
+// ⚠️ state diffing
+let _lastRenderSignature = '';       // امضای آخرین render کامل
+let _lastVisibleTasks = [];           // snapshot از taskهای قابل مشاهده (برای diff)
+let _rafPending = false;              // آیا render در صف rAF است؟
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * آیا این وظیفه (کار/برنامه/زیرکار) مکان دارد؟
- * مکان می‌تواند روی خود وظیفه یا روی یکی از sessionها باشد.
  */
 function hasAnyLocation(t) {
     if (!t) return false;
@@ -67,13 +83,6 @@ function hasAnyLocation(t) {
 
 /**
  * بارگذاری غیرهمزمان آیکن هوا برای همه‌ی اسلات‌های موجود در DOM.
- * بعد از هر render() صدا زده می‌شود.
- *
- * این اسلات‌ها توسط sessionSummaryHtml (در sessions.js) و weatherButtonHtml
- * در childHtml ساخته می‌شوند. کلید = `taskId|at`.
- *
- * خود getWeatherIcon کش localStorage دارد (TTL 3 ساعت) پس نیازی به کش
- * در این لایه نیست.
  */
 function hydrateWeatherIcons(rootEl) {
     if (!rootEl) return;
@@ -100,7 +109,6 @@ function hydrateWeatherIcons(rootEl) {
             return;
         }
 
-        // ساخت آبجکت موقت برای getWeatherIcon (که task با location و sessions می‌خواهد)
         const tempTask = {
             location: task.location,
             sessions: [{ at }]
@@ -442,10 +450,6 @@ function operationMenu(items, label = 'عملیات') {
     </div>`;
 }
 
-/**
- * ساخت HTML دکمه‌ی هوا با اسلات آیکن.
- * فقط برای زیرکارها استفاده می‌شود (task اصلی دکمه‌اش را در sessionSummaryHtml دارد).
- */
 function childWeatherButton(c) {
     if (!c || !c.location) return '';
     const n = nearestUpcoming(c);
@@ -459,7 +463,6 @@ function childWeatherButton(c) {
 }
 
 function childHtml(c) {
-    // حالت ویرایش
     if (String(c.id) === String(state.editingId)) {
         return `<div class="child-item" data-id="${escapeHtml(String(c.id))}">
             <div class="edit-wrap">
@@ -477,7 +480,6 @@ function childHtml(c) {
     const wBtn = childWeatherButton(c);
     const recur = recurBadge(c, 'child-meta-badge');
 
-    // آیا ردیف متادیتا محتوایی دارد؟
     const hasMeta = n || hasLoc || hasPhotos || recur || wBtn;
 
     return `<div class="child-item ${c.completed ? 'completed' : ''} ${String(c.id) === String(state.justAddedId) ? 'just-added' : ''}" data-id="${escapeHtml(String(c.id))}">
@@ -572,6 +574,57 @@ function taskTypeIcon(task) {
     return (task.kind === 'series' || task.recur !== 'none') ? '🔁' : '📝';
 }
 
+function taskItemHtml(task) {
+    if (String(task.id) === String(state.editingId)) {
+        return `
+        <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${escapeHtml(String(task.id))}">
+            <div class="task-main-row">
+                <div class="task-content">
+                    <div class="edit-wrap">
+                        <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش وظیفه">
+                        <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
+                        <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف از ویرایش">✕</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+    return `
+    <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
+        <div class="task-main-row">
+            <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
+                aria-label="${task.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
+                aria-pressed="${task.completed}"></button>
+            <div class="task-content">
+                <div class="task-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
+            </div>
+            <div class="task-actions">
+                ${operationMenu(state.currentFilter === 'archived'
+                    ? [
+                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
+                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                    ]
+                    : [
+                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
+                        ...(hasAnyLocation(task) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
+                        { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
+                        { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
+                        { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
+                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
+                    ], 'عملیات وظیفه')}
+            </div>
+        </div>
+        <div class="task-info-row">
+            <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
+            ${recurBadge(task)}
+            <span class="created-date">${faDate(task.createdAt)}</span>
+            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
+            ${task.location ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
+        </div>
+        ${sessionSummaryHtml(task)}
+    </div>`;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Snackbar / Undo
 // ═══════════════════════════════════════════════════════════════════════════
@@ -618,11 +671,146 @@ export function hideSnackbar() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// رندر اصلی
+// رندر اصلی — با diffing
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * رندر کامل — innerHTML-based.
+ * @param {object[]} filtered
+ * @param {number} total
+ * @param {number} done
+ */
+function renderFull(filtered, total, done) {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    if (filtered.length === 0) {
+        let msg;
+        if (state.searchQuery) {
+            msg = 'نتیجه‌ای برای جستجو یافت نشد';
+        } else if (state.currentFilter === 'completed') {
+            msg = 'هنوز وظیفه انجام شده‌ای ندارید';
+        } else if (state.currentFilter === 'active') {
+            msg = 'همه وظایف انجام شده‌اند!';
+        } else {
+            msg = 'لیست وظایف خالی است';
+        }
+        taskList.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">✦</div>
+                <p>${msg}</p>
+                ${state.tasks.length === 0 && !state.searchQuery ? '<p class="empty-hint">برای شروع عنوان را بنویسید و «افزودن» را بزنید — با 📅 تاریخ و با 📍 محل هم می‌توانید اضافه کنید.</p>' : ''}
+            </div>`;
+        state.justAddedId = null;
+        updateTaskListStatus('');
+        return;
+    }
+
+    taskList.innerHTML = filtered.map(task => {
+        if (task.kind === 'plan') return planHtml(task);
+        return taskItemHtml(task);
+    }).join('');
+
+    hydrateWeatherIcons(taskList);
+    updateTaskListStatus(`${filtered.length} مورد نمایش داده می‌شود`);
+    state.justAddedId = null;
+}
+
+/**
+ * رندر diff-based — فقط DOM را patch می‌کند.
+ * @param {object[]} filtered
+ * @returns {boolean} آیا diff موفق بود؟
+ */
+function renderDiff(filtered) {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return false;
+
+    const ops = diffTasks(_lastVisibleTasks, filtered);
+
+    // اگر add/remove داریم، diff امن نیست (indexها می‌شکنند)
+    if (!isSafeForDiff(ops)) return false;
+
+    // اگر هیچ تغییری نیست، کاری نکن
+    if (ops.length === 0) return true;
+
+    for (const op of ops) {
+        if (op.type !== 'update') continue;
+
+        const idStr = String(op.id);
+        const el = taskList.querySelector(`[data-id="${CSS.escape(idStr)}"]`);
+        if (!el) {
+            // اگر المان پیدا نشد (مثلاً plan بسته شده)، diff امن نیست
+            return false;
+        }
+
+        // patch فیلدهای ساده
+        if ('text' in op.patches) {
+            const textEl = el.querySelector('.task-text');
+            if (textEl) {
+                // حفظ آیکن نوع
+                const icon = textEl.querySelector('.task-type-icon');
+                const iconHtml = icon ? icon.outerHTML + ' ' : '';
+                textEl.innerHTML = iconHtml + escapeHtml(op.patches.text);
+            }
+        }
+        if ('completed' in op.patches) {
+            el.classList.toggle('completed', op.patches.completed);
+            const cb = el.querySelector('.task-checkbox');
+            if (cb) {
+                cb.classList.toggle('checked', op.patches.completed);
+                cb.setAttribute('aria-pressed', String(op.patches.completed));
+                cb.setAttribute('aria-label', op.patches.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده');
+            }
+        }
+        if ('priority' in op.patches) {
+            el.classList.remove('prio-high', 'prio-medium', 'prio-low');
+            el.classList.add(`prio-${op.patches.priority}`);
+            const badge = el.querySelector('.priority-badge');
+            if (badge) {
+                badge.className = `priority-badge p-${op.patches.priority}`;
+                badge.textContent = PRIORITY_LABELS[op.patches.priority];
+            }
+        }
+        if ('pinned' in op.patches) {
+            // pin نیاز به جابه‌جایی دارد → diff امن نیست
+            return false;
+        }
+        if ('archived' in op.patches) {
+            // archive نیاز به جابه‌جایی دارد → diff امن نیست
+            return false;
+        }
+        if ('hasLocation' in op.patches) {
+            // تغییر location بر mini-link اثر دارد → innerHTML از نو
+            return false;
+        }
+        if ('sessionsLength' in op.patches || 'childrenDone' in op.patches || 'childrenLength' in op.patches) {
+            // تغییر session یا child → innerHTML از نو (پیچیده است)
+            return false;
+        }
+        if ('photosLength' in op.patches) {
+            return false;
+        }
+        if ('recur' in op.patches || 'recurN' in op.patches || 'recurDays' in op.patches) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * تابع اصلی render — تصمیم می‌گیرد renderFull یا renderDiff.
+ *
+ * استراتژی:
+ *   1. محاسبه‌ی لیست filtered
+ *   2. ساخت signature از state
+ *   3. اگر signature عوض شده → renderFull (و snapshot ذخیره کن)
+ *   4. اگر signature یکسان → try renderDiff
+ *   5. اگر diff موفق نشد → renderFull
+ */
 export function render() {
     scheduleMarkerRefresh();
+
     const live = state.tasks.filter(t => !t.archived);
     const filtered = getFiltered();
     const total = live.length;
@@ -635,7 +823,6 @@ export function render() {
     const progressFill = document.getElementById('progressFill');
     const progressPct = document.getElementById('progressPct');
     const progressBar = document.getElementById('progressBar');
-    const taskList = document.getElementById('taskList');
 
     if (totalCountEl) totalCountEl.textContent = toFa(total);
     if (doneCountEl) doneCountEl.textContent = toFa(done);
@@ -684,87 +871,29 @@ export function render() {
     const doneActionsEl = document.getElementById('doneActions');
     if (doneActionsEl) doneActionsEl.style.display = done > 0 ? 'flex' : 'none';
 
-    if (filtered.length === 0) {
-        let msg;
-        if (state.searchQuery) {
-            msg = 'نتیجه‌ای برای جستجو یافت نشد';
-        } else if (state.currentFilter === 'completed') {
-            msg = 'هنوز وظیفه انجام شده‌ای ندارید';
-        } else if (state.currentFilter === 'active') {
-            msg = 'همه وظایف انجام شده‌اند!';
-        } else {
-            msg = 'لیست وظایف خالی است';
-        }
-        taskList.innerHTML = `
-            <div class="empty-state">
-                <div class="icon">✦</div>
-                <p>${msg}</p>
-                ${state.tasks.length === 0 && !state.searchQuery ? '<p class="empty-hint">برای شروع عنوان را بنویسید و «افزودن» را بزنید — با 📅 تاریخ و با 📍 محل هم می‌توانید اضافه کنید.</p>' : ''}
-            </div>`;
-        state.justAddedId = null;
-        updateTaskListStatus('');
+    // ─── تصمیم renderFull vs renderDiff ───
+    const visibleIds = filtered.map(t => String(t.id));
+    const signature = buildRenderSignature(state, visibleIds);
+
+    if (signature !== _lastRenderSignature) {
+        // تغییر ساختاری → render کامل
+        renderFull(filtered, total, done);
+        _lastRenderSignature = signature;
+        _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
         return;
     }
 
-    taskList.innerHTML = filtered.map(task => {
-        if (task.kind === 'plan') return planHtml(task);
-        if (String(task.id) === String(state.editingId)) {
-            return `
-            <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${escapeHtml(String(task.id))}">
-                <div class="task-main-row">
-                    <div class="task-content">
-                        <div class="edit-wrap">
-                            <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش وظیفه">
-                            <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
-                            <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف از ویرایش">✕</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        }
-        return `
-        <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
-            <div class="task-main-row">
-                <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
-                    aria-label="${task.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
-                    aria-pressed="${task.completed}"></button>
-                <div class="task-content">
-                    <div class="task-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
-                </div>
-                <div class="task-actions">
-                    ${operationMenu(state.currentFilter === 'archived'
-                        ? [
-                            { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                            { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                        ]
-                        : [
-                            { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
-                            ...(hasAnyLocation(task) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
-                            { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
-                            { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
-                            { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
-                            { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                        ], 'عملیات وظیفه')}
-                </div>
-            </div>
-            <div class="task-info-row">
-                <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
-                ${recurBadge(task)}
-                <span class="created-date">${faDate(task.createdAt)}</span>
-                ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
-                ${task.location ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
-            </div>
-            ${sessionSummaryHtml(task)}
-        </div>`;
-    }).join('');
+    // signature یکسان → try diff
+    const diffSucceeded = renderDiff(filtered);
+    if (!diffSucceeded) {
+        // diff نشد → render کامل
+        renderFull(filtered, total, done);
+        _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
+        return;
+    }
 
-    // بارگذاری غیرهمزمان آیکن‌های هوا
-    hydrateWeatherIcons(taskList);
-
-    // به‌روزرسانی ناحیه‌ی status برای screen reader
-    updateTaskListStatus(`${filtered.length} مورد نمایش داده می‌شود`);
-
-    state.justAddedId = null;
+    // diff موفق بود → snapshot را به‌روز کن
+    _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
 }
 
 /**
@@ -773,6 +902,15 @@ export function render() {
 function updateTaskListStatus(msg) {
     const el = document.getElementById('taskListStatus');
     if (el) el.textContent = msg || '';
+}
+
+/**
+ * ⚠️ تابع کمکی برای reset کردن signature — در صورت نیاز خارجی.
+ * مثلاً وقتی state به‌صورت دستی تغییر می‌کند (import).
+ */
+export function resetRenderSignature() {
+    _lastRenderSignature = '';
+    _lastVisibleTasks = [];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

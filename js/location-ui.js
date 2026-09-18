@@ -1,5 +1,9 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// location-ui.js -- saved locations: local IndexedDB + human-readable labels (ESM)
+// location-ui.js -- saved locations: local IndexedDB + human-readable labels (ESM) — گام ۴ فاز ۴
+//
+// ⚠️ این نسخه فقط callbackها را به EventEmitter منتقل کرده است.
+// رفتار مکان‌های ذخیره‌شده (IndexedDB، نام‌گذاری، مدیریت) بدون تغییر است.
+// ═══════════════════════════════════════════════════════════════════════════
 
 import { state, toFa, escapeHtml, uid, trapFocus, showConfirmModal } from './core.js';
 import { findTask, saveTasks } from './store.js';
@@ -13,6 +17,7 @@ import {
     getMapReady
 } from './map.js';
 import { openDetail } from './detail.js';
+import { events, EV, CALLBACK_TO_EVENT } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants & local state
@@ -31,19 +36,39 @@ let mapRelocateBoundTo = null;
 let newFromMapBoundTo = null;
 let _savedLocTrapCleanup = null;
 
-// callback registry برای توابعی که نمی‌توانیم import کنیم (circular)
-const _callbacks = {
-    render: null,
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// Backward-compat: registerLocationCallbacks (پل موقت به EventEmitter)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ این تابع در گام ۵ (بازنویسی app.js) حذف می‌شود.
 
+/**
+ * @deprecated از events.on استفاده کنید. این تابع فقط برای سازگاری موقت است.
+ * @param {Record<string, Function>} cbs
+ */
 export function registerLocationCallbacks(cbs) {
-    Object.assign(_callbacks, cbs);
+    if (!cbs || typeof cbs !== 'object') return;
+    for (const [name, fn] of Object.entries(cbs)) {
+        if (typeof fn !== 'function') continue;
+        const eventName = CALLBACK_TO_EVENT[name];
+        if (!eventName) continue;
+        events.on(eventName, fn);
+    }
 }
 
+/**
+ * فراخوانی یک callback از طریق EventEmitter.
+ * @param {string} name
+ * @param {...any} args
+ */
 function call(name, ...args) {
-    const fn = _callbacks[name];
-    if (typeof fn === 'function') return fn(...args);
-    return undefined;
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`location-ui.call: unknown callback "${name}"`);
+        return;
+    }
+    events.emit(eventName, ...args);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,10 +155,6 @@ function coords(loc) {
     return `${toFa(a)}، ${toFa(b)}`;
 }
 
-/**
- * نام نمایشی مکان بر اساس زبان فعلی
- * اولویت: mکان ذخیره‌شده → نام ذخیره‌شده → مختصات
- */
 function label(loc) {
     if (!loc) return '';
     const saved = savedFor(loc);
@@ -145,20 +166,15 @@ function label(loc) {
         }
         if (saved.name) return saved.name;
     }
-    // مکان ذخیره نشده → مختصات
     const n = normalize(loc);
     return n ? coords(n) : '';
 }
 
-/**
- * نمایش با آیکن مناسب — فقط مکان‌های ذخیره‌شده نام نمایش می‌دهند
- */
 function displayFor(loc) {
     if (!loc) return { icon: '📍', name: '', cls: 'location-display-coords', isSaved: false };
     const n = normalize(loc);
     if (!n) return { icon: '📍', name: '', cls: 'location-display-coords', isSaved: false };
 
-    // ⚠️ فقط اگر در لیست مکان‌های ذخیره‌شده باشد، نام نمایش داده می‌شود
     const saved = savedFor(n);
     if (saved) {
         let name = saved.name;
@@ -169,7 +185,6 @@ function displayFor(loc) {
         return { icon: '📌', name, cls: 'location-display-name', isSaved: true };
     }
 
-    // مکان ذخیره نشده → فقط مختصات
     return { icon: '📍', name: coords(n), cls: 'location-display-coords', isSaved: false };
 }
 
@@ -327,7 +342,6 @@ function renderAdd() {
     if (text.innerHTML !== html) text.innerHTML = html;
     let actions = chip.querySelector('.loc-chip-actions');
     if (!actions) { actions = document.createElement('span'); actions.className = 'loc-chip-actions'; chip.appendChild(actions); }
-    // دکمه «ذخیره نام» یا «تغییر نام» — همیشه نمایش داده می‌شود
     const label = d.isSaved ? '✏️ تغییر نام' : '📌 ذخیره نام';
     const ah = `<button type="button" class="loc-chip-save" data-save-pending-location>${label}</button>`;
     if (actions.innerHTML !== ah) actions.innerHTML = ah;
@@ -347,7 +361,6 @@ function renderDetail() {
     const host = changeBtn ? changeBtn.parentElement : line.parentElement;
     if (!host) return;
 
-    // حذف دکمه‌ی قدیمی (اگر وجود دارد)
     const staleSave = line.querySelector('[data-save-detail-location]') || host.querySelector('[data-save-detail-location]');
     if (staleSave) staleSave.remove();
 
@@ -378,7 +391,6 @@ function renderDetail() {
         changeBtn.style.display = '';
     }
 
-    // دکمه «ذخیره نام» یا «تغییر نام» — همیشه نمایش داده می‌شود
     const save = document.createElement('button');
     save.type = 'button';
     save.className = 'location-save-btn';
@@ -448,15 +460,11 @@ function renderManageList() {
     `).join('')}</div>`;
 }
 
-/**
- * باز کردن مودال مدیریت مکان‌ها — با try/finally برای اطمینان از cleanup.
- */
 function openManageModal() {
     renderManageList();
     const modal = document.getElementById('savedLocationsModal');
     if (!modal) return;
 
-    // پاک‌سازی trap قبلی (اگر وجود دارد)
     if (_savedLocTrapCleanup) {
         try { _savedLocTrapCleanup(); } catch { /* silent */ }
         _savedLocTrapCleanup = null;
@@ -483,10 +491,20 @@ function closeManageModal() {
     if (modal) modal.style.display = 'none';
 }
 
+// محافظ برای جلوگیری از loop بی‌نهایت
+let _syncing = false;
+
 function sync() {
-    renderAdd();
-    renderDetail();
-    renderList();
+    if (_syncing) return;   // ⬅️ اگر داخل sync هستیم، برنگرد
+    _syncing = true;
+    try {
+        renderAdd();
+        renderDetail();
+        renderList();
+        events.emit(EV.LOCATION_UPDATED);
+    } finally {
+        _syncing = false;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -575,14 +593,12 @@ async function saveLocationWithName(loc, name) {
     item.name = cleanName;
     item.lat = n.lat;
     item.lng = n.lng;
-    // حفظ نام دو زبانه‌ی مکان (اگر قبلاً ذخیره شده)
     if (loc.names && typeof loc.names === 'object') {
         const names = {};
         if (typeof loc.names.fa === 'string' && loc.names.fa.trim()) names.fa = loc.names.fa.trim().slice(0, 80);
         if (typeof loc.names.en === 'string' && loc.names.en.trim()) names.en = loc.names.en.trim().slice(0, 80);
         if (Object.keys(names).length) item.names = names;
     }
-    // ذخیره‌ی نام شهر (cityNames) — اول از loc، اگر نبود از existing
     const cityNames = loc.cityNames || existing?.cityNames;
     if (cityNames && typeof cityNames === 'object') {
         const cn = {};
@@ -666,7 +682,6 @@ function bindMapRelocate() {
             }
             mapHint(`مکان «${item.name}» به‌روزرسانی شد ✓`);
 
-            // دریافت نام شهر جدید (cityNames) برای مکان تغییر یافته
             (async () => {
                 try {
                     const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -779,7 +794,6 @@ function bind() {
             if (!savePending) return;
             e.preventDefault();
             e.stopPropagation();
-            // اگر مکان ذخیره شده، نامش را پیشنهاد بده
             const saved = savedFor(state.pendingLoc);
             const suggested = saved ? saved.name : '';
             const name = askLocationName(suggested);
@@ -964,7 +978,6 @@ function bindNewLocationFromMap() {
         const loc = { lat: +e.latlng.lat.toFixed(5), lng: +e.latlng.lng.toFixed(5) };
         askLocationName('').then(name => {
             if (!name) return;
-            // دریافت cityNames به صورت موازی
             (async () => {
                 try {
                     const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -1017,8 +1030,13 @@ export function isRelocateActive() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// listener برای map-ready (چون map بعد از init ساخته می‌شود)
+// listener برای map-ready — dual-emit برای سازگاری موقت
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// در گام ۳، map.js هم `events.emit(EV.MAP_READY)` و هم
+// `window.dispatchEvent(new Event('rahe-map-ready'))` را emit می‌کند.
+// این listener به رویداد window گوش می‌دهد (سازگاری). در گام ۵ به
+// `events.on(EV.MAP_READY, ...)` تغییر می‌کند.
 window.addEventListener('rahe-map-ready', () => {
     bindMapRelocate();
     bindNewLocationFromMap();

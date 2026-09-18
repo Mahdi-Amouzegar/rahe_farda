@@ -1,5 +1,9 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// detail.js -- detail page (ESM)
+// detail.js -- detail page (ESM) — گام ۴ فاز ۴
+//
+// ⚠️ این نسخه فقط callbackها را به EventEmitter منتقل کرده است.
+// رفتار صفحه جزئیات (ویرایش، جلسات، عکس، timer، smart suggest) بدون تغییر است.
+// ═══════════════════════════════════════════════════════════════════════════
 
 import { state, toFa, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
@@ -14,6 +18,47 @@ import {
     removePickMarker
 } from './map.js';
 import { openPicker } from './picker.js';
+import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Backward-compat: registerDetailCallbacks (پل موقت به EventEmitter)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ این تابع در گام ۵ (بازنویسی app.js) حذف می‌شود.
+// تا آن زمان، app.js همچنان می‌تواند registerDetailCallbacks را صدا بزند.
+
+/**
+ * @deprecated از events.on استفاده کنید. این تابع فقط برای سازگاری موقت است.
+ * @param {Record<string, Function>} cbs
+ */
+export function registerDetailCallbacks(cbs) {
+    if (!cbs || typeof cbs !== 'object') return;
+    for (const [name, fn] of Object.entries(cbs)) {
+        if (typeof fn !== 'function') continue;
+        const eventName = CALLBACK_TO_EVENT[name];
+        if (!eventName) continue;
+        events.on(eventName, fn);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// call() — جایگزین _callbacks[name](...args)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * فراخوانی یک callback از طریق EventEmitter.
+ * @param {string} name - نام callback (مثل 'render')
+ * @param {...any} args
+ */
+function call(name, ...args) {
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`detail.call: unknown callback "${name}"`);
+        return;
+    }
+    events.emit(eventName, ...args);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -27,26 +72,6 @@ let lightboxTrapCleanup = null;
 let detailSmartTimer = null;
 let detailSmartDismissedFor = { fTitle: '', fDesc: '' };
 let detailSmartTargetId = null;
-
-// callback registry برای توابعی که نمی‌توانیم import کنیم (circular)
-const _callbacks = {
-    render: null,
-    refreshSavedLocationUI: null,
-    showUndoFor: null,
-    showMobilePickBanner: null,
-    hideMobilePickBanner: null,
-    showRouteTo: null,
-};
-
-export function registerDetailCallbacks(cbs) {
-    Object.assign(_callbacks, cbs);
-}
-
-function call(name, ...args) {
-    const fn = _callbacks[name];
-    if (typeof fn === 'function') return fn(...args);
-    return undefined;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -86,26 +111,22 @@ function openLightbox(src) {
     const img = document.getElementById('lightboxImg');
     if (!lb || !img) return;
 
-    // ذخیره focus قبلی برای بازگشت
     const previousFocus = document.activeElement;
 
     img.src = src;
     lb.style.display = 'flex';
 
-    // پاک‌سازی trap قبلی
     if (lightboxTrapCleanup) {
         try { lightboxTrapCleanup(); } catch { /* silent */ }
         lightboxTrapCleanup = null;
     }
 
-    // trap focus داخل lightbox
     try {
         lightboxTrapCleanup = trapFocus(lb);
     } catch {
         lightboxTrapCleanup = null;
     }
 
-    // Escape برای بستن
     const onKey = e => {
         if (e.key === 'Escape') {
             e.preventDefault();
@@ -115,12 +136,9 @@ function openLightbox(src) {
     };
     document.addEventListener('keydown', onKey, true);
 
-    // ذخیره listener برای cleanup
     lb._escHandler = onKey;
     lb._previousFocus = previousFocus;
 
-    // focus به lightbox برای accessibility
-    // (lightbox خودش role="dialog" دارد)
     setTimeout(() => {
         lb.focus?.({ preventScroll: true });
     }, 30);
@@ -131,23 +149,19 @@ function closeLightbox() {
     const img = document.getElementById('lightboxImg');
     if (!lb || !img) return;
 
-    // پاک‌سازی trap
     if (lightboxTrapCleanup) {
         try { lightboxTrapCleanup(); } catch { /* silent */ }
         lightboxTrapCleanup = null;
     }
 
-    // حذف Escape handler
     if (lb._escHandler) {
         document.removeEventListener('keydown', lb._escHandler, true);
         lb._escHandler = null;
     }
 
-    // مخفی کردن
     lb.style.display = 'none';
     img.removeAttribute('src');
 
-    // بازگشت focus
     const prev = lb._previousFocus;
     lb._previousFocus = null;
     if (prev && document.body.contains(prev) && typeof prev.focus === 'function') {
@@ -236,7 +250,6 @@ function renderPlanDates() {
     const section = document.querySelector('.detail-section[data-detail-section="plan-dates"]');
     if (!section) return;
 
-    // فقط برای برنامه نمایش داده شود
     if (task.kind !== 'plan') {
         section.style.display = 'none';
         return;
@@ -279,12 +292,10 @@ export function openDetail(id) {
     const task = getDetailTask();
     if (!task) return;
 
-    // ریست smart suggest برای این وظیفه
     resetDetailSmart();
 
     document.getElementById('detailTitle').textContent = (task.kind === 'plan' ? '📁 ' : '') + task.text;
     document.getElementById('fTitle').value = task.text;
-    // حالا location برای برنامه هم نمایش داده می‌شود
     document.getElementById('fLocField').style.display = '';
     const locAccordion = document.querySelector('.detail-accordion.location');
     if (locAccordion) locAccordion.style.display = '';
@@ -317,6 +328,7 @@ export function openDetail(id) {
         pageEl.scrollTop = prevScroll;
         requestAnimationFrame(() => { pageEl.scrollTop = prevScroll; });
     }
+    events.emit(EV.DETAIL_OPENED, { id });
 }
 
 export function closeDetail() {
@@ -326,12 +338,14 @@ export function closeDetail() {
     if (typeof debouncedSaveAddr !== 'undefined') debouncedSaveAddr.flush();
     if (typeof debouncedSaveUrl !== 'undefined') debouncedSaveUrl.flush();
 
+    const closedId = state.currentDetailId;
     state.currentDetailId = null;
     clearInterval(timerTick);
     document.getElementById('detailPage').style.display = 'none';
     document.body.style.overflow = '';
     call('hideMobilePickBanner');
     call('render');
+    events.emit(EV.DETAIL_CLOSED, { id: closedId });
 }
 
 // ورود به حالت انتخاب مکان بدون بستن صفحه جزئیات
@@ -832,7 +846,6 @@ export function bindDetailInputs() {
             if (!t || t.kind !== 'plan') return;
             openPicker('tpldate', iso => {
                 t.startAt = iso;
-                // اگر endAt قبل از startAt جدید بود، null شود
                 if (t.endAt && new Date(t.endAt) < new Date(iso)) t.endAt = null;
                 saveTasks();
                 renderPlanDates();

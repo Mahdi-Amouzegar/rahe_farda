@@ -1,37 +1,87 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// map.js -- Leaflet map + markers + visibility prefs (ESM)
+// map.js -- Leaflet map + markers + visibility prefs (ESM) — گام ۳ فاز ۴
+//
+// ⚠️ این نسخه فقط callbackها را به EventEmitter منتقل کرده است.
+// رفتار نقشه (Leaflet، markerها، fullscreen، live tracking) بدون تغییر است.
+// ═══════════════════════════════════════════════════════════════════════════
 
 import { state, toFa, escapeHtml } from './core.js';
 import { nearestUpcoming, faShort } from './sessions.js';
-import { findTask, saveTasks, registerCallbacks as registerStoreCallbacks } from './store.js';
+import { findTask, saveTasks } from './store.js';
+import { events, EV, CALLBACK_TO_EVENT } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Callback registry (به جای shim‌های window.X)
+// Backward-compat: registerMapCallbacks (پل موقت به EventEmitter)
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ این تابع در گام ۵ (بازنویسی app.js) حذف می‌شود.
+// تا آن زمان، app.js همچنان می‌تواند registerMapCallbacks را صدا بزند و
+// callbackها به رویدادهای EventEmitter وصل می‌شوند.
 
-const _callbacks = {
-    render: null,
-    openDetail: null,
-    showRouteTo: null,
-    saveLocationFromPopup: null,
-    updateLocChip: null,
-    refreshSavedLocationUI: null,
-    locationLabelFor: null,
-    showMobilePickBanner: null,
-    hideMobilePickBanner: null,
-    isRelocateLocationActive: null,
-    hasActiveRoute: null,
-    getActiveRouteDestination: null,
-};
-
+/**
+ * @deprecated از events.on استفاده کنید. این تابع فقط برای سازگاری موقت است.
+ * @param {Record<string, Function>} cbs
+ */
 export function registerMapCallbacks(cbs) {
-    Object.assign(_callbacks, cbs);
+    if (!cbs || typeof cbs !== 'object') return;
+    for (const [name, fn] of Object.entries(cbs)) {
+        if (typeof fn !== 'function') continue;
+        const eventName = CALLBACK_TO_EVENT[name];
+        if (!eventName) continue;
+        events.on(eventName, fn);
+    }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// call() و invoke() — جایگزین _callbacks[name](...args)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * فراخوانی یک callback از طریق EventEmitter (بدون مقدار برگشتی).
+ * @param {string} name - نام callback (مثل 'render')
+ * @param {...any} args
+ */
 function call(name, ...args) {
-    const fn = _callbacks[name];
-    if (typeof fn === 'function') return fn(...args);
-    return undefined;
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`map.call: unknown callback "${name}"`);
+        return;
+    }
+    events.emit(eventName, ...args);
+}
+
+/**
+ * فراخوانی یک callback و برگرداندن اولین مقدار غیر-undefined.
+ * برای getterها (مثل locationLabelFor, hasActiveRoute, getActiveRouteDestination).
+ *
+ * @param {string} name - نام callback
+ * @param {...any} args
+ * @returns {any}
+ */
+function invoke(name, ...args) {
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`map.invoke: unknown callback "${name}"`);
+        return undefined;
+    }
+    const listeners = events._listeners.get(eventName);
+    if (!listeners || listeners.size === 0) return undefined;
+    let result;
+    for (const listener of listeners) {
+        try {
+            const r = listener(...args);
+            if (r !== undefined) {
+                result = r;
+                break;
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`map.invoke: listener for "${eventName}" threw:`, err);
+        }
+    }
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -89,6 +139,7 @@ export function mapHint(msg, ms) {
     el.classList.add('show');
     clearTimeout(mapHintTimer);
     mapHintTimer = setTimeout(() => el.classList.remove('show'), ms || 3000);
+    events.emit(EV.MAP_HINT, { msg, ms });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -106,6 +157,7 @@ export function switchToTab(name) {
     if (tasksPanel) tasksPanel.classList.toggle('active', name === 'tasks');
     if (mapPanel) mapPanel.classList.toggle('active', name === 'map');
     if (name === 'map' && mapReady) setTimeout(() => map.invalidateSize(), 60);
+    events.emit(EV.UI_SWITCH_TAB, name);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -142,7 +194,7 @@ export function savePrefs() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function clearRoute() {
-    call('clearMapRoute');
+    events.emit(EV.ROUTE_CLEAR);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -156,7 +208,7 @@ export function destroyMap() {
     mapInitTimers = [];
     clearRoute();
     stopLiveTracking();
-    window.dispatchEvent(new Event('rahe-map-destroy'));
+    events.emit(EV.MAP_DESTROYED);
     const mapEl = document.getElementById('map');
     if (mapEl && mapDomClickHandler) mapEl.removeEventListener('click', mapDomClickHandler);
     if (mapLoadHandler) window.removeEventListener('load', mapLoadHandler);
@@ -218,39 +270,21 @@ function showMapFallback() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Initial view resolution
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// استراتژی:
-//  1. اگر Permissions API در دسترس باشد، وضعیت geolocation را چک می‌کنیم.
-//     - granted  → منتظر موقعیت می‌مانیم (تا ۵ ثانیه). اگر آمد، مستقیم آنجا.
-//                  اگر نیامد (timeout)، تهران.
-//     - denied   → فوری تهران.
-//     - prompt   → فوری تهران + درخواست موازی برای دفعات بعد (بدون انتظار).
-//  2. اگر Permissions API در دسترس نباشد (مرورگرهای قدیمی)، فوری تهران
-//     و در پس‌زمینه موقعیت را می‌گیریم (بدون پرش).
-//
+
 const DEFAULT_CENTER = [35.69, 51.39]; // تهران
 const DEFAULT_ZOOM = 12;
 const GEO_WAIT_MS = 5000;
 
-/**
- * وضعیت geolocation را از Permissions API چک می‌کند.
- * @returns {Promise<'granted'|'denied'|'prompt'|'unknown'>}
- */
 async function queryGeolocationPermission() {
     if (!navigator.permissions || !navigator.permissions.query) return 'unknown';
     try {
         const status = await navigator.permissions.query({ name: 'geolocation' });
-        return status.state; // 'granted' | 'denied' | 'prompt'
+        return status.state;
     } catch {
         return 'unknown';
     }
 }
 
-/**
- * یک‌بار موقعیت کاربر را می‌گیرد.
- * @param {number} timeoutMs
- * @returns {Promise<{lat:number, lng:number} | null>}
- */
 function getCurrentPositionOnce(timeoutMs) {
     return new Promise(resolve => {
         if (!navigator.geolocation) return resolve(null);
@@ -278,10 +312,6 @@ function getCurrentPositionOnce(timeoutMs) {
     });
 }
 
-/**
- * مرکز و زوم اولیه نقشه را تعیین می‌کند.
- * بدون پرش بصری — یک‌بار و برای همیشه.
- */
 async function resolveInitialView() {
     const permission = await queryGeolocationPermission();
 
@@ -297,13 +327,9 @@ async function resolveInitialView() {
         return { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, user: null };
     }
 
-    // prompt یا unknown → فوری تهران، درخواست موازی در پس‌زمینه
-    // (این درخواست ممکن است prompt نشان دهد، ولی ما منتظرش نمی‌مانیم)
     getCurrentPositionOnce(GEO_WAIT_MS).then(pos => {
         if (!pos) return;
         if (!mapReady || !map) return;
-        // اگر کاربر prompt را زد و اجازه داد، حالا pan می‌کنیم
-        // (این پرش فقط در حالت prompt اتفاق می‌افتد که کاربر تازه اجازه داده)
         const ll = [pos.lat, pos.lng];
         setYouMarker(ll);
         map.flyTo(ll, 13, { duration: 1 });
@@ -373,10 +399,8 @@ export async function initMap() {
 
     mapInitializing = true;
 
-    // تعیین مرکز اولیه بر اساس وضعیت geolocation
     const initial = await resolveInitialView();
 
-    // چک مجدد — ممکن است در فاصله انتظار، نقشه مخفی شده باشد
     if (!state.prefs.mapVisible || mapReady) {
         mapInitializing = false;
         return;
@@ -419,7 +443,7 @@ export async function initMap() {
     ];
     mapLoadHandler = () => { if (mapReady && map) map.invalidateSize(); };
     window.addEventListener('load', mapLoadHandler);
-    window.dispatchEvent(new Event('rahe-map-ready'));
+    events.emit(EV.MAP_READY);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -443,7 +467,8 @@ export function refreshMarkers() {
         const dateLine = n ? faShort(n.at) : ((t.sessions && t.sessions.length) ? 'همه جلسات گذشته' : 'بدون سررسید');
 
         const snap = (loc.name && String(loc.name).trim()) || null;
-        const saved = call('locationLabelFor', loc);
+        // استفاده از invoke چون locationLabelFor یک getter است
+        const saved = invoke('locationLabelFor', loc);
         const hasSavedName = Boolean(snap) || Boolean(
             saved &&
             (function () {
@@ -464,7 +489,6 @@ export function refreshMarkers() {
             locRow = `<div class="pp-loc pp-loc-unsaved"><span>📍</span><span class="pp-coords">${escapeHtml(latTxt)}، ${escapeHtml(lngTxt)}</span><button class="pp-save-btn" type="button" data-save-popup-location data-lat="${loc.lat}" data-lng="${loc.lng}">📌 ذخیره نام</button></div>`;
         }
 
-        // خط شهر از cityNames
         let cityRow = '';
         if (loc.cityNames) {
             const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
@@ -480,7 +504,6 @@ export function refreshMarkers() {
     state.tasks.forEach(t => {
         if (t.kind === 'plan') (t.children || []).forEach(c => { const l = displayLoc(c); if (l) pts.push({ t: c, loc: l }); });
         else { const l = displayLoc(t); if (l) pts.push({ t, loc: l }); }
-        // خود برنامه هم اگر location دارد
         if (t.kind === 'plan' && t.location) pts.push({ t, loc: t.location });
     });
     const CELL = 64;
@@ -499,6 +522,7 @@ export function refreshMarkers() {
         m.on('click', () => { suppressMapClickUntil = Date.now() + 400; map.flyTo([lat, lng], Math.min(map.getZoom() + 2, 19), { duration: .6 }); });
         markersLayer.addLayer(m);
     });
+    events.emit(EV.MAP_MARKERS_REFRESHED);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -571,7 +595,7 @@ export function removePickMarker() {
 
 export function onMapClick(e) {
     if (Date.now() < suppressMapClickUntil) return;
-    if (call('isRelocateLocationActive')) return;
+    if (invoke('isRelocateLocationActive')) return;
 
     const loc = { lat: +e.latlng.lat.toFixed(5), lng: +e.latlng.lng.toFixed(5) };
 
@@ -592,7 +616,6 @@ export function onMapClick(e) {
                 refreshMarkers();
                 call('refreshSavedLocationUI');
                 mapHint('محل جلسه ذخیره شد ✓');
-                // دریافت cityNames
                 (async () => {
                     try {
                         const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -628,7 +651,6 @@ export function onMapClick(e) {
             call('refreshSavedLocationUI');
             mapHint('محل جدید ذخیره شد ✓');
             flyToTask(found.task.id);
-            // دریافت cityNames
             (async () => {
                 try {
                     const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -658,7 +680,6 @@ export function onMapClick(e) {
     switchToTab('tasks');
     mapHint('📍 محل انتخاب شد — عنوان وظیفه را بنویسید');
 
-    // دریافت نام شهر برای cityNames (بدون نمایش در loc-chip)
     (async () => {
         try {
             const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -737,8 +758,8 @@ export function startLiveTracking() {
             if (liveTrackingFirstFix) {
                 liveTrackingFirstFix = false;
 
-                if (call('hasActiveRoute')) {
-                    const dest = call('getActiveRouteDestination');
+                if (invoke('hasActiveRoute')) {
+                    const dest = invoke('getActiveRouteDestination');
                     if (dest && Number.isFinite(dest.lat) && Number.isFinite(dest.lng)) {
                         setYouMarker(ll, {
                             fitBounds: [ll, [dest.lat, dest.lng]]
@@ -805,18 +826,8 @@ export function isLiveTrackingActive() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function updateLocChip() {
-    call('updateLocChip');
+    events.emit(EV.LOCATION_PENDING_CHANGED);
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Registration with store (register our getters/setters there)
-// ═══════════════════════════════════════════════════════════════════════════
-registerStoreCallbacks({
-    getMap: getMap,
-    getMapReady: getMapReady,
-    getPickMarker: getPickMarker,
-    setPickMarker: setPickMarker,
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ⚠️ گام ۱۵: SHIM‌ها حذف شدند
