@@ -1,5 +1,8 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// core.js -- shared state + tiny helpers (ESM)
+// core.js -- shared state + tiny helpers (ESM) — گام ۱ فاز ۵
+//
+// ⚠️ این نسخه helperهای export/import را اضافه کرده است.
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -7,6 +10,12 @@
 export const STORAGE_KEY = 'spaceTodoTasks';
 export const MAX_LENGTH = 200;
 export const PREFS_KEY = 'spaceTodoPrefs';
+
+// ⚠️ جدید: schema version برای export/import
+export const SCHEMA_VERSION = '1.0.0';
+
+// ⚠️ جدید: نام فایل backup پیش‌فرض
+export const BACKUP_FILENAME_PREFIX = 'rahe-farda-backup';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State
@@ -40,6 +49,12 @@ export const state = {
         proMode: false,
         pendingKind: 'task',
         soundOn: true,
+        // ⚠️ جدید: تنظیمات صدا
+        soundDefault: true,        // ریتم پیش‌فرض
+        soundPreset: null,          // نام فایل از assets/sounds/ (مثل 'gentle-bell')
+        soundPresetOn: false,       // آیا ریتم آماده فعال است؟
+        soundTtsOn: false,          // آیا خواندن متن عنوان فعال است؟
+        soundTtsVoice: null,        // نام voice انتخابی (مثل 'fa-IR')
         theme: 'auto',
         lang: 'fa'
     },
@@ -59,6 +74,11 @@ export const state = {
     taskIndexVersion: 0,
     taskIndex: null,
     trash: [],
+    // ⚠️ جدید: صف تغییرات معلق (برای فاز ۶ — Cloudflare)
+    pendingChanges: [],
+
+    // ⚠️ جدید: نشانگر آنلاین/آفلاین
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -131,6 +151,133 @@ export function debounce(fn, ms) {
         }
     };
     return wrapped;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ جدید: Export/Import helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * نمایش حجم فایل به فارسی.
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return '—';
+    if (bytes < 1024) return `${toFa(Math.round(bytes))} بایت`;
+    if (bytes < 1024 * 1024) return `${toFa((bytes / 1024).toFixed(1))} کیلوبایت`;
+    if (bytes < 1024 * 1024 * 1024) return `${toFa((bytes / (1024 * 1024)).toFixed(2))} مگابایت`;
+    return `${toFa((bytes / (1024 * 1024 * 1024)).toFixed(2))} گیگابایت`;
+}
+
+/**
+ * دانلود یک آبجکت به صورت فایل JSON.
+ *
+ * @param {object} data
+ * @param {string} filename
+ * @returns {boolean} آیا موفق بود؟
+ */
+export function downloadJSON(data, filename) {
+    try {
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename || `backup-${Date.now()}.json`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        // پاک‌سازی بعد از یک tick
+        setTimeout(() => {
+            a.remove();
+            URL.revokeObjectURL(url);
+        }, 100);
+        return true;
+    } catch (err) {
+        console.error('downloadJSON failed:', err);
+        return false;
+    }
+}
+
+/**
+ * خواندن محتوای یک فایل JSON.
+ *
+ * @param {File} file
+ * @returns {Promise<object>}
+ */
+export function readJSONFile(file) {
+    return new Promise((resolve, reject) => {
+        if (!file) {
+            reject(new Error('no-file'));
+            return;
+        }
+        // بررسی حجم (حداکثر ۵۰ مگابایت)
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+            reject(new Error('file-too-large'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const text = typeof reader.result === 'string' ? reader.result : '';
+                const data = JSON.parse(text);
+                resolve(data);
+            } catch (err) {
+                reject(new Error('invalid-json'));
+            }
+        };
+        reader.onerror = () => reject(new Error('read-error'));
+        reader.readAsText(file, 'utf-8');
+    });
+}
+
+/**
+ * محاسبه‌ی SHA-256 از یک رشته.
+ * اگر crypto.subtle در دسترس نبود (مثلاً HTTP غیرامن)، یک hash ساده برمی‌گرداند.
+ *
+ * @param {string} str
+ * @returns {Promise<string>}
+ */
+export async function computeChecksum(str) {
+    try {
+        if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+    } catch {
+        // fallback
+    }
+    // fallback: hash ساده (برای HTTP غیرامن)
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return 'fallback-' + Math.abs(hash).toString(16);
+}
+
+/**
+ * ساخت نام فایل backup با تاریخ شمسی.
+ * @returns {string}
+ */
+export function buildBackupFilename() {
+    try {
+        const d = new Date();
+        const y = d.toLocaleDateString('fa-IR', { year: 'numeric' }).replace(/[^\d]/g, '');
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${BACKUP_FILENAME_PREFIX}-${y}${m}${day}-${hh}${mm}.json`;
+    } catch {
+        return `${BACKUP_FILENAME_PREFIX}-${Date.now()}.json`;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,37 +1,81 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// store.js -- IndexedDB + CRUD actions (ESM)
+// store.js -- IndexedDB + CRUD actions (ESM) — گام ۱ فاز ۵، فایل ۲ از ۷
+//
+// ⚠️ این نسخه:
+//   - exportTasks() و importTasks() را اضافه می‌کند
+//   - صف تغییرات (pendingChanges) را برای آینده‌نگری Cloudflare اضافه می‌کند
+//   - saveTask/deleteTaskFromStore به صف entry اضافه می‌کنند
+// ═══════════════════════════════════════════════════════════════════════════
 
-import { state, MAX_LENGTH, toFa, uid, escapeHtml } from './core.js';
+import {
+    state,
+    MAX_LENGTH,
+    toFa,
+    uid,
+    escapeHtml,
+    SCHEMA_VERSION,
+    computeChecksum
+} from './core.js';
 import { sameMinute, nearestUpcoming, allSessions, hasSessionAt, visibleChildren } from './sessions.js';
 import { getNow } from './time.js';
+import { events, EV, CALLBACK_TO_EVENT } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Callback registry (به جای shim‌های window.X)
+// Map helpers — set by app.js during boot
 // ═══════════════════════════════════════════════════════════════════════════
 
-const _callbacks = {
-    render: null,
-    updateDueChips: null,
-    renderPlanKids: null,
-    updateLocChip: null,
-    openDetail: null,
-    showUndoFor: null,
-    showConfirmModal: null,
-    renderTrash: null,
-    getMap: null,
-    getMapReady: null,
-    getPickMarker: null,
-    setPickMarker: null,
+const _mapHelpers = {
+    getMap: () => null,
+    getMapReady: () => false,
+    getPickMarker: () => null,
+    setPickMarker: () => {}
 };
 
-export function registerCallbacks(cbs) {
-    Object.assign(_callbacks, cbs);
+export function setMapHelpers(helpers) {
+    if (!helpers || typeof helpers !== 'object') return;
+    if (typeof helpers.getMap === 'function') _mapHelpers.getMap = helpers.getMap;
+    if (typeof helpers.getMapReady === 'function') _mapHelpers.getMapReady = helpers.getMapReady;
+    if (typeof helpers.getPickMarker === 'function') _mapHelpers.getPickMarker = helpers.getPickMarker;
+    if (typeof helpers.setPickMarker === 'function') _mapHelpers.setPickMarker = helpers.setPickMarker;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// call() / invoke() — جایگزین _callbacks[name](...args)
+// ═══════════════════════════════════════════════════════════════════════════
+
 function call(name, ...args) {
-    const fn = _callbacks[name];
-    if (typeof fn === 'function') return fn(...args);
-    return undefined;
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`store.call: unknown callback "${name}"`);
+        return;
+    }
+    events.emit(eventName, ...args);
+}
+
+function invoke(name, ...args) {
+    const eventName = CALLBACK_TO_EVENT[name];
+    if (!eventName) {
+        // eslint-disable-next-line no-console
+        console.warn(`store.invoke: unknown callback "${name}"`);
+        return undefined;
+    }
+    const listeners = events._listeners.get(eventName);
+    if (!listeners || listeners.size === 0) return undefined;
+    let result;
+    for (const listener of listeners) {
+        try {
+            const r = listener(...args);
+            if (r !== undefined) {
+                result = r;
+                break;
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`store.invoke: listener for "${eventName}" threw:`, err);
+        }
+    }
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -89,6 +133,33 @@ function idbPutAll(storeName, items, opts) {
     }));
 }
 
+function idbPut(storeName, item) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(item);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+function idbDelete(storeName, id) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+function idbClear(storeName) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Sanitization
 // ═══════════════════════════════════════════════════════════════════════════
@@ -112,10 +183,8 @@ export function validLoc(v) {
     } else {
         out.name = null;
     }
-    // نام مکان دو زبانه (اختیاری — فقط برای مکان‌های ذخیره‌شده)
     const names = sanitizeBilingualNames(v.names);
     if (names) out.names = names;
-    // نام شهر دو زبانه (خودکار — از reverse geocode)
     const cityNames = sanitizeBilingualNames(v.cityNames);
     if (cityNames) out.cityNames = cityNames;
     return out;
@@ -205,13 +274,93 @@ export function sanitizeTask(t) {
             .slice(0, 8)
             .map(p => ({ id: typeof p.id !== 'undefined' ? p.id : uid(), dataUrl: p.dataUrl, addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString() }))
             : [],
-        // حالا برای برنامه‌ها هم location مجاز است
         location: validLoc(t.location)
     };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Load / Save
+// ⚠️ جدید: صف تغییرات (pendingChanges)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// این صف برای آینده‌نگری Cloudflare (فاز ۶) است.
+// هر تغییر (save/delete/restore) یک entry به صف اضافه می‌کند.
+// در این گام، صف فقط در localStorage ذخیره می‌شود و sync نمی‌شود.
+//
+// ساختار entry:
+//   { type: 'save' | 'delete' | 'trash-add' | 'trash-delete',
+//     id: string,
+//     data: object (برای save),
+//     parentId: string | null,
+//     timestamp: string }
+
+const PENDING_KEY = 'spaceTodoPendingChanges';
+const MAX_PENDING_CHANGES = 500;
+
+/**
+ * افزودن یک تغییر به صف.
+ * @param {object} entry
+ */
+function enqueueChange(entry) {
+    if (!entry || !entry.type) return;
+    try {
+        state.pendingChanges = state.pendingChanges || [];
+        state.pendingChanges.push({
+            ...entry,
+            timestamp: new Date().toISOString()
+        });
+        // اگر صف پر شد، قدیمی‌ترین‌ها را حذف کن
+        if (state.pendingChanges.length > MAX_PENDING_CHANGES) {
+            state.pendingChanges = state.pendingChanges.slice(-MAX_PENDING_CHANGES);
+        }
+        // ذخیره در localStorage (سبک — فقط برای sync آینده)
+        try {
+            localStorage.setItem(PENDING_KEY, JSON.stringify(state.pendingChanges));
+        } catch {
+            // اگر localStorage پر بود، فقط در حافظه نگه دار
+        }
+    } catch (err) {
+        console.error('enqueueChange failed:', err);
+    }
+}
+
+/**
+ * پاک کردن صف (برای بعد از sync موفق).
+ */
+export function clearPendingChanges() {
+    state.pendingChanges = [];
+    try {
+        localStorage.removeItem(PENDING_KEY);
+    } catch { /* silent */ }
+    events.emit('sync:queue-cleared');
+}
+
+/**
+ * خواندن صف از localStorage (در boot).
+ */
+export function loadPendingChanges() {
+    try {
+        const raw = localStorage.getItem(PENDING_KEY);
+        if (!raw) {
+            state.pendingChanges = [];
+            return;
+        }
+        const parsed = JSON.parse(raw);
+        state.pendingChanges = Array.isArray(parsed) ? parsed : [];
+    } catch {
+        state.pendingChanges = [];
+    }
+}
+
+/**
+ * گرفتن snapshot از صف (برای دیباگ یا sync).
+ * @returns {object[]}
+ */
+export function getPendingChanges() {
+    return [...(state.pendingChanges || [])];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Load / Save — Incremental
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function loadTasks() {
@@ -229,29 +378,81 @@ export async function loadTasks() {
 }
 
 /**
- * کپی عمیق از داده‌ها با fallback برای مرورگرهای قدیمی.
- * structuredClone در Safari < 15.4 و برخی WebViewها در دسترس نیست.
+ * ذخیره‌ی یک task تکی در IndexedDB.
  */
-function deepClone(value) {
-    if (typeof structuredClone === 'function') {
-        try {
-            return structuredClone(value);
-        } catch {
-            // اگر structuredClone با داده‌های غیرقابل clone برخورد کرد، به JSON برمی‌گردیم
-        }
+export function saveTask(task, parent) {
+    if (!task || typeof task.id === 'undefined') {
+        return Promise.reject(new Error('saveTask: invalid task'));
     }
-    return JSON.parse(JSON.stringify(value));
+    invalidateTaskIndex();
+
+    const target = parent || task;
+
+    const p = useIDB
+        ? idbPut(IDB_STORE, target)
+        : (function () {
+            try {
+                localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        })();
+
+    p.then(() => {
+        // ⚠️ جدید: افزودن به صف
+        enqueueChange({
+            type: 'save',
+            id: target.id,
+            data: target,
+            parentId: parent ? parent.id : null
+        });
+        events.emit(EV.TASK_SAVED, { task, parent: parent || null });
+    }).catch(err => {
+        console.error('saveTask failed', err);
+        events.emit(EV.STORAGE_ERROR, {
+            message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
+        });
+        if (!saveTask._warned) {
+            saveTask._warned = true;
+            window.dispatchEvent(new CustomEvent('rahe-storage-error', {
+                detail: { message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.' }
+            }));
+        }
+    });
+    return p;
 }
 
-export function saveTasks() {
-    let snapshot;
-    try {
-        snapshot = deepClone(state.tasks);
-    } catch (e) {
-        console.error('saveTasks: deepClone failed', e);
-        return Promise.reject(e);
-    }
+/**
+ * حذف یک task تکی از IndexedDB.
+ */
+export function deleteTaskFromStore(id) {
+    invalidateTaskIndex();
+    const p = useIDB
+        ? idbDelete(IDB_STORE, id)
+        : (function () {
+            try {
+                localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
+                return Promise.resolve();
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        })();
 
+    p.then(() => {
+        // ⚠️ جدید: افزودن به صف
+        enqueueChange({ type: 'delete', id });
+    }).catch(err => {
+        console.error('deleteTaskFromStore failed', err);
+    });
+    return p;
+}
+
+/**
+ * ذخیره‌ی کل state.tasks (bulk) — برای import/migration.
+ */
+export function saveTasks() {
+    const snapshot = state.tasks;
     invalidateTaskIndex();
 
     const p = useIDB
@@ -264,27 +465,344 @@ export function saveTasks() {
                 return Promise.reject(e);
             }
         })();
-    p.catch(() => {
-        console.error('storage save failed');
-        if (!saveTasks._warned) {
-            saveTasks._warned = true;
-            window.dispatchEvent(new CustomEvent('rahe-storage-error', {
-                detail: { message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.' }
-            }));
-        }
+    p.then(() => {
+        events.emit(EV.TASK_SAVED, { bulk: true });
+    }).catch(() => {
+        console.error('storage save failed (bulk)');
+        events.emit(EV.STORAGE_ERROR, {
+            message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
+        });
     });
     return p;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ جدید: Export / Import
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ساخت ساختار JSON برای export.
+ *
+ * @param {object} options
+ * @param {boolean} [options.includePhotos=false]
+ * @param {boolean} [options.includeSettings=false]
+ * @returns {Promise<object>}
+ */
+export async function exportTasks(options) {
+    const opts = options || {};
+    const includePhotos = Boolean(opts.includePhotos);
+    const includeSettings = Boolean(opts.includeSettings);
+
+    // snapshot از taskها
+    const tasksSnapshot = state.tasks.map(t => {
+        const copy = { ...t };
+        if (!includePhotos) {
+            copy.photos = [];
+        } else {
+            copy.photos = (t.photos || []).map(p => ({ ...p }));
+        }
+        if (Array.isArray(t.children)) {
+            copy.children = t.children.map(c => {
+                const childCopy = { ...c };
+                if (!includePhotos) childCopy.photos = [];
+                else childCopy.photos = (c.photos || []).map(p => ({ ...p }));
+                return childCopy;
+            });
+        }
+        return copy;
+    });
+
+    const trashSnapshot = state.trash.map(x => {
+        const copy = { ...x };
+        if (!includePhotos) {
+            copy.photos = [];
+        } else {
+            copy.photos = (x.photos || []).map(p => ({ ...p }));
+        }
+        return copy;
+    });
+
+    const data = {
+        tasks: tasksSnapshot,
+        trash: trashSnapshot
+    };
+
+    // checksum از data
+    let checksum = '';
+    try {
+        checksum = await computeChecksum(JSON.stringify(data));
+    } catch {
+        checksum = '';
+    }
+
+    const backup = {
+        schemaVersion: SCHEMA_VERSION,
+        appVersion: '1.3.1.0',
+        exportedAt: new Date().toISOString(),
+        options: {
+            includePhotos,
+            includeSettings
+        },
+        data,
+        checksum
+    };
+
+    if (includeSettings) {
+        // فقط فیلدهای امن prefs (بدون lastDigest که وابسته به دستگاه است)
+        backup.settings = {
+            theme: state.prefs.theme,
+            lang: state.prefs.lang,
+            remindOn: state.prefs.remindOn,
+            remindMin: state.prefs.remindMin,
+            digestOn: state.prefs.digestOn,
+            soundOn: state.prefs.soundOn,
+            soundDefault: state.prefs.soundDefault,
+            soundPreset: state.prefs.soundPreset,
+            soundPresetOn: state.prefs.soundPresetOn,
+            soundTtsOn: state.prefs.soundTtsOn,
+            soundTtsVoice: state.prefs.soundTtsVoice,
+            proMode: state.prefs.proMode,
+            mapVisible: state.prefs.mapVisible
+        };
+    }
+
+    return backup;
+}
+
+/**
+ * بررسی سازگاری نسخه.
+ *
+ * @param {string} backupVersion
+ * @param {string} currentVersion
+ * @returns {{ ok: boolean, warning?: string, error?: string }}
+ */
+export function checkVersionCompatibility(backupVersion, currentVersion) {
+    const bv = String(backupVersion || '0.0.0');
+    const cv = String(currentVersion || SCHEMA_VERSION);
+
+    // اگر backup version ندارد (نسخه‌ی خیلی قدیمی)، به عنوان 0.0.0 در نظر بگیر
+    const parseVersion = v => {
+        const parts = v.split('.').map(n => parseInt(n, 10) || 0);
+        while (parts.length < 3) parts.push(0);
+        return parts.slice(0, 3);
+    };
+
+    const [bMajor, bMinor, bPatch] = parseVersion(bv);
+    const [cMajor, cMinor, cPatch] = parseVersion(cv);
+
+    // backup از نسخه‌ی major جدیدتر
+    if (bMajor > cMajor) {
+        return {
+            ok: false,
+            error: `این فایل با نسخه‌ی جدیدتر (${bv}) ساخته شده است. لطفاً ابتدا اپ را به‌روزرسانی کنید.`
+        };
+    }
+
+    // backup از نسخه‌ی minor جدیدتر (سازگار اما با هشدار)
+    if (bMajor === cMajor && bMinor > cMinor) {
+        return {
+            ok: true,
+            warning: `این فایل با نسخه‌ی ${bv} ساخته شده که از نسخه‌ی فعلی (${cv}) جدیدتر است. برخی فیلدهای ناشناخته ممکن است نادیده گرفته شوند.`
+        };
+    }
+
+    return { ok: true };
+}
+
+/**
+ * Merge یک task از backup با ساختار فعلی.
+ *
+ * برای هر فیلد در `sanitizeTask({})`، اگر در backup بود، از backup استفاده می‌شود.
+ * اگر نبود، مقدار پیش‌فرض (خالی) می‌ماند.
+ *
+ * این تضمین می‌کند:
+ *   - فیلدهای جدید (که در backup نیستند) → خالی می‌مانند
+ *   - فیلدهای حذف‌شده (که در backup هستند) → نادیده گرفته می‌شوند
+ *   - فیلدهای موجود → از backup کپی می‌شوند
+ *
+ * @param {object} backupTask
+ * @returns {object} task ادغام‌شده
+ */
+function mergeTaskFields(backupTask) {
+    if (!backupTask || typeof backupTask !== 'object') return null;
+
+    // task خالی با همه‌ی فیلدهای پیش‌فرض فعلی
+    const template = sanitizeTask({
+        id: backupTask.id || uid(),
+        text: backupTask.text || 'بدون عنوان'
+    });
+
+    const merged = {};
+    for (const field of Object.keys(template)) {
+        if (field in backupTask) {
+            merged[field] = backupTask[field];
+        } else {
+            merged[field] = template[field];  // فیلد جدید → پیش‌فرض
+        }
+    }
+
+    // حالا merged را از sanitizeTask عبور بده تا نوع‌ها تأیید شوند
+    return sanitizeTask(merged);
+}
+
+/**
+ * Import داده‌ها از backup.
+ *
+ * @param {object} backup - ساختار JSON خوانده‌شده
+ * @param {object} options
+ * @param {'merge'|'replace'} [options.mode='merge']
+ * @param {boolean} [options.importSettings=false]
+ * @returns {Promise<{ ok: boolean, imported: number, skipped: number, warning?: string, error?: string }>}
+ */
+export async function importTasks(backup, options) {
+    const opts = options || {};
+    const mode = opts.mode === 'replace' ? 'replace' : 'merge';
+    const importSettings = Boolean(opts.importSettings);
+
+    // ۱. اعتبارسنجی ساختار
+    if (!backup || typeof backup !== 'object') {
+        return { ok: false, error: 'ساختار فایل نامعتبر است.', imported: 0, skipped: 0 };
+    }
+    if (!backup.data || typeof backup.data !== 'object') {
+        return { ok: false, error: 'بخش داده (data) در فایل یافت نشد.', imported: 0, skipped: 0 };
+    }
+    if (!Array.isArray(backup.data.tasks)) {
+        return { ok: false, error: 'لیست وظایف در فایل نامعتبر است.', imported: 0, skipped: 0 };
+    }
+
+    // ۲. بررسی نسخه
+    const versionCheck = checkVersionCompatibility(backup.schemaVersion, SCHEMA_VERSION);
+    if (!versionCheck.ok) {
+        return { ok: false, error: versionCheck.error, imported: 0, skipped: 0 };
+    }
+
+    // ۳. بررسی checksum (اگر وجود دارد)
+    let checksumWarning = '';
+    if (backup.checksum && backup.data) {
+        try {
+            const computed = await computeChecksum(JSON.stringify(backup.data));
+            if (computed !== backup.checksum) {
+                checksumWarning = 'هشدار: checksum فایل مطابقت ندارد. ممکن است فایل دست‌کاری شده باشد.';
+            }
+        } catch {
+            // اگر checksum قابل محاسبه نبود، نادیده بگیر
+        }
+    }
+
+    // ۴. ذخیره‌ی وضعیت فعلی برای rollback در صورت خطا
+    const previousTasks = state.tasks.slice();
+    const previousTrash = state.trash.slice();
+
+    try {
+        // ۵. حالت replace
+        if (mode === 'replace') {
+            state.tasks = [];
+            state.trash = [];
+        }
+
+        // ۶. import taskها
+        let imported = 0;
+        let skipped = 0;
+        const existingIds = new Set(state.tasks.map(t => String(t.id)));
+
+        for (const rawTask of backup.data.tasks) {
+            try {
+                const merged = mergeTaskFields(rawTask);
+                if (!merged || !merged.id) {
+                    skipped++;
+                    continue;
+                }
+                // در حالت merge، اگر ID تکراری بود، نسخه‌ی backup را نگه دار
+                if (mode === 'merge' && existingIds.has(String(merged.id))) {
+                    // جایگزینی: task قدیمی را حذف کن
+                    state.tasks = state.tasks.filter(t => String(t.id) !== String(merged.id));
+                }
+                state.tasks.push(merged);
+                existingIds.add(String(merged.id));
+                imported++;
+            } catch (err) {
+                console.error('importTask failed:', err);
+                skipped++;
+            }
+        }
+
+        // ۷. import trash (اختیاری)
+        if (Array.isArray(backup.data.trash)) {
+            const trashIds = new Set(state.trash.map(t => String(t.id)));
+            for (const rawTrash of backup.data.trash) {
+                try {
+                    const merged = mergeTaskFields(rawTrash);
+                    if (!merged || !merged.id) continue;
+                    if (trashIds.has(String(merged.id))) continue;
+                    // اضافه کردن deletedAt و parentId
+                    merged.deletedAt = rawTrash.deletedAt || new Date().toISOString();
+                    merged.parentId = rawTrash.parentId || null;
+                    state.trash.push(merged);
+                    trashIds.add(String(merged.id));
+                } catch {
+                    // نادیده
+                }
+            }
+        }
+
+        // ۸. ذخیره‌سازی bulk (چون داده‌های زیادی ممکن است تغییر کرده باشند)
+        invalidateTaskIndex();
+        if (useIDB) {
+            await idbPutAll(IDB_STORE, state.tasks, { allowEmptyClear: true });
+            await idbPutAll(IDB_TRASH, state.trash, { allowEmptyClear: true });
+        }
+
+        // ۹. import تنظیمات (اختیاری)
+        if (importSettings && backup.settings && typeof backup.settings === 'object') {
+            const safeFields = [
+                'theme', 'lang', 'remindOn', 'remindMin', 'digestOn',
+                'soundOn', 'soundDefault', 'soundPreset', 'soundPresetOn',
+                'soundTtsOn', 'soundTtsVoice', 'proMode', 'mapVisible'
+            ];
+            for (const field of safeFields) {
+                if (field in backup.settings) {
+                    state.prefs[field] = backup.settings[field];
+                }
+            }
+            // ذخیره‌ی prefs
+            try {
+                localStorage.setItem('spaceTodoPrefs', JSON.stringify(state.prefs));
+            } catch { /* silent */ }
+        }
+
+        // ۱۰. پاک کردن صف (چون کل state بازنویسی شد)
+        clearPendingChanges();
+
+        // ۱۱. render و اعلام موفقیت
+        call('render');
+        events.emit('import:completed', { imported, skipped, mode });
+
+        const warnings = [versionCheck.warning, checksumWarning].filter(Boolean).join(' ');
+        return {
+            ok: true,
+            imported,
+            skipped,
+            warning: warnings || undefined
+        };
+
+    } catch (err) {
+        // rollback
+        state.tasks = previousTasks;
+        state.trash = previousTrash;
+        console.error('importTasks failed:', err);
+        return {
+            ok: false,
+            error: 'خطا در import. تغییرات لغو شد.',
+            imported: 0,
+            skipped: 0
+        };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Cache Invalidation
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// ⚠️ نکته: قبلاً این ماژول یک Map به نام `taskIndex` می‌ساخت که هیچ‌وقت
-// استفاده نمی‌شد (findTask همیشه روی state.tasks لوپ می‌زد). حالا حذف شده.
-// اما `state.taskIndexVersion` را نگه می‌داریم چون `sessions.js` برای
-// invalidate کردن cache خودش به آن وابسته است.
-//
+
 export function invalidateTaskIndex() {
     state.taskIndex = null;
     state.taskIndexVersion++;
@@ -434,18 +952,41 @@ export function saveTrash() {
     return p;
 }
 
+export function saveTrashItem(item) {
+    if (!item || typeof item.id === 'undefined') return Promise.resolve();
+    const p = useIDB ? idbPut(IDB_TRASH, item) : Promise.resolve();
+    p.then(() => {
+        enqueueChange({ type: 'trash-add', id: item.id, data: item });
+    }).catch(() => {});
+    return p;
+}
+
+export function deleteTrashItem(id) {
+    const p = useIDB ? idbDelete(IDB_TRASH, id) : Promise.resolve();
+    p.then(() => {
+        enqueueChange({ type: 'trash-delete', id });
+    }).catch(() => {});
+    return p;
+}
+
 export function purgeTrash(renderAfter) {
     const cut = Date.now() - 30 * 86400000;
     const before = state.trash.length;
+    const removed = [];
     state.trash = state.trash.filter(x => {
         try {
-            return new Date(x.deletedAt).getTime() > cut;
+            const keep = new Date(x.deletedAt).getTime() > cut;
+            if (!keep) removed.push(x.id);
+            return keep;
         } catch {
+            removed.push(x.id);
             return false;
         }
     });
     if (state.trash.length !== before) {
-        saveTrash();
+        if (useIDB) {
+            removed.forEach(id => deleteTrashItem(id));
+        }
         if (renderAfter !== false) call('render');
     }
 }
@@ -453,12 +994,28 @@ export function purgeTrash(renderAfter) {
 export function moveToTrashById(id) {
     const found = findTask(id);
     if (!found) return false;
-    if (found.parent) found.parent.children = found.parent.children.filter(c => String(c.id) !== String(id));
-    else state.tasks = state.tasks.filter(t => String(t.id) !== String(id));
-    state.trash.unshift({ ...found.task, parentId: found.parent ? found.parent.id : null, deletedAt: new Date().toISOString() });
+    const trashItem = {
+        ...found.task,
+        parentId: found.parent ? found.parent.id : null,
+        deletedAt: new Date().toISOString()
+    };
+    if (found.parent) {
+        found.parent.children = found.parent.children.filter(c => String(c.id) !== String(id));
+    } else {
+        state.tasks = state.tasks.filter(t => String(t.id) !== String(id));
+    }
+    state.trash.unshift(trashItem);
     invalidateTaskIndex();
-    saveTrash();
-    saveTasks();
+
+    if (useIDB) {
+        saveTrashItem(trashItem);
+        deleteTaskFromStore(id);
+    } else {
+        saveTrash();
+        saveTasks();
+    }
+
+    events.emit(EV.TASK_DELETED, { id, task: found.task, parentId: found.parent ? found.parent.id : null });
     return true;
 }
 
@@ -468,12 +1025,25 @@ export function restoreTrash(id) {
     const [item] = state.trash.splice(i, 1);
     const { parentId, deletedAt, ...rest } = item;
     const g = parentId ? state.tasks.find(t => String(t.id) === String(parentId) && t.kind === 'plan') : null;
-    if (g) (g.children = g.children || []).unshift(rest);
-    else state.tasks.unshift(rest);
-    saveTrash();
-    saveTasks();
+    if (g) {
+        (g.children = g.children || []).unshift(rest);
+    } else {
+        state.tasks.unshift(rest);
+    }
+    invalidateTaskIndex();
+
+    if (useIDB) {
+        if (g) saveTask(rest, g);
+        else saveTask(rest);
+        deleteTrashItem(id);
+    } else {
+        saveTrash();
+        saveTasks();
+    }
+
     call('render');
     call('renderTrash');
+    events.emit(EV.TASK_RESTORED, { id, task: rest });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -528,7 +1098,7 @@ export function addTask(forceKind) {
         }
     }
     state.justAddedId = uid();
-    state.tasks.unshift({
+    const newTask = {
         id: state.justAddedId,
         text: text.slice(0, MAX_LENGTH),
         completed: false,
@@ -553,9 +1123,12 @@ export function addTask(forceKind) {
         photos: [],
         startAt: isPlan ? (state.planDraftStart || null) : null,
         endAt: isPlan ? (state.planDraftEnd || null) : null
-    });
+    };
+    state.tasks.unshift(newTask);
     if (isPlan) state.expandedPlans.add(String(state.justAddedId));
-    saveTasks();
+
+    saveTask(newTask);
+
     input.value = '';
     input.classList.remove('input-error');
     state.addDraftSessions = [];
@@ -569,11 +1142,11 @@ export function addTask(forceKind) {
     const sErr = document.getElementById('seriesError');
     if (sErr) sErr.textContent = '';
     state.pendingLoc = null;
-    const map = call('getMap');
-    const pm = call('getPickMarker');
-    if (pm && map && call('getMapReady')) {
+    const map = _mapHelpers.getMap();
+    const pm = _mapHelpers.getPickMarker();
+    if (pm && map && _mapHelpers.getMapReady()) {
         map.removeLayer(pm);
-        call('setPickMarker', null);
+        _mapHelpers.setPickMarker(null);
     }
     call('updateLocChip');
     input.focus();
@@ -593,7 +1166,7 @@ export function toggleTask(id) {
     if (found.task.completed && found.task.recur && found.task.recur !== 'none' && advanceRecur(found.task)) {
         found.task.completed = false;
     }
-    saveTasks();
+    saveTask(found.task, found.parent);
     call('render');
 }
 
@@ -601,7 +1174,7 @@ export async function deleteTask(id, el) {
     const pre = findTask(id);
     if (!pre) return;
     if (!pre.parent && pre.task.kind === 'plan' && (pre.task.children || []).length > 0) {
-        const ok = await call('showConfirmModal', {
+        const ok = await invoke('showConfirmModal', {
             title: 'حذف برنامه',
             message: `این برنامه ${toFa(pre.task.children.length)} کار دارد. همه با هم به سطل زباله منتقل شوند؟`,
             confirmText: 'بله، منتقل کن',
@@ -629,14 +1202,31 @@ export async function deleteTask(id, el) {
 
 export function archiveDone() {
     let n = 0;
+    const changedParents = new Set();
     state.tasks.forEach(t => {
-        if (t.kind === 'plan') (t.children || []).forEach(c => {
-            if (c.completed && !c.archived) { c.archived = true; n++; }
-        });
-        else if (t.completed && !t.archived) { t.archived = true; n++; }
+        if (t.kind === 'plan') {
+            let planChanged = false;
+            (t.children || []).forEach(c => {
+                if (c.completed && !c.archived) {
+                    c.archived = true;
+                    n++;
+                    planChanged = true;
+                }
+            });
+            if (planChanged) changedParents.add(t);
+        } else if (t.completed && !t.archived) {
+            t.archived = true;
+            n++;
+            changedParents.add(t);
+        }
     });
     if (!n) return;
-    saveTasks();
+
+    if (useIDB) {
+        changedParents.forEach(t => saveTask(t));
+    } else {
+        saveTasks();
+    }
     call('render');
 }
 
@@ -647,7 +1237,7 @@ export async function clearCompleted() {
         else if (t.completed && !t.archived) ids.push(t.id);
     });
     if (ids.length === 0) return;
-    const ok = await call('showConfirmModal', {
+    const ok = await invoke('showConfirmModal', {
         title: 'پاک کردن انجام‌شده‌ها',
         message: `${toFa(ids.length)} وظیفه انجام‌شده به سطل زباله منتقل شود؟`,
         confirmText: 'بله، منتقل کن',
@@ -710,7 +1300,9 @@ export function createPlanCustom(name, kids, opts) {
     state.tasks.unshift(g);
     state.expandedPlans.add(String(g.id));
     state.justAddedId = g.id;
-    saveTasks();
+
+    saveTask(g);
+
     call('render');
     return g.id;
 }
@@ -749,7 +1341,9 @@ export function addChild(gid) {
         location: null
     });
     state.childDrafts[gid] = [];
-    saveTasks();
+
+    saveTask(g);
+
     call('render');
     const ni = taskList ? taskList.querySelector(`.task-item[data-id="${gid}"] .child-input`) : null;
     if (ni) ni.focus();

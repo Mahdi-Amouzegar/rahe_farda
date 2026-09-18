@@ -86,6 +86,7 @@
                                 <h3 id="appSettingsTitle">برنامه و حریم خصوصی</h3>
                                 <div class="settings-row"><span>استفاده روی دستگاه</span><button class="btn-small" id="installBtn" type="button" style="display: none;">⬇ نصب اپلیکیشن</button><span class="settings-note" id="installStatus">نصب از مرورگر در دسترس است</span></div>
                                 <div class="settings-row"><span>اطلاعات و داده‌ها</span><button class="btn-small" id="privacyBtn" type="button" title="حریم خصوصی شما">🔒 حریم خصوصی</button></div>
+                                <div class="settings-row"><span>پشتیبان‌گیری</span><button class="btn-small" id="exportBtn" type="button" title="ذخیره‌ی نسخه‌ی پشتیبان از داده‌ها">📤 پشتیبان‌گیری</button><button class="btn-small" id="importBtn" type="button" title="بازیابی از فایل پشتیبان">📥 بازیابی از پشتیبان</button></div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="reminderSettingsTitle">
                                 <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
@@ -575,6 +576,93 @@
             <div class="modal-body" id="infoModalBody"></div>
             <div class="picker-actions">
                 <button class="btn-add picker-confirm" id="infoModalOk" type="button">فهمیدم</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ⚠️ جدید: مودال Export (پشتیبان‌گیری)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="picker-overlay" id="exportModal" style="display: none;">
+        <div class="picker" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
+            <div class="picker-title" id="exportModalTitle">📤 پشتیبان‌گیری از داده‌ها</div>
+            <p class="modal-message">
+                یک فایل JSON از همه‌ی وظایف، برنامه‌ها، دوره‌ها و سطل زباله ساخته می‌شود.
+                می‌توانید آن را در جای امنی نگه دارید یا به دستگاه دیگری منتقل کنید.
+            </p>
+
+            <div class="export-options">
+                <label class="export-option">
+                    <input type="checkbox" id="exportIncludePhotos">
+                    <span>
+                        <strong>شامل تصاویر</strong>
+                        <small>حجم فایل را زیاد می‌کند (هر عکس تا ~۲۰۰KB).</small>
+                    </span>
+                </label>
+                <label class="export-option">
+                    <input type="checkbox" id="exportIncludeSettings">
+                    <span>
+                        <strong>شامل تنظیمات</strong>
+                        <small>تم، زبان، یادآورها و سایر ترجیحات.</small>
+                    </span>
+                </label>
+            </div>
+
+            <div class="export-meta" id="exportMeta"></div>
+
+            <div class="picker-actions">
+                <button class="btn-add picker-confirm" id="exportConfirm" type="button">📥 دانلود فایل پشتیبان</button>
+                <button class="btn-clear" id="exportCancel" type="button">انصراف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ⚠️ جدید: مودال Import (بازیابی از پشتیبان)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="picker-overlay" id="importModal" style="display: none;">
+        <div class="picker" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+            <div class="picker-title" id="importModalTitle">📥 بازیابی از فایل پشتیبان</div>
+            <p class="modal-message">
+                یک فایل JSON پشتیبان انتخاب کنید. قبل از بازیابی، نسخه‌ی فایل بررسی می‌شود.
+            </p>
+
+            <div class="import-file-row">
+                <label class="due-btn photo-upload-btn" for="importFileInput" style="cursor: pointer;">📁 انتخاب فایل JSON</label>
+                <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+                <span class="import-file-name" id="importFileName">فایلی انتخاب نشده</span>
+            </div>
+
+            <div class="import-mode" id="importModeWrap" style="display: none;">
+                <div class="field-label" style="margin-bottom: 6px;">روش بازیابی</div>
+                <label class="export-option">
+                    <input type="radio" name="importMode" value="merge" checked>
+                    <span>
+                        <strong>ادغام با داده‌های فعلی</strong>
+                        <small>وظایف جدید اضافه می‌شوند؛ وظایف با شناسه‌ی یکسان جایگزین می‌شوند.</small>
+                    </span>
+                </label>
+                <label class="export-option">
+                    <input type="radio" name="importMode" value="replace">
+                    <span>
+                        <strong>جایگزینی کامل</strong>
+                        <small>همه‌ی وظایف فعلی حذف و با محتوای فایل جایگزین می‌شوند. این کار قابل بازگشت نیست.</small>
+                    </span>
+                </label>
+                <label class="export-option" id="importSettingsWrap">
+                    <input type="checkbox" id="importSettingsCheck">
+                    <span>
+                        <strong>بازیابی تنظیمات</strong>
+                        <small>تم، زبان و سایر ترجیحات ذخیره‌شده در فایل اعمال می‌شوند.</small>
+                    </span>
+                </label>
+            </div>
+
+            <div class="import-meta" id="importMeta"></div>
+
+            <div class="picker-actions">
+                <button class="btn-add picker-confirm" id="importConfirm" type="button" disabled>بازیابی</button>
+                <button class="btn-clear" id="importCancel" type="button">انصراف</button>
             </div>
         </div>
     </div>
