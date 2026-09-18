@@ -40,8 +40,17 @@
 //                            TTL برای cache جستجو، کلمپ endDate در weather، guard در weather-modal،
 //                            try/finally در location-ui، مخفی‌سازی route-summary در map-hidden،
 //                            رفع تکرار دکمه هوا، بازطراحی child-item، کاهش timeout زمان‌سنج)
+//   v1.4.0.0-2026-09-18 — فاز ۴ + فاز ۵ گام ۱:
+//                          - EventEmitter مرکزی (events.js)
+//                          - حذف registerCallbacks در app.js
+//                          - DueChipsManager جایگزین _dueHome
+//                          - incremental save در store.js
+//                          - render-diff برای کاهش DOM rebuilds
+//                          - setMapHelpers (رفع circular import)
+//                          - Export/Import JSON با schemaVersion
+//                          - صف تغییرات (pendingChanges) برای Cloudflare
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.3.1.0-2026-09-17';
+const CACHE = 'rahefarda-v1.4.0.0-2026-09-18';
 
 // فایل‌ها بدون query-string (?v=N) کش می‌شوند.
 // networkFirst + ignoreSearch تضمین می‌کند همیشه نسخه درست لود شود:

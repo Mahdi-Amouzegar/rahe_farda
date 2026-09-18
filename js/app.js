@@ -1,5 +1,13 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// app.js -- event wiring + boot (ESM entry point)
+// app.js -- event wiring + boot (ESM entry point) — فاز ۴ گام ۵ + فاز ۵ گام ۱
+//
+// ⚠️ این نسخه:
+//   - registerCallbacksها را با events.on مستقیم جایگزین می‌کند
+//   - _dueHome را با DueChipsManager جایگزین می‌کند
+//   - setMapHelpers را صدا می‌زند (رفع circular import)
+//   - Export/Import را به UI وصل می‌کند
+//   - loadPendingChanges را در boot صدا می‌زند
+// ═══════════════════════════════════════════════════════════════════════════
 
 import {
     state,
@@ -14,7 +22,11 @@ import {
     addBtn,
     searchInput,
     taskList,
-    clearBtn
+    clearBtn,
+    downloadJSON,
+    readJSONFile,
+    buildBackupFilename,
+    formatBytes
 } from './core.js';
 import { getNow, syncServerTime } from './time.js';
 import {
@@ -38,7 +50,11 @@ import {
     deleteTask,
     clearCompleted,
     archiveDone,
-    registerCallbacks as registerStoreCallbacks
+    setMapHelpers,
+    exportTasks,
+    importTasks,
+    loadPendingChanges,
+    getPendingChanges
 } from './store.js';
 import {
     openPicker,
@@ -66,7 +82,6 @@ import {
     setPickMarker,
     removePickMarker,
     flyToTask,
-    registerMapCallbacks,
     startLiveTracking,
     stopLiveTracking,
     isLiveTrackingActive
@@ -79,8 +94,7 @@ import {
 import {
     openDetail,
     closeDetail,
-    bindDetailInputs,
-    registerDetailCallbacks
+    bindDetailInputs
 } from './detail.js';
 import {
     render,
@@ -100,7 +114,8 @@ import {
     startEdit,
     commitEdit,
     cancelEdit,
-    showUndoFor
+    showUndoFor,
+    resetRenderSignature
 } from './ui.js';
 import {
     refreshSavedLocationUI,
@@ -109,8 +124,7 @@ import {
     saveLocationFromPopup,
     showMobileBanner,
     hideMobileBanner,
-    isRelocateActive,
-    registerLocationCallbacks
+    isRelocateActive
 } from './location-ui.js';
 import {
     showRouteTo,
@@ -120,103 +134,107 @@ import {
 } from './route-ui.js';
 import { initMapSearch } from './map-search.js';
 import { bindWeatherModal } from './weather-modal.js';
+import { events, EV } from './events.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// State داخلی ماژول (جایگزین window.__dueHome)
-// ═══════════════════════════════════════════════════════════════════════════
-const _dueHome = { p: null, n: null };
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Register callbacks (به جای shim‌های window.X)
+// DueChipsManager — جایگزین _dueHome سراسری
 // ═══════════════════════════════════════════════════════════════════════════
 
-registerStoreCallbacks({
-    render,
-    updateDueChips,
-    renderPlanKids,
-    updateLocChip,
-    openDetail,
-    showUndoFor,
-    showConfirmModal,
-    renderTrash,
-    getMap,
-    getMapReady,
-    getPickMarker,
-    setPickMarker,
-});
-
-registerMapCallbacks({
-    render,
-    openDetail,
-    showRouteTo,
-    saveLocationFromPopup,
-    updateLocChip,
-    refreshSavedLocationUI,
-    locationLabelFor,
-    showMobilePickBanner: showMobileBanner,
-    hideMobilePickBanner: hideMobileBanner,
-    isRelocateLocationActive: isRelocateActive,
-    clearMapRoute,
-    hasActiveRoute,
-    getActiveRouteDestination,
-});
-
-registerDetailCallbacks({
-    render,
-    refreshSavedLocationUI,
-    showUndoFor,
-    showMobilePickBanner: showMobileBanner,
-    hideMobilePickBanner: hideMobileBanner,
-    showRouteTo,
-});
-
-registerLocationCallbacks({
-    render,
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Event wiring
-// ═══════════════════════════════════════════════════════════════════════════
-
-addBtn.addEventListener('click', () => addTask(state.pendingKind));
-input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(state.pendingKind); });
-
-document.getElementById('dueBtn').addEventListener('click', () => openPicker('add'));
-document.getElementById('dueChips').addEventListener('click', e => {
-    const b = e.target.closest('[data-dchip]');
-    if (!b) return;
-    state.addDraftSessions = state.addDraftSessions.filter(s => String(s.id) !== b.dataset.dchip);
-    updateDueChips();
-});
-document.getElementById('locBtn').addEventListener('click', () => {
-    ensureMapVisible();
-    switchToTab('map');
-    document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
-    mapHint('روی نقشه کلیک کنید تا محل وظیفه جدید انتخاب شود');
-});
-document.getElementById('locChip').addEventListener('click', e => {
-    if (!e.target.closest('[data-locclear]')) return;
-    state.pendingLoc = null;
-    removePickMarker();
-    refreshSavedLocationUI();
-});
-document.getElementById('myLocBtn').addEventListener('click', () => { ensureMapVisible(); locateUser(true); });
-document.getElementById('liveTrackBtn').addEventListener('click', () => {
-    ensureMapVisible();
-    if (isLiveTrackingActive()) {
-        stopLiveTracking();
-    } else {
-        startLiveTracking();
+class DueChipsManager {
+    constructor() {
+        this.chips = null;
+        this.originalParent = null;
+        this.originalNext = null;
+        this.mountedAt = null;
     }
-});
-document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
-document.getElementById('fsExit').addEventListener('click', toggleFullscreen);
-document.getElementById('routeClearBtn').addEventListener('click', clearRoute);
 
-document.getElementById('sortSelect').addEventListener('change', e => {
-    state.currentSort = e.target.value;
-    render();
-});
+    init() {
+        this.chips = document.getElementById('dueChips');
+        if (!this.chips) return;
+        this.originalParent = this.chips.parentElement;
+        this.originalNext = this.chips.nextElementSibling;
+        this.mountedAt = this.originalParent;
+    }
+
+    mountAt(parent, before = null) {
+        if (!this.chips) return;
+        if (!parent) {
+            this.restore();
+            return;
+        }
+        if (this.mountedAt === parent && this.chips.parentElement === parent) {
+            if (before && this.chips.nextElementSibling !== before) {
+                parent.insertBefore(this.chips, before);
+            }
+            return;
+        }
+        if (before) {
+            parent.insertBefore(this.chips, before);
+        } else {
+            parent.appendChild(this.chips);
+        }
+        this.mountedAt = parent;
+    }
+
+    restore() {
+        if (!this.chips || !this.originalParent) return;
+        if (this.chips.parentElement === this.originalParent) {
+            this.mountedAt = this.originalParent;
+            return;
+        }
+        if (this.originalNext && this.originalNext.parentElement === this.originalParent) {
+            this.originalParent.insertBefore(this.chips, this.originalNext);
+        } else {
+            this.originalParent.appendChild(this.chips);
+        }
+        this.mountedAt = this.originalParent;
+    }
+
+    isMountedAt(parent) {
+        return this.chips && this.chips.parentElement === parent;
+    }
+}
+
+const dueChipsManager = new DueChipsManager();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// wireEvents — اتصال مستقیم همه‌ی listenerها
+// ═══════════════════════════════════════════════════════════════════════════
+
+function wireEvents() {
+    // ─── UI render (از store، map، detail، location-ui) ───
+    events.on(EV.UI_RENDER_REQUESTED, render);
+    events.on('ui:update-due-chips', updateDueChips);
+    events.on('ui:render-plan-kids', renderPlanKids);
+    events.on('ui:render-trash', renderTrash);
+    events.on(EV.UI_SNACKBAR, showUndoFor);
+
+    // ─── UI open detail ───
+    events.on(EV.UI_OPEN_DETAIL, openDetail);
+
+    // ─── Location ───
+    events.on(EV.LOCATION_UPDATED, refreshSavedLocationUI);
+    events.on(EV.LOCATION_PENDING_CHANGED, updateLocChip);
+    events.on('location:save-from-popup', saveLocationFromPopup);
+    events.on('location:label-for', locationLabelFor);
+    events.on('location:show-mobile-banner', showMobileBanner);
+    events.on('location:hide-mobile-banner', hideMobileBanner);
+    events.on('location:is-relocate-active', isRelocateActive);
+
+    // ─── Route ───
+    events.on(EV.ROUTE_SHOW, showRouteTo);
+    events.on(EV.ROUTE_CLEAR, clearMapRoute);
+    events.on('route:has-active', hasActiveRoute);
+    events.on('route:get-destination', getActiveRouteDestination);
+
+    // ─── Modals ───
+    // ⚠️ از store.invoke('showConfirmModal') استفاده می‌شود — مقدار Promise برگردانده می‌شود
+    events.on(EV.MODAL_CONFIRM, showConfirmModal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// setKind + helpers
+// ═══════════════════════════════════════════════════════════════════════════
 
 function setKind(kind) {
     state.pendingKind = kind;
@@ -291,14 +309,12 @@ function updateDueRow() {
     if (dueB) dueB.style.display = (state.pendingKind === 'series' && !isDates) ? 'none' : '';
     const sad = document.getElementById('seriesAddDate');
     if (sad) sad.style.display = isDates ? '' : 'none';
-    const dc = document.getElementById('dueChips');
-    const slot = document.getElementById('dueChipsSlot');
-    if (dc && slot) {
-        if (isDates) {
-            slot.appendChild(dc);
-        } else if (_dueHome.p && dc.parentElement !== _dueHome.p) {
-            _dueHome.p.insertBefore(dc, _dueHome.n);
-        }
+
+    if (isDates) {
+        const slot = document.getElementById('dueChipsSlot');
+        if (slot) dueChipsManager.mountAt(slot);
+    } else {
+        dueChipsManager.restore();
     }
 }
 
@@ -306,6 +322,50 @@ function syncDisclosure() {
     const md = document.getElementById('moreDetails');
     if (md) md.open = state.prefs.proMode === true;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Event wiring — add task, due, loc, etc.
+// ═══════════════════════════════════════════════════════════════════════════
+
+addBtn.addEventListener('click', () => addTask(state.pendingKind));
+input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(state.pendingKind); });
+
+document.getElementById('dueBtn').addEventListener('click', () => openPicker('add'));
+document.getElementById('dueChips').addEventListener('click', e => {
+    const b = e.target.closest('[data-dchip]');
+    if (!b) return;
+    state.addDraftSessions = state.addDraftSessions.filter(s => String(s.id) !== b.dataset.dchip);
+    updateDueChips();
+});
+document.getElementById('locBtn').addEventListener('click', () => {
+    ensureMapVisible();
+    switchToTab('map');
+    document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
+    mapHint('روی نقشه کلیک کنید تا محل وظیفه جدید انتخاب شود');
+});
+document.getElementById('locChip').addEventListener('click', e => {
+    if (!e.target.closest('[data-locclear]')) return;
+    state.pendingLoc = null;
+    removePickMarker();
+    refreshSavedLocationUI();
+});
+document.getElementById('myLocBtn').addEventListener('click', () => { ensureMapVisible(); locateUser(true); });
+document.getElementById('liveTrackBtn').addEventListener('click', () => {
+    ensureMapVisible();
+    if (isLiveTrackingActive()) {
+        stopLiveTracking();
+    } else {
+        startLiveTracking();
+    }
+});
+document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
+document.getElementById('fsExit').addEventListener('click', toggleFullscreen);
+document.getElementById('routeClearBtn').addEventListener('click', clearRoute);
+
+document.getElementById('sortSelect').addEventListener('change', e => {
+    state.currentSort = e.target.value;
+    render();
+});
 
 document.querySelectorAll('.kind3-btn').forEach(b => {
     b.addEventListener('click', () => {
@@ -529,7 +589,7 @@ document.getElementById('tplEndBtn').addEventListener('click', () => {
     });
 });
 
-/* ---------- دکمه‌های هدر: راهنما و تنظیمات ---------- */
+/* ---------- Settings Modal ---------- */
 
 const settingsModal = document.getElementById('settingsModal');
 const settingsBtn = document.getElementById('settingsBtn');
@@ -588,7 +648,7 @@ document.getElementById('privacyBtn').addEventListener('click', async () => {
             '<strong>همگام‌سازی زمان</strong> با سرورهای عمومی (timeapi.io، worldclockapi.com) فقط برای اصلاح ساعت دستگاه است و هیچ اطلاعاتی ارسال نمی‌کند.',
             '<strong>پیش‌بینی هوا</strong> از Open-Meteo دریافت می‌شود و فقط مختصات مکان و تاریخ درخواست را می‌فرستد. هیچ اطلاعاتی از وظایف شما ارسال نمی‌شود.',
             '<strong>نام مکان</strong> با Nominatim (OpenStreetMap) دریافت می‌شود؛ فقط مختصات ارسال می‌شود و نام شهر برگردانده می‌شود.',
-            '<strong>پشتیبان‌گیری:</strong> چون داده‌ها فقط روی دستگاه شماست، توصیه می‌شود از قابلیت Export (به‌زودی) یا پشتیبان‌گیری از مرورگر خود استفاده کنید.',
+            '<strong>پشتیبان‌گیری:</strong> از دکمه‌ی «📤 پشتیبان‌گیری» در تنظیمات می‌توانید یک فایل JSON بسازید.',
             'برای پاک کردن کامل داده‌ها، از سطل زباله استفاده کنید یا داده‌های سایت را از تنظیمات مرورگر حذف کنید.'
         ],
         buttonText: 'فهمیدم'
@@ -596,6 +656,208 @@ document.getElementById('privacyBtn').addEventListener('click', async () => {
     if (window.matchMedia('(min-width: 901px)').matches) {
         const ti = document.getElementById('taskInput');
         if (ti) ti.focus({ preventScroll: true });
+    }
+});
+
+/* ---------- Export / Import ---------- */
+
+const exportModal = document.getElementById('exportModal');
+const importModal = document.getElementById('importModal');
+let _exportTrapCleanup = null;
+let _importTrapCleanup = null;
+let _importFileData = null;   // backup خوانده‌شده
+
+function openExportModal() {
+    if (!exportModal) return;
+    // پیش‌فرض: photos خاموش، settings خاموش
+    document.getElementById('exportIncludePhotos').checked = false;
+    document.getElementById('exportIncludeSettings').checked = false;
+    updateExportMeta();
+
+    exportModal.style.display = 'flex';
+    if (_exportTrapCleanup) _exportTrapCleanup();
+    _exportTrapCleanup = trapFocus(exportModal);
+    setTimeout(() => document.getElementById('exportConfirm')?.focus(), 60);
+}
+
+function closeExportModal() {
+    if (_exportTrapCleanup) { _exportTrapCleanup(); _exportTrapCleanup = null; }
+    if (exportModal) exportModal.style.display = 'none';
+}
+
+function updateExportMeta() {
+    const meta = document.getElementById('exportMeta');
+    if (!meta) return;
+    const includePhotos = document.getElementById('exportIncludePhotos')?.checked;
+    const taskCount = state.tasks.length;
+    const trashCount = state.trash.length;
+    // تخمین حجم
+    const baseSize = JSON.stringify({ tasks: state.tasks, trash: state.trash }).length;
+    const photosSize = includePhotos
+        ? state.tasks.reduce((sum, t) => sum + (t.photos || []).reduce((s, p) => s + (p.dataUrl?.length || 0), 0), 0)
+        : 0;
+    const estimated = baseSize + photosSize;
+    meta.innerHTML = `
+        <div class="export-meta-row"><span>وظایف:</span> <strong>${toFa(taskCount)}</strong></div>
+        <div class="export-meta-row"><span>سطل زباله:</span> <strong>${toFa(trashCount)}</strong></div>
+        <div class="export-meta-row"><span>حجم تخمینی:</span> <strong>${formatBytes(estimated)}</strong></div>
+    `;
+}
+
+document.getElementById('exportBtn')?.addEventListener('click', openExportModal);
+document.getElementById('exportCancel')?.addEventListener('click', closeExportModal);
+document.getElementById('exportIncludePhotos')?.addEventListener('change', updateExportMeta);
+exportModal?.addEventListener('click', e => {
+    if (e.target === exportModal) closeExportModal();
+});
+
+document.getElementById('exportConfirm')?.addEventListener('click', async () => {
+    try {
+        const includePhotos = document.getElementById('exportIncludePhotos')?.checked || false;
+        const includeSettings = document.getElementById('exportIncludeSettings')?.checked || false;
+
+        const backup = await exportTasks({ includePhotos, includeSettings });
+        const filename = buildBackupFilename();
+        const ok = downloadJSON(backup, filename);
+        if (ok) {
+            closeExportModal();
+            events.emit(EV.UI_SNACKBAR, [], `✓ فایل پشتیبان ساخته شد (${filename})`);
+        } else {
+            alert('خطا در ساخت فایل پشتیبان');
+        }
+    } catch (err) {
+        console.error('export failed:', err);
+        alert('خطا در ساخت فایل پشتیبان');
+    }
+});
+
+function openImportModal() {
+    if (!importModal) return;
+    _importFileData = null;
+    document.getElementById('importFileName').textContent = 'فایلی انتخاب نشده';
+    document.getElementById('importModeWrap').style.display = 'none';
+    document.getElementById('importMeta').innerHTML = '';
+    document.getElementById('importConfirm').disabled = true;
+    // ریست radio
+    const mergeRadio = document.querySelector('input[name="importMode"][value="merge"]');
+    if (mergeRadio) mergeRadio.checked = true;
+    document.getElementById('importSettingsCheck').checked = false;
+
+    importModal.style.display = 'flex';
+    if (_importTrapCleanup) _importTrapCleanup();
+    _importTrapCleanup = trapFocus(importModal);
+    setTimeout(() => document.getElementById('importFileInput')?.click(), 100);
+}
+
+function closeImportModal() {
+    if (_importTrapCleanup) { _importTrapCleanup(); _importTrapCleanup = null; }
+    if (importModal) importModal.style.display = 'none';
+    _importFileData = null;
+}
+
+document.getElementById('importBtn')?.addEventListener('click', openImportModal);
+document.getElementById('importCancel')?.addEventListener('click', closeImportModal);
+importModal?.addEventListener('click', e => {
+    if (e.target === importModal) closeImportModal();
+});
+
+document.getElementById('importFileInput')?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const nameEl = document.getElementById('importFileName');
+    const metaEl = document.getElementById('importMeta');
+    if (nameEl) nameEl.textContent = `${file.name} (${formatBytes(file.size)})`;
+
+    try {
+        const data = await readJSONFile(file);
+        _importFileData = data;
+
+        // بررسی ساختار
+        if (!data || !data.data || !Array.isArray(data.data.tasks)) {
+            if (metaEl) metaEl.innerHTML = '<div class="import-error">ساختار فایل نامعتبر است.</div>';
+            document.getElementById('importConfirm').disabled = true;
+            return;
+        }
+
+        // نمایش اطلاعات
+        const schemaVersion = data.schemaVersion || 'نامشخص';
+        const taskCount = data.data.tasks.length;
+        const trashCount = Array.isArray(data.data.trash) ? data.data.trash.length : 0;
+        const exportedAt = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'نامشخص';
+        const hasSettings = Boolean(data.settings);
+        const hasPhotos = (data.options && data.options.includePhotos);
+
+        if (metaEl) {
+            metaEl.innerHTML = `
+                <div class="import-meta-row"><span>نسخه:</span> <strong>${escapeHtml(schemaVersion)}</strong></div>
+                <div class="import-meta-row"><span>تاریخ ساخت:</span> <strong>${escapeHtml(exportedAt)}</strong></div>
+                <div class="import-meta-row"><span>وظایف:</span> <strong>${toFa(taskCount)}</strong></div>
+                <div class="import-meta-row"><span>سطل زباله:</span> <strong>${toFa(trashCount)}</strong></div>
+                ${hasPhotos ? '<div class="import-meta-warn">⚠️ این فایل شامل تصاویر است.</div>' : ''}
+            `;
+        }
+
+        document.getElementById('importModeWrap').style.display = '';
+
+        // فعال کردن checkbox تنظیمات اگر فایل شامل تنظیمات است
+        const settingsWrap = document.getElementById('importSettingsWrap');
+        const settingsCheck = document.getElementById('importSettingsCheck');
+        if (settingsWrap) settingsWrap.style.display = hasSettings ? '' : 'none';
+        if (settingsCheck) settingsCheck.checked = false;
+
+        document.getElementById('importConfirm').disabled = false;
+    } catch (err) {
+        console.error('read file failed:', err);
+        let msg = 'خطا در خواندن فایل';
+        if (err.message === 'invalid-json') msg = 'فایل JSON نامعتبر است';
+        else if (err.message === 'file-too-large') msg = 'حجم فایل بیش از حد مجاز است (۵۰MB)';
+        if (metaEl) metaEl.innerHTML = `<div class="import-error">${escapeHtml(msg)}</div>`;
+        document.getElementById('importConfirm').disabled = true;
+    }
+});
+
+document.getElementById('importConfirm')?.addEventListener('click', async () => {
+    if (!_importFileData) return;
+    const mode = document.querySelector('input[name="importMode"]:checked')?.value || 'merge';
+    const importSettings = document.getElementById('importSettingsCheck')?.checked || false;
+
+    // تأیید نهایی برای replace
+    if (mode === 'replace') {
+        const ok = await showConfirmModal({
+            title: 'جایگزینی کامل',
+            message: 'همه‌ی وظایف فعلی حذف و با محتوای فایل جایگزین می‌شوند. این کار قابل بازگشت نیست. ادامه می‌دهید؟',
+            confirmText: 'بله، جایگزین کن',
+            cancelText: 'انصراف',
+            danger: true
+        });
+        if (!ok) return;
+    }
+
+    try {
+        const result = await importTasks(_importFileData, { mode, importSettings });
+        closeImportModal();
+
+        if (result.ok) {
+            // ⚠️ مهم: reset امضای رندر
+            resetRenderSignature();
+            render();
+            renderTrash();
+            // اعمال تنظیمات اگر import شده
+            if (importSettings) {
+                applyDisplaySettings();
+                applyMapVisibility();
+                applyProMode();
+            }
+            const parts = [`✓ ${toFa(result.imported)} وظیفه بازیابی شد`];
+            if (result.skipped > 0) parts.push(`${toFa(result.skipped)} مورد رد شد`);
+            if (result.warning) parts.push(result.warning);
+            events.emit(EV.UI_SNACKBAR, [], parts.join(' — '));
+        } else {
+            alert(result.error || 'خطا در بازیابی');
+        }
+    } catch (err) {
+        console.error('import failed:', err);
+        alert('خطا در بازیابی');
     }
 });
 
@@ -735,8 +997,6 @@ if (_themeMedia.addEventListener) {
     _themeMedia.addListener(_onThemeMediaChange);
 }
 
-/* ---------- پایان بخش Theme/Lang ---------- */
-
 document.getElementById('mapToggle').addEventListener('click', () => {
     state.prefs.mapVisible = !state.prefs.mapVisible;
     savePrefs();
@@ -744,7 +1004,7 @@ document.getElementById('mapToggle').addEventListener('click', () => {
     if (state.prefs.mapVisible) initMap();
 });
 
-/* ---------- Bottom Action Bar (فاز ۳) ---------- */
+/* ---------- Bottom Action Bar ---------- */
 
 document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     const btn = e.target.closest('.bottom-action');
@@ -752,22 +1012,15 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     const action = btn.dataset.action;
 
     if (action === 'new-task' || action === 'new-plan' || action === 'new-series') {
-        // ۱. سوئیچ به تب وظایف (اگر در تب نقشه هستیم)
         switchToTab('tasks');
-
-        // ۲. تنظیم نوع
         const kind = action === 'new-task' ? 'task'
                    : action === 'new-plan' ? 'plan'
                    : 'series';
         setKind(kind);
-
-        // ۳. اسکرول نرم به create-zone
         const createZone = document.querySelector('.create-zone');
         if (createZone) {
             createZone.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-
-        // ۴. focus روی input بعد از اسکرول
         setTimeout(() => {
             const ti = document.getElementById('taskInput');
             if (ti) ti.focus({ preventScroll: true });
@@ -781,8 +1034,7 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     }
 });
 
-/* ---------- Photo Camera Input (فاز ۳) ---------- */
-// اتصال photoCameraInput به همان logic photoInput (در detail.js)
+/* ---------- Photo Camera Input ---------- */
 
 (function initPhotoCameraInput() {
     const photoCameraInput = document.getElementById('photoCameraInput');
@@ -797,7 +1049,6 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
             photoInput.files = dt.files;
             photoInput.dispatchEvent(new Event('change', { bubbles: true }));
         } catch {
-            // fallback برای مرورگرهای قدیمی — فقط رویداد را dispatch می‌کنیم
             photoInput.dispatchEvent(new Event('change', { bubbles: true }));
         } finally {
             photoCameraInput.value = '';
@@ -897,7 +1148,7 @@ function applyProMode() {
     render();
 }
 
-// PWA: نصب به‌عنوان اپلیکیشن
+// PWA: نصب
 let deferredPrompt = null;
 const installBtn = document.getElementById('installBtn');
 window.addEventListener('beforeinstallprompt', e => {
@@ -1001,7 +1252,10 @@ document.addEventListener('keydown', e => {
 
     if (settingsModal && !settingsModal.hidden) { toggleSettings(false); return; }
 
-  const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal', 'weatherModal'];
+    if (exportModal && exportModal.style.display === 'flex') { closeExportModal(); return; }
+    if (importModal && importModal.style.display === 'flex') { closeImportModal(); return; }
+
+    const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal', 'weatherModal'];
     for (const id of stacked) {
         const el = document.getElementById(id);
         if (el && el.style.display === 'flex') return;
@@ -1076,7 +1330,7 @@ taskList.addEventListener('click', e => {
         actionEl.setAttribute('aria-expanded', String(willOpen));
         return;
     }
-    
+
     const action = actionEl ? actionEl.dataset.action : null;
 
     if (action === 'toggle') toggleTask(id);
@@ -1218,7 +1472,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 clearBtn.addEventListener('click', clearCompleted);
 document.getElementById('archiveDone').addEventListener('click', archiveDone);
 
-// ورود صوتی: مستقل از mobile و محدود به ورودی‌های متنی آزاد
+// ورود صوتی
 (function initMic() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const buttons = [...document.querySelectorAll('[data-mic-target]'), document.getElementById('micBtn')].filter(Boolean);
@@ -1416,13 +1670,21 @@ try {
 
 bindDetailInputs();
 loadPrefs();
-(function initDueHome() {
-    const dc = document.getElementById('dueChips');
-    if (dc) {
-        _dueHome.p = dc.parentElement;
-        _dueHome.n = dc.nextElementSibling;
-    }
+
+// ─── رفع circular import: map helpers به store ───
+setMapHelpers({ getMap, getMapReady, getPickMarker, setPickMarker });
+
+// ─── ثبت listenerهای EventEmitter ───
+wireEvents();
+
+// ─── مقداردهی DueChipsManager ───
+(function initDueChips() {
+    dueChipsManager.init();
 })();
+
+// ─── خواندن صف تغییرات ───
+loadPendingChanges();
+
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
     document.getElementById('welcomeOverlay').style.display = 'flex';
@@ -1462,13 +1724,15 @@ loadTasks().then(async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Debug-only global (در build نهایی حذف می‌شود)
+// Debug-only global
 // ═══════════════════════════════════════════════════════════════════════════
 if (import.meta.env.DEV) {
     window.TodoApp = {
         getState: () => state,
         findTask,
         saveTasks,
-        render
+        render,
+        events,
+        getPendingChanges
     };
 }

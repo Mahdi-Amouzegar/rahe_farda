@@ -2355,3 +2355,165 @@
         display: none;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ فاز ۵ گام ۱: استایل Export/Import
+   این بخش در انتهای components.css اضافه شود.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer overrides {
+    /* ═══ Export Options ═══ */
+    .export-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .export-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+        cursor: pointer;
+        transition: border-color .16s ease, background .16s ease;
+    }
+
+    .export-option:hover {
+        border-color: var(--accent-cyan-border);
+        background: var(--bg-4);
+    }
+
+    .export-option input[type="checkbox"],
+    .export-option input[type="radio"] {
+        flex: 0 0 auto;
+        margin-top: 2px;
+        accent-color: var(--accent-purple);
+    }
+
+    .export-option > span {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .export-option strong {
+        color: var(--text-primary);
+        font-size: 0.88rem;
+        font-weight: 700;
+    }
+
+    .export-option small {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        line-height: 1.6;
+    }
+
+    /* ═══ Export/Import Meta ═══ */
+    .export-meta,
+    .import-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 12px;
+        margin-bottom: 14px;
+        border-radius: var(--radius-md);
+        background: var(--accent-cyan-soft);
+        border: 1px solid var(--accent-cyan-border);
+        font-size: 0.8rem;
+    }
+
+    .export-meta:empty,
+    .import-meta:empty {
+        display: none;
+    }
+
+    .export-meta-row,
+    .import-meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+    }
+
+    .export-meta-row strong,
+    .import-meta-row strong {
+        color: var(--accent-cyan);
+        font-weight: 700;
+    }
+
+    .import-meta-warn {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid var(--accent-cyan-border);
+        color: var(--accent-yellow);
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .import-error {
+        padding: 8px 0;
+        color: var(--accent-pink);
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    /* ═══ Import File Row ═══ */
+    .import-file-row {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .import-file-row .photo-upload-btn {
+        align-self: stretch;
+        justify-content: center;
+        min-height: 44px;
+        font-weight: 700;
+    }
+
+    .import-file-name {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ═══ Import Mode ═══ */
+    .import-mode {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .import-mode .field-label {
+        color: var(--text-secondary);
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+
+    /* ═══ Light theme overrides ═══ */
+    html.theme-light .export-option {
+        background: #ffffff;
+        border-color: #d8dde5;
+    }
+
+    html.theme-light .export-option:hover {
+        background: #f8fafc;
+    }
+
+    html.theme-light .export-meta,
+    html.theme-light .import-meta {
+        background: rgba(8, 145, 178, 0.06);
+    }
+}

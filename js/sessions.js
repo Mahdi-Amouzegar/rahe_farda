@@ -136,9 +136,82 @@ export function hasSessionAt(list, iso) {
 // Task matching / visible children
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * نرمال‌سازی متن فارسی برای جستجو.
+ *  - تبدیل اعداد فارسی/عربی به انگلیسی
+ *  - تبدیل ی/ک عربی به فارسی
+ *  - حذف فاصله‌های اضافی
+ *  - lowercase برای انگلیسی
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+export function normalizeForSearch(s) {
+    if (!s) return '';
+    let out = String(s);
+    // اعداد فارسی/عربی → انگلیسی
+    out = out.replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+    out = out.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    // ی و ک عربی → فارسی
+    out = out.replace(/ي/g, 'ی').replace(/ك/g, 'ک');
+    // حذف اعراب (فتحه، کسره، ...)
+    out = out.replace(/[\u064B-\u065F\u0670]/g, '');
+    // حذف ZWNJ (نیم‌فاصله) — برای جستجوی «می‌روم» با «میروم»
+    out = out.replace(/\u200C/g, '');
+    // فاصله‌های اضافی
+    out = out.replace(/\s+/g, ' ').trim();
+    // lowercase (برای انگلیسی)
+    out = out.toLowerCase();
+    return out;
+}
+
+/**
+ * جستجوی معنایی در یک task.
+ *
+ * فیلدهای جستجو:
+ *   - text (عنوان)
+ *   - description (توضیح)
+ *   - phone (تلفن)
+ *   - address (آدرس)
+ *   - url (آدرس اینترنتی)
+ *
+ * ⚠️ برای plan، فیلدهای فرزندان هم جداگانه چک می‌شوند
+ * (در getFiltered در ui.js).
+ *
+ * @param {object} t
+ * @param {string} q
+ * @returns {boolean}
+ */
 export function taskMatches(t, q) {
     if (!q) return true;
-    return t.text.includes(q) || (t.description || '').includes(q);
+    if (!t) return false;
+    const needle = normalizeForSearch(q);
+    if (!needle) return true;
+
+    const fields = [
+        t.text,
+        t.description,
+        t.phone,
+        t.address,
+        t.url
+    ];
+
+    for (const f of fields) {
+        if (f && normalizeForSearch(f).includes(needle)) return true;
+    }
+
+    // جستجو در عنوان فرزندان (برای plan)
+    if (t.kind === 'plan' && Array.isArray(t.children)) {
+        for (const c of t.children) {
+            if (!c) continue;
+            const cFields = [c.text, c.description, c.phone, c.address, c.url];
+            for (const f of cFields) {
+                if (f && normalizeForSearch(f).includes(needle)) return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 export function visibleChildren(g) {

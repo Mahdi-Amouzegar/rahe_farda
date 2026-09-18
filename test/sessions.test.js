@@ -1,5 +1,5 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// test/sessions.test.js — تست‌های منطق جلسات
+// test/sessions.test.js — تست‌های منطق جلسات + جستجوی معنایی (فاز ۵ گام ۲)
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -9,6 +9,7 @@ import {
     sameMinute,
     hasSessionAt,
     taskMatches,
+    normalizeForSearch,
     parseFaDateTime,
     nearestUpcoming
 } from '../js/sessions.js';
@@ -21,6 +22,10 @@ beforeEach(() => {
     state.currentFilter = 'all';
     state.selectedDay = null;
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// faToEn
+// ═══════════════════════════════════════════════════════════════════════════
 
 describe('sessions — faToEn', () => {
     it('ارقام فارسی را به انگلیسی تبدیل می‌کند', () => {
@@ -41,6 +46,10 @@ describe('sessions — faToEn', () => {
     });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// dayKey
+// ═══════════════════════════════════════════════════════════════════════════
+
 describe('sessions — dayKey', () => {
     it('کلید روز را درست می‌سازد', () => {
         const d = new Date(2024, 0, 15); // ۱۵ ژانویه ۲۰۲۴
@@ -52,6 +61,10 @@ describe('sessions — dayKey', () => {
         expect(dayKey(d.toISOString())).toBe('2024-6-20');
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// sameMinute
+// ═══════════════════════════════════════════════════════════════════════════
 
 describe('sessions — sameMinute', () => {
     it('دو تاریخ با همان دقیقه را true برمی‌گرداند', () => {
@@ -71,6 +84,10 @@ describe('sessions — sameMinute', () => {
     });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// hasSessionAt
+// ═══════════════════════════════════════════════════════════════════════════
+
 describe('sessions — hasSessionAt', () => {
     it('وقتی جلسه با همان دقیقه وجود دارد true برمی‌گرداند', () => {
         const list = [{ at: new Date(2024, 0, 15, 10, 0).toISOString() }];
@@ -87,7 +104,16 @@ describe('sessions — hasSessionAt', () => {
     it('برای آرایه خالی false برمی‌گرداند', () => {
         expect(hasSessionAt([], new Date().toISOString())).toBe(false);
     });
+
+    it('برای آرایه null امن است', () => {
+        expect(hasSessionAt(null, new Date().toISOString())).toBe(false);
+        expect(hasSessionAt(undefined, new Date().toISOString())).toBe(false);
+    });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// hasSessionOn
+// ═══════════════════════════════════════════════════════════════════════════
 
 describe('sessions — hasSessionOn', () => {
     it('وقتی جلسه در آن روز وجود دارد true برمی‌گرداند', () => {
@@ -105,7 +131,60 @@ describe('sessions — hasSessionOn', () => {
     });
 });
 
-describe('sessions — taskMatches', () => {
+// ═══════════════════════════════════════════════════════════════════════════
+// normalizeForSearch
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('sessions — normalizeForSearch', () => {
+    it('ارقام فارسی را به انگلیسی تبدیل می‌کند', () => {
+        expect(normalizeForSearch('۱۲۳')).toBe('123');
+        expect(normalizeForSearch('۱۴۰۳')).toBe('1403');
+    });
+
+    it('ارقام عربی را به انگلیسی تبدیل می‌کند', () => {
+        expect(normalizeForSearch('١٢٣')).toBe('123');
+    });
+
+    it('ی عربی را به فارسی تبدیل می‌کند', () => {
+        expect(normalizeForSearch('ايران')).toBe('ایران');
+        expect(normalizeForSearch('كتاب')).toBe('کتاب');
+    });
+
+    it('نیم‌فاصله (ZWNJ) را حذف می‌کند', () => {
+        expect(normalizeForSearch('می‌روم')).toBe('میروم');
+        expect(normalizeForSearch('کتاب‌ها')).toBe('کتابها');
+    });
+
+    it('اعراب را حذف می‌کند', () => {
+        expect(normalizeForSearch('مَدرَسِه')).toBe('مدرسه');
+    });
+
+    it('lowercase می‌کند (برای انگلیسی)', () => {
+        expect(normalizeForSearch('HELLO')).toBe('hello');
+        expect(normalizeForSearch('Buy Milk')).toBe('buy milk');
+    });
+
+    it('فاصله‌های اضافی را نرمال می‌کند', () => {
+        expect(normalizeForSearch('سلام   دنیا')).toBe('سلام دنیا');
+        expect(normalizeForSearch('  سلام  ')).toBe('سلام');
+    });
+
+    it('برای null و undefined رشته خالی برمی‌گرداند', () => {
+        expect(normalizeForSearch(null)).toBe('');
+        expect(normalizeForSearch(undefined)).toBe('');
+    });
+
+    it('برای اعداد (غیر رشته) کار می‌کند', () => {
+        expect(normalizeForSearch(123)).toBe('123');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// taskMatches (جستجوی معنایی)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('sessions — taskMatches (جستجوی معنایی)', () => {
+    // ─── تست‌های پایه (بدون تغییر) ───
     it('متن شامل عبارت است true برمی‌گرداند', () => {
         expect(taskMatches({ text: 'خرید نان' }, 'نان')).toBe(true);
     });
@@ -122,7 +201,103 @@ describe('sessions — taskMatches', () => {
         expect(taskMatches({ text: 'هر چیزی' }, '')).toBe(true);
         expect(taskMatches({ text: 'هر چیزی' }, null)).toBe(true);
     });
+
+    // ─── تست‌های فیلدهای جدید ───
+    it('تلفن را جستجو می‌کند', () => {
+        expect(taskMatches({ text: 'تماس', phone: '09123456789' }, '0912')).toBe(true);
+        expect(taskMatches({ text: 'تماس', phone: '09123456789' }, '9999')).toBe(false);
+    });
+
+    it('آدرس را جستجو می‌کند', () => {
+        expect(taskMatches({ text: 'مراجعه', address: 'تهران، خیابان ولیعصر' }, 'ولیعصر')).toBe(true);
+        expect(taskMatches({ text: 'مراجعه', address: 'تهران' }, 'اصفهان')).toBe(false);
+    });
+
+    it('URL را جستجو می‌کند', () => {
+        expect(taskMatches({ text: 'بازکردن', url: 'https://example.com/path' }, 'example')).toBe(true);
+        expect(taskMatches({ text: 'بازکردن', url: 'https://example.com' }, 'google')).toBe(false);
+    });
+
+    // ─── نرمال‌سازی ───
+    it('اعداد فارسی و انگلیسی را یکسان می‌بیند', () => {
+        expect(taskMatches({ text: 'جلسه ۱۴۰۳' }, '1403')).toBe(true);
+        expect(taskMatches({ text: 'جلسه 1403' }, '۱۴۰۳')).toBe(true);
+    });
+
+    it('ی و ک عربی و فارسی را یکسان می‌بیند', () => {
+        expect(taskMatches({ text: 'کتاب' }, 'كتاب')).toBe(true);
+        expect(taskMatches({ text: 'ايران' }, 'ایران')).toBe(true);
+    });
+
+    it('نیم‌فاصله را نادیده می‌گیرد', () => {
+        expect(taskMatches({ text: 'می‌روم' }, 'میروم')).toBe(true);
+        expect(taskMatches({ text: 'میروم' }, 'می‌روم')).toBe(true);
+    });
+
+    it('فاصله‌های اضافی را نرمال می‌کند', () => {
+        expect(taskMatches({ text: 'سلام   دنیا' }, 'سلام دنیا')).toBe(true);
+    });
+
+    it('case-insensitive برای انگلیسی', () => {
+        expect(taskMatches({ text: 'Buy Milk' }, 'buy')).toBe(true);
+        expect(taskMatches({ text: 'buy milk' }, 'MILK')).toBe(true);
+    });
+
+    // ─── جستجو در فرزندان plan ───
+    it('در فرزندان plan جستجو می‌کند', () => {
+        const plan = {
+            text: 'سفر',
+            kind: 'plan',
+            children: [
+                { id: 'c1', text: 'رزرو بلیت', kind: 'task' },
+                { id: 'c2', text: 'بسته‌بندی وسایل', kind: 'task' }
+            ]
+        };
+        expect(taskMatches(plan, 'بلیت')).toBe(true);
+        expect(taskMatches(plan, 'بسته')).toBe(true);
+        expect(taskMatches(plan, 'هتل')).toBe(false);
+    });
+
+    it('در فیلدهای فرزندان (تلفن/آدرس) هم جستجو می‌کند', () => {
+        const plan = {
+            text: 'سفر',
+            kind: 'plan',
+            children: [
+                { id: 'c1', text: 'تماس با هتل', phone: '02112345678', kind: 'task' }
+            ]
+        };
+        expect(taskMatches(plan, '12345678')).toBe(true);
+    });
+
+    // ─── موارد edge ───
+    it('برای null امن است', () => {
+        expect(taskMatches(null, 'x')).toBe(false);
+        expect(taskMatches({ text: 'سلام' }, '')).toBe(true);
+    });
+
+    it('عبارت شامل نویسه‌های خاص را مدیریت می‌کند', () => {
+        expect(taskMatches({ text: 'قیمت ۱۰۰٪' }, '100')).toBe(true);
+        expect(taskMatches({ text: 'task#1' }, '#1')).toBe(true);
+    });
+
+    it('چند فیلد را همزمان چک می‌کند', () => {
+        const task = {
+            text: 'خرید',
+            description: 'از فروشگاه',
+            phone: '09123456789',
+            address: 'تهران',
+            url: 'https://shop.com'
+        };
+        expect(taskMatches(task, 'فروشگاه')).toBe(true);
+        expect(taskMatches(task, '0912')).toBe(true);
+        expect(taskMatches(task, 'تهران')).toBe(true);
+        expect(taskMatches(task, 'shop')).toBe(true);
+    });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// nearestUpcoming
+// ═══════════════════════════════════════════════════════════════════════════
 
 describe('sessions — nearestUpcoming', () => {
     it('نزدیک‌ترین جلسه آینده را برمی‌گرداند', () => {
@@ -148,6 +323,10 @@ describe('sessions — nearestUpcoming', () => {
     });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// parseFaDateTime
+// ═══════════════════════════════════════════════════════════════════════════
+
 describe('sessions — parseFaDateTime', () => {
     // برای تست، از یک "now" ثابت استفاده می‌کنیم
     const now = new Date(2024, 5, 15, 10, 0, 0); // ۱۵ ژوئن ۲۰۲۴، ۱۰ صبح
@@ -167,7 +346,6 @@ describe('sessions — parseFaDateTime', () => {
     });
 
     it('«امروز» را می‌فهمد وقتی ساعت پیش‌فرض در آینده باشد', () => {
-        // اگر الان ۶ صبح است، ساعت پیش‌فرض ۹ صبح امروز معتبر است
         const morningNow = new Date(2024, 5, 15, 6, 0, 0);
         const iso = parseFaDateTime('امروز', morningNow);
         expect(iso).toBeTruthy();
@@ -177,7 +355,6 @@ describe('sessions — parseFaDateTime', () => {
     });
 
     it('«امروز» را null برمی‌گرداند وقتی ساعت پیش‌فرض گذشته باشد', () => {
-        // در ساعت ۱۰ صبح، ساعت پیش‌فرض ۹ امروز گذشته است → null
         const iso = parseFaDateTime('امروز', now);
         expect(iso).toBe(null);
     });
