@@ -1,61 +1,36 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // Service Worker: آفلاین‌سازی پوسته برنامه (فقط فایل‌های همین‌سایت)
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // راهنمای نسخه‌بندی CACHE
 // ─────────────────────────────────────────────────────────────────────────────
 // ساختار: rahefarda-v<MAJOR>.<API>.<FEATURE>.<PHASE>-<DATE>
 //
-//   MAJOR    : تغییر بزرگ در معماری پروژه (مثلاً مهاجرت به framework جدید)
-//   API      : تغییر در ساختار ذخیره‌سازی یا قرارداد داده (data contract)
-//   FEATURE  : فیچر جدید یا بازسازی بزرگ (مثلاً بازسازی CSS، Light theme)
-//   PHASE    : هر فاز از برنامه ارتقا (۰ تا ۷)
-//   DATE     : تاریخ آخرین bump به فرمت YYYY-MM-DD (برای اطمینان از پاک شدن کش)
-//
-// راهنما:
-//   - هر فاز برنامه ارتقا → PHASE + ۱
-//   - هر فیچر جدید → FEATURE + ۱ و PHASE = ۰
-//   - هر تغییر در ساختار داده → API + ۱ و بقیه صفر
-//   - تغییر بزرگ معماری → MAJOR + ۱ و بقیه صفر
-// ─────────────────────────────────────────────────────────────────────────────
 // تاریخچه:
 //   v1.0.0.0-2026-09-11 — نقطه شروع (baseline) قبل از برنامه ارتقا
-//   v1.0.0.1-2026-09-11 — فاز ۱: رفع باگ‌های بحرانی (saveTasks deep clone، idbPutAll guard)
-//   v1.0.0.2-2026-09-11 — فاز ۲: امنیت (CSP، SRI، sanitizeUrl، escapeHtml سریع)
-//   v1.0.0.3-2026-09-11 — فاز ۳: عملکرد (debounce، Task Index، cache allSessions، ترتیب منابع زمان)
-//   v1.0.0.4-2026-09-11 — فاز ۴: UX و دسترس‌پذیری (focus trap، مودال‌های سفارشی، Snackbar دقیق، Escape متمرکز)
-//   v1.1.0.0-2026-09-11 — فاز ۵-الف: Cascade Layers + Logical Properties + رفع باگ findTask
-//   v1.1.0.1-2026-09-11 — فاز ۵-ب: CSS Variables (Design Tokens) برای پشتیبانی از Light theme
-//   v1.1.1.0-2026-09-11 — فاز ۵-ج: دکمه‌های تغییر Theme (auto/dark/light) و Lang (fa/en)
-//   v1.1.2.0-2026-09-11 — فاز ۵-د: تقسیم CSS به ۶ فایل منطقی + دکمه‌های done-actions کنار هم
-//   v1.1.2.1-2026-09-12 — فاز ۶-ب: Refactor ESM + Vite + Vitest
-//   v1.2.0.0-2026-09-12 — فاز ۷: حذف کامل shim‌ها + refactor نهایی ESM + Vite build
-//   v1.2.0.1-2026-09-16 — فاز ۷-الف: حذف favicon.svg (۳MB) + پاکسازی ارجاع‌ها
-//   v1.2.0.2-2026-09-16 — فاز ۷-ب: افزودن جستجوی مکان با Nominatim (map-search.js) + دکمه میکروفن
-//   v1.3.0.0-2026-09-16 — فاز ۸: ردیابی آنلاین، حالت پیشرفته، بهبود چیدمان موبایل، رفع باگ‌ها
-//   v1.3.0.1-2026-09-16 — فاز ۸-الف: پیش‌بینی هوا با Open-Meteo (weather.js + weather-modal.js)
-//   v1.3.1.0-2026-09-17 — فیچر: آیکن وضعیت هوا روی کارت وظایف (با کش پایدار localStorage)
-//                          + تصحیحات فاز ۱+۲ (viewport-fit، structuredClone fallback، حذف taskIndex،
-//                            TTL برای cache جستجو، کلمپ endDate در weather، guard در weather-modal،
-//                            try/finally در location-ui، مخفی‌سازی route-summary در map-hidden،
-//                            رفع تکرار دکمه هوا، بازطراحی child-item، کاهش timeout زمان‌سنج)
-//   v1.4.0.0-2026-09-18 — فاز ۴ + فاز ۵ گام ۱:
-//                          - EventEmitter مرکزی (events.js)
-//                          - حذف registerCallbacks در app.js
-//                          - DueChipsManager جایگزین _dueHome
-//                          - incremental save در store.js
-//                          - render-diff برای کاهش DOM rebuilds
-//                          - setMapHelpers (رفع circular import)
-//                          - Export/Import JSON با schemaVersion
-//                          - صف تغییرات (pendingChanges) برای Cloudflare
+//   v1.0.0.1-2026-09-11 — فاز ۱: رفع باگ‌های بحرانی
+//   v1.0.0.2-2026-09-11 — فاز ۲: امنیت
+//   v1.0.0.3-2026-09-11 — فاز ۳: عملکرد
+//   v1.0.0.4-2026-09-11 — فاز ۴: UX و دسترس‌پذیری
+//   v1.1.0.0-2026-09-11 — فاز ۵-الف: Cascade Layers
+//   v1.1.0.1-2026-09-11 — فاز ۵-ب: Design Tokens
+//   v1.1.1.0-2026-09-11 — فاز ۵-ج: Theme/Lang
+//   v1.1.2.0-2026-09-11 — فاز ۵-د: تقسیم CSS
+//   v1.1.2.1-2026-09-12 — فاز ۶-ب: ESM + Vite + Vitest
+//   v1.2.0.0-2026-09-12 — فاز ۷: حذف کامل shim‌ها
+//   v1.2.0.1-2026-09-16 — فاز ۷-الف: حذف favicon.svg
+//   v1.2.0.2-2026-09-16 — فاز ۷-ب: جستجوی مکان با Nominatim
+//   v1.3.0.0-2026-09-16 — فاز ۸: ردیابی آنلاین، حالت پیشرفته
+//   v1.3.0.1-2026-09-16 — فاز ۸-الف: پیش‌بینی هوا
+//   v1.3.1.0-2026-09-17 — آیکن وضعیت هوا
+//   v1.4.0.0-2026-09-18 — فاز ۴ + فاز ۵ گام ۱
+//   v1.4.0.1-2026-09-18 — فاز ۵ گام ۳: یادآور صوتی سه‌حالته
+//   v1.4.0.2-2026-09-18 — فاز ۵ گام ۳-الف: انتقال فایل‌های صوتی به runtime cache
+//                          - حذف ogg از ASSETS اولیه (جلوگیری از باز شدن IDM در load)
+//                          - افزودن isAudioAsset + cache-first برای صداها
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.4.0.0-2026-09-18';
+const CACHE = 'rahefarda-v1.4.0.2-2026-09-18';
 
-// فایل‌ها بدون query-string (?v=N) کش می‌شوند.
-// networkFirst + ignoreSearch تضمین می‌کند همیشه نسخه درست لود شود:
-//  - آنلاین: از شبکه (با query جدید)
-//  - آفلاین: از کش (ignoreSearch نادیده می‌گیرد)
 const ASSETS = [
   './',
   './index.html',
@@ -74,6 +49,7 @@ const ASSETS = [
   './icons/apple-touch-icon.png',
   './icons/favicon-32.ico',
   './icons/favicon-96x96.png'
+  // ⚠️ فایل‌های صوتی اینجا نیستن — در runtime cache می‌آن
 ];
 
 self.addEventListener('notificationclick', e => {
@@ -98,7 +74,7 @@ self.addEventListener('install', e => {
           failed++;
         }
       }));
-      // اگر بیش از ۳۰٪ assetها fail شوند، نصب را fail کن تا کاربر با SW ناقص نماند.
+      // اگر بیش از ۳۰٪ assetها fail شوند، نصب را fail کن
       if (failed > ASSETS.length * 0.3) {
         throw new Error(`SW install failed: ${failed}/${ASSETS.length} assets could not be cached`);
       }
@@ -118,9 +94,12 @@ function isCodeAsset(request) {
   return request.destination === 'script' || request.destination === 'style' || /\.(?:js|css)$/i.test(new URL(request.url).pathname);
 }
 
+// ⚠️ فاز ۵ گام ۳-الف: تشخیص فایل صوتی
+function isAudioAsset(request) {
+  return /\.(?:ogg|mp3|wav|m4a)$/i.test(new URL(request.url).pathname);
+}
+
 // برای code assets: اول شبکه، اگر fail شد (آفلاین) از کش.
-// مهم: ابتدا exact match (با query)، سپس در صورت نبود، ignoreSearch.
-// این ترتیب از باگ «نسخه قدیمی CSS بعد از bump» جلوگیری می‌کند.
 function networkFirst(request) {
   return fetch(request).then(res => {
     if (res && res.ok) {
@@ -152,6 +131,22 @@ self.addEventListener('fetch', e => {
   }
   if (isCodeAsset(e.request)) {
     e.respondWith(networkFirst(e.request));
+    return;
+  }
+  // ⚠️ فایل‌های صوتی: cache-first
+  if (isAudioAsset(e.request)) {
+    e.respondWith(
+      caches.match(e.request).then(hit => {
+        if (hit) return hit;
+        return fetch(e.request).then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+          }
+          return res;
+        });
+      })
+    );
     return;
   }
   e.respondWith(

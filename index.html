@@ -92,7 +92,62 @@
                                 <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
                                 <div class="settings-row"><label><input type="checkbox" id="setRemindOn"> یادآور جلسات</label><label>چند دقیقه قبل؟ <select id="setRemindMin" class="sort-select"><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60" selected>۱ ساعت</option><option value="180">۳ ساعت</option><option value="1440">۱ روز</option></select></label></div>
                                 <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label></div>
-                                <div class="settings-row"><label><input type="checkbox" id="setSoundOn"> صدای یادآور</label><span class="settings-note">اعلان‌ها فقط برای یادآورهای فعلی استفاده می‌شوند.</span></div>
+
+                                <!-- ⚠️ فاز ۵ گام ۳: بخش صدای یادآور سه‌حالته -->
+                                <div class="settings-row">
+                                    <label><input type="checkbox" id="setSoundOn"> صدای یادآور (کلید اصلی)</label>
+                                    <span class="settings-note">اگر خاموش باشد، هیچ صدایی پخش نمی‌شود.</span>
+                                </div>
+
+                                <div class="sound-modes" id="soundModesWrap">
+                                    <!-- حالت ۱: ریتم پیش‌فرض -->
+                                    <div class="sound-mode">
+                                        <label class="sound-mode-toggle">
+                                            <input type="checkbox" id="setSoundDefault">
+                                            <span class="sound-mode-label">
+                                                <strong>🔔 ریتم پیش‌فرض</strong>
+                                                <small>دو نت ملایم با Web Audio API</small>
+                                            </span>
+                                        </label>
+                                        <button class="btn-small sound-test-btn" id="testSoundDefaultBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                    </div>
+
+                                    <!-- حالت ۲: ریتم‌های آماده -->
+                                    <div class="sound-mode">
+                                        <label class="sound-mode-toggle">
+                                            <input type="checkbox" id="setSoundPresetOn">
+                                            <span class="sound-mode-label">
+                                                <strong>🎵 ریتم آماده</strong>
+                                                <small>یک فایل صوتی از لیست زیر</small>
+                                            </span>
+                                        </label>
+                                        <button class="btn-small sound-test-btn" id="testSoundPresetBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                    </div>
+                                    <div class="settings-row sound-preset-select-row">
+                                        <label for="setSoundPreset">انتخاب ریتم:</label>
+                                        <select id="setSoundPreset" class="sort-select" aria-label="انتخاب ریتم آماده">
+                                            <option value="">— هیچ‌کدام —</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- حالت ۳: TTS -->
+                                    <div class="sound-mode">
+                                        <label class="sound-mode-toggle">
+                                            <input type="checkbox" id="setSoundTtsOn">
+                                            <span class="sound-mode-label">
+                                                <strong>🗣 خواندن عنوان (TTS)</strong>
+                                                <small>با speechSynthesis مرورگر</small>
+                                            </span>
+                                        </label>
+                                        <button class="btn-small sound-test-btn" id="testSoundTtsBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                    </div>
+                                    <div class="settings-row sound-preset-select-row" id="soundTtsVoiceRow" style="display: none;">
+                                        <label for="setSoundTtsVoice">انتخاب voice:</label>
+                                        <select id="setSoundTtsVoice" class="sort-select" aria-label="انتخاب voice">
+                                            <option value="">— پیش‌فرض مرورگر —</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </section>
                             <section class="settings-card settings-card-wide permissions-card" aria-labelledby="permissionsTitle">
                                 <h3 id="permissionsTitle">مجوزهای سیستم</h3>

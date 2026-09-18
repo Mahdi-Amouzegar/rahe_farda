@@ -2517,3 +2517,165 @@
         background: rgba(8, 145, 178, 0.06);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ فاز ۵ گام ۳: استایل صدای یادآور سه‌حالته
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer overrides {
+    /* ═══ Sound Modes Container ═══ */
+    .sound-modes {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    .sound-mode {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+        transition: border-color .16s ease, background .16s ease;
+    }
+
+    .sound-mode:hover {
+        border-color: var(--accent-cyan-border);
+        background: var(--bg-4);
+    }
+
+    /* ═══ Toggle (checkbox + label) ═══ */
+    .sound-mode-toggle {
+        flex: 1;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        min-width: 0;
+    }
+
+    .sound-mode-toggle input[type="checkbox"] {
+        flex: 0 0 auto;
+        margin-top: 3px;
+        accent-color: var(--accent-purple);
+        width: 18px;
+        height: 18px;
+    }
+
+    .sound-mode-label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .sound-mode-label strong {
+        color: var(--text-primary);
+        font-size: 0.88rem;
+        font-weight: 700;
+    }
+
+    .sound-mode-label small {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        line-height: 1.5;
+    }
+
+    /* ═══ Test Button ═══ */
+    .sound-test-btn {
+        flex: 0 0 auto;
+        min-width: 62px;
+        padding: 6px 12px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        border-color: var(--accent-cyan-border);
+        color: var(--accent-cyan);
+        background: var(--accent-cyan-soft);
+        transition: background .16s ease, border-color .16s ease, transform .16s ease;
+    }
+
+    .sound-test-btn:hover {
+        background: var(--accent-cyan-soft);
+        border-color: var(--accent-cyan);
+        transform: translateY(-1px);
+    }
+
+    .sound-test-btn:active {
+        transform: translateY(1px);
+    }
+
+    .sound-test-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* ═══ Select Row (preset/voice) ═══ */
+    .sound-preset-select-row {
+        margin-top: 0;
+        padding-inline-start: 34px;
+        gap: 8px;
+    }
+
+    .sound-preset-select-row label {
+        flex: 0 0 auto;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+
+    .sound-preset-select-row .sort-select {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+    }
+
+    /* ═══ حالت غیرفعال (وقتی master خاموش است) ═══ */
+    .sound-modes.is-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    /* ═══ Light theme overrides ═══ */
+    html.theme-light .sound-mode {
+        background: #ffffff;
+        border-color: #d8dde5;
+    }
+
+    html.theme-light .sound-mode:hover {
+        background: #f8fafc;
+        border-color: var(--accent-cyan);
+    }
+
+    html.theme-light .sound-test-btn {
+        background: var(--accent-cyan-soft);
+    }
+
+    /* ═══ Mobile ═══ */
+    @media (max-width: 600px) {
+        .sound-mode {
+            flex-wrap: wrap;
+        }
+
+        .sound-test-btn {
+            width: 100%;
+            min-height: 40px;
+        }
+
+        .sound-preset-select-row {
+            padding-inline-start: 0;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .sound-preset-select-row label {
+            margin-bottom: 4px;
+        }
+    }
+}

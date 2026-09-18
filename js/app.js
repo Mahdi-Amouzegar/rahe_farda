@@ -89,7 +89,13 @@ import {
 import {
     startReminderLoop,
     ensureNotifPerm,
-    fireNotification
+    fireNotification,
+    getSoundPresets,
+    getVoicesForLang,
+    ttsSupported,
+    testAudioReminder,
+    stopTts,
+    hasPersianTtsVoice
 } from './notify.js';
 import {
     openDetail,
@@ -1078,12 +1084,228 @@ function initSettings() {
     on.addEventListener('change', () => { state.prefs.remindOn = on.checked; savePrefs(); });
     mins.addEventListener('change', () => { state.prefs.remindMin = parseInt(mins.value, 10) || 60; savePrefs(); });
     dig.addEventListener('change', () => { state.prefs.digestOn = dig.checked; savePrefs(); });
-    const snd = document.getElementById('setSoundOn');
-    if (snd) {
-        snd.checked = state.prefs.soundOn !== false;
-        snd.addEventListener('change', () => { state.prefs.soundOn = snd.checked; savePrefs(); });
+
+    // ⚠️ فاز ۵ گام ۳: تنظیمات صدای یادآور سه‌حالته
+    initSoundSettings();
+
+    initSystemPermissions();
+}
+
+/**
+ * راه‌اندازی تنظیمات صدای یادآور سه‌حالته.
+ * این تابع از initSettings صدا زده می‌شود.
+ */
+function initSoundSettings() {
+    // ─── master switch ───
+    const master = document.getElementById('setSoundOn');
+    const modesWrap = document.getElementById('soundModesWrap');
+    const syncDisabledState = () => {
+        if (!modesWrap) return;
+        modesWrap.classList.toggle('is-disabled', master && !master.checked);
+    };
+    if (master) {
+        master.checked = state.prefs.soundOn !== false;
+        master.addEventListener('change', () => {
+            state.prefs.soundOn = master.checked;
+            savePrefs();
+            syncDisabledState();
+        });
     }
-  initSystemPermissions();
+    syncDisabledState();
+
+    // ─── حالت ۱: ریتم پیش‌فرض ───
+    const defCb = document.getElementById('setSoundDefault');
+    if (defCb) {
+        defCb.checked = state.prefs.soundDefault !== false;
+        defCb.addEventListener('change', () => {
+            state.prefs.soundDefault = defCb.checked;
+            savePrefs();
+        });
+    }
+    const defTest = document.getElementById('testSoundDefaultBtn');
+    if (defTest) {
+        defTest.addEventListener('click', () => {
+            const prev = state.prefs.soundDefault;
+            const prevPresetOn = state.prefs.soundPresetOn;
+            const prevTtsOn = state.prefs.soundTtsOn;
+            const prevSoundOn = state.prefs.soundOn;
+            state.prefs.soundOn = true;
+            state.prefs.soundDefault = true;
+            state.prefs.soundPresetOn = false;
+            state.prefs.soundTtsOn = false;
+            testAudioReminder();
+            state.prefs.soundDefault = prev;
+            state.prefs.soundPresetOn = prevPresetOn;
+            state.prefs.soundTtsOn = prevTtsOn;
+            state.prefs.soundOn = prevSoundOn;
+        });
+    }
+
+    // ─── حالت ۲: ریتم آماده ───
+    const presetCb = document.getElementById('setSoundPresetOn');
+    const presetSel = document.getElementById('setSoundPreset');
+    if (presetSel) {
+        const presets = getSoundPresets();
+        const current = state.prefs.soundPreset;
+        presetSel.innerHTML = '<option value="">— هیچ‌کدام —</option>' +
+            presets.map(p => `<option value="${escapeHtml(p.key)}"${p.key === current ? ' selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
+        presetSel.addEventListener('change', () => {
+            state.prefs.soundPreset = presetSel.value || null;
+            savePrefs();
+        });
+    }
+    if (presetCb) {
+        presetCb.checked = state.prefs.soundPresetOn === true;
+        presetCb.addEventListener('change', () => {
+            state.prefs.soundPresetOn = presetCb.checked;
+            savePrefs();
+        });
+    }
+    const presetTest = document.getElementById('testSoundPresetBtn');
+    if (presetTest) {
+        presetTest.addEventListener('click', () => {
+            if (!state.prefs.soundPreset) {
+                alert('اول یک ریتم از لیست انتخاب کنید.');
+                return;
+            }
+            const prev = state.prefs.soundDefault;
+            const prevPresetOn = state.prefs.soundPresetOn;
+            const prevTtsOn = state.prefs.soundTtsOn;
+            const prevSoundOn = state.prefs.soundOn;
+            state.prefs.soundOn = true;
+            state.prefs.soundDefault = false;
+            state.prefs.soundPresetOn = true;
+            state.prefs.soundTtsOn = false;
+            testAudioReminder();
+            state.prefs.soundDefault = prev;
+            state.prefs.soundPresetOn = prevPresetOn;
+            state.prefs.soundTtsOn = prevTtsOn;
+            state.prefs.soundOn = prevSoundOn;
+        });
+    }
+
+    // ─── حالت ۳: TTS ───
+    const ttsCb = document.getElementById('setSoundTtsOn');
+    const ttsVoiceRow = document.getElementById('soundTtsVoiceRow');
+    const ttsVoiceSel = document.getElementById('setSoundTtsVoice');
+    const ttsSupportedNow = ttsSupported();
+
+    // تعریف populateTtsVoices (function declaration → hoisted)
+    function populateTtsVoices(sel) {
+        if (!sel) return;
+        const voices = getVoicesForLang(state.prefs.lang);
+        const current = state.prefs.soundTtsVoice;
+        sel.innerHTML = '<option value="">— پیش‌فرض مرورگر —</option>' +
+            voices.map(v => {
+                const label = `${escapeHtml(v.name)} (${escapeHtml(v.lang)})`;
+                const selected = v.name === current ? ' selected' : '';
+                return `<option value="${escapeHtml(v.name)}"${selected}>${label}</option>`;
+            }).join('');
+    }
+
+    // هشدار نبود voice فارسی
+    function updateTtsWarning() {
+        const label = document.querySelector('#setSoundTtsOn')
+            ?.closest('.sound-mode')
+            ?.querySelector('small');
+        if (!label) return;
+        if (!ttsSupportedNow) return;
+        if (!hasPersianTtsVoice()) {
+            label.innerHTML =
+                '⚠️ voice فارسی در سیستم یافت نشد. ' +
+                'متن با voice انگلیسی خوانده می‌شود. ' +
+                '<a href="https://support.microsoft.com/en-us/windows/how-to-download-voices-for-text-to-speech-44883593-a2f2-9a6d-a1b6-2f7f8dc8ff2b" ' +
+                'target="_blank" rel="noopener">راهنمای نصب</a>';
+        } else {
+            label.textContent = 'با speechSynthesis مرورگر';
+        }
+    }
+    // اگه TTS پشتیبانی نمی‌شه، غیرفعال کن
+    if (!ttsSupportedNow) {
+        if (ttsCb) {
+            ttsCb.disabled = true;
+            const modeEl = ttsCb.closest('.sound-mode');
+            if (modeEl) {
+                const small = modeEl.querySelector('small');
+                if (small) small.textContent = 'مرورگر شما از TTS پشتیبانی نمی‌کند.';
+            }
+        }
+        if (ttsVoiceSel) ttsVoiceSel.disabled = true;
+    }
+
+    if (ttsCb) {
+        ttsCb.checked = state.prefs.soundTtsOn === true;
+        ttsCb.addEventListener('change', () => {
+            state.prefs.soundTtsOn = ttsCb.checked;
+            savePrefs();
+            if (!ttsCb.checked) {
+                stopTts();  // ⬅️ توقف فوری TTS
+            }
+            if (ttsCb.checked) {
+                if (!state.prefs.soundTtsVoice) {
+                    const voices = getVoicesForLang(state.prefs.lang);
+                    if (voices.length) {
+                        state.prefs.soundTtsVoice = voices[0].name;
+                        savePrefs();
+                        populateTtsVoices(ttsVoiceSel);
+                    }
+                }
+            }
+        });
+    }
+
+    if (ttsVoiceSel) {
+        populateTtsVoices(ttsVoiceSel);
+        ttsVoiceSel.addEventListener('change', () => {
+            state.prefs.soundTtsVoice = ttsVoiceSel.value || null;
+            savePrefs();
+        });
+    }
+
+    // به‌روزرسانی هشدار (اولیه)
+    updateTtsWarning();
+
+    // در Chrome، voiceها async لود می‌شن
+    if (ttsSupportedNow && typeof window.speechSynthesis !== 'undefined') {
+        try {
+            window.speechSynthesis.onvoiceschanged = () => {
+                populateTtsVoices(ttsVoiceSel);
+                updateTtsWarning();
+            };
+        } catch { /* silent */ }
+    }
+
+    // نمایش/پنهان کردن سطر انتخاب voice بر اساس چک‌باکس
+    const syncVoiceRowVisibility = () => {
+        if (!ttsVoiceRow || !ttsCb) return;
+        ttsVoiceRow.style.display = ttsCb.checked ? '' : 'none';
+    };
+    if (ttsCb) ttsCb.addEventListener('change', syncVoiceRowVisibility);
+    syncVoiceRowVisibility();
+
+    const ttsTest = document.getElementById('testSoundTtsBtn');
+    if (ttsTest) {
+        ttsTest.disabled = !ttsSupportedNow;
+        ttsTest.addEventListener('click', () => {
+            if (!ttsSupportedNow) {
+                alert('مرورگر شما از TTS پشتیبانی نمی‌کند.');
+                return;
+            }
+            const prev = state.prefs.soundDefault;
+            const prevPresetOn = state.prefs.soundPresetOn;
+            const prevTtsOn = state.prefs.soundTtsOn;
+            const prevSoundOn = state.prefs.soundOn;
+            state.prefs.soundOn = true;
+            state.prefs.soundDefault = false;
+            state.prefs.soundPresetOn = false;
+            state.prefs.soundTtsOn = true;
+            testAudioReminder('این یک آزمایش خواندن عنوان است');
+            state.prefs.soundDefault = prev;
+            state.prefs.soundPresetOn = prevPresetOn;
+            state.prefs.soundTtsOn = prevTtsOn;
+            state.prefs.soundOn = prevSoundOn;
+        });
+    }
 }
 
 async function queryPermission(name) {
