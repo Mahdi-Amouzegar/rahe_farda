@@ -354,6 +354,7 @@ function renderAuthModal() {
 
         <div class="auth-actions">
             <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">خروج از حساب</button>
+            <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="برای ورود با حساب تلگرام دیگر، ابتدا اتصال فعلی را قطع کنید">🔗 قطع اتصال از تلگرام</button>
         </div>
     `;
 
@@ -403,6 +404,23 @@ function renderAuthModal() {
                 applyTtlBtn.disabled = false;
                 applyTtlBtn.textContent = 'اعمال';
             }
+        });
+    }
+        // ─── دکمه‌ی «قطع اتصال از تلگرام» ───
+    // ⚠️ این دکمه برای کاربرانی است که می‌خواهند با حساب تلگرام دیگری وارد شوند.
+    //    session تلگرام را در سمت تلگرام پاک می‌کند (کاربر باید در صفحه‌ی
+    //    oauth.telegram.org دکمه‌ی Logout را بزند).
+    //    (طبق D-009 در DECISIONS.md)
+    const disconnectBtn = document.getElementById('authDisconnectBtn');
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener('click', () => {
+            const ok = window.confirm(
+                'برای قطع اتصال کامل از تلگرام، در صفحه‌ای که باز می‌شود روی دکمه‌ی «Log out» کلیک کنید.\n\n' +
+                'این کار برای زمانی است که می‌خواهید با حساب تلگرام دیگری وارد شوید.\n\n' +
+                'آیا به آن صفحه بروید؟'
+            );
+            if (!ok) return;
+            window.open('https://oauth.telegram.org/auth', '_blank', 'noopener,noreferrer');
         });
     }
 }

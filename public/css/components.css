@@ -2867,7 +2867,8 @@
     /* ═══ Auth Actions ═══ */
     .auth-actions {
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
         margin-top: 14px;
     }
 
@@ -2877,6 +2878,41 @@
         padding: 12px 18px;
         font-size: 0.9rem;
         font-weight: 700;
+    }
+
+    /* ⚠️ D-009: دکمه‌ی «قطع اتصال از تلگرام» */
+    .auth-disconnect-btn {
+        width: 100%;
+        margin: 8px 0 0;
+        padding: 10px 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        border-color: var(--border-subtle);
+        background: var(--bg-2);
+        transition: color .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .auth-disconnect-btn:hover {
+        color: var(--accent-yellow);
+        border-color: var(--accent-yellow-border);
+        background: var(--accent-yellow-soft);
+        box-shadow: 0 0 12px var(--accent-yellow-soft);
+    }
+
+    .auth-disconnect-btn:focus-visible {
+        outline: 2px solid var(--accent-yellow);
+        outline-offset: 2px;
+    }
+
+    html.theme-light .auth-disconnect-btn {
+        background: #ffffff;
+        border-color: #d8dde5;
+    }
+
+    html.theme-light .auth-disconnect-btn:hover {
+        background: rgba(217, 119, 6, 0.08);
+        border-color: var(--accent-yellow);
     }
 
     /* ═══ Account Status (تنظیمات) ═══ */
