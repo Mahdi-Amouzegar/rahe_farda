@@ -354,7 +354,7 @@ function renderAuthModal() {
 
         <div class="auth-actions">
             <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">خروج از حساب</button>
-            <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="برای ورود با حساب تلگرام دیگر، ابتدا اتصال فعلی را قطع کنید">🔗 قطع اتصال از تلگرام</button>
+                        <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="راهنمای ورود با حساب تلگرام دیگر">🔗 ورود با حساب تلگرام دیگر</button>
         </div>
     `;
 
@@ -406,30 +406,27 @@ function renderAuthModal() {
             }
         });
     }
-    // ─── دکمه‌ی «قطع اتصال از تلگرام» ───
-    // ⚠️ این دکمه برای کاربرانی است که می‌خواهند با حساب تلگرام دیگری وارد شوند.
-    //    session تلگرام را در سمت تلگرام پاک می‌کند (کاربر باید در صفحه‌ی
-    //    oauth.telegram.org دکمه‌ی Log out را بزند).
-    //    (طبق D-009 در DECISIONS.md)
+    // ─── دکمه‌ی «راهنمای ورود با حساب دیگر» ───
+    // ⚠️ طبق D-009: Telegram Login (Legacy Redirect-based) پارامتر رسمی
+    //    برای قطع session از سمت ما ندارد. پس فقط راهنمای متنی نشان می‌دهیم.
+    //    کاربر باید در اپ تلگرام session را Terminate کند.
     const disconnectBtn = document.getElementById('authDisconnectBtn');
     if (disconnectBtn) {
         disconnectBtn.addEventListener('click', async () => {
-            const ok = await showConfirmModal({
-                title: 'قطع اتصال از تلگرام',
-                message:
-                    'برای قطع اتصال کامل از تلگرام، در صفحه‌ای که باز می‌شود ' +
-                    'روی دکمه‌ی «Log out» کلیک کنید.\n\n' +
-                    'این کار برای زمانی است که می‌خواهید با حساب تلگرام دیگری وارد شوید.',
-                confirmText: 'باز کن',
-                cancelText: 'انصراف',
-                danger: false
+            await showInfoModal({
+                title: '🔗 ورود با حساب تلگرام دیگر',
+                paragraphs: [
+                    'برای ورود با حساب تلگرام دیگر، لطفاً این مراحل را انجام دهید:',
+                    '<strong>۱.</strong> در اپ تلگرام به <strong>Settings → Privacy and Security</strong> بروید.',
+                    '<strong>۲.</strong> بخش <strong>«Logged in with Telegram»</strong> (یا Active Sessions) را باز کنید.',
+                    '<strong>۳.</strong> session مربوط به <strong>rahe_farda_bot</strong> یا <strong>mahdi-amouzegar.github.io</strong> را پیدا کنید.',
+                    '<strong>۴.</strong> روی <strong>Terminate Session</strong> بزنید.',
+                    '<strong>۵.</strong> به راه فردا برگردید و «خروج از حساب» را بزنید.',
+                    '<strong>۶.</strong> سپس روی «ورود با حساب تلگرام» بزنید — این بار شماره‌ی جدید را می‌پرسد.',
+                    '<small style="color:var(--text-muted);">توجه: اگر فقط «خروج از حساب» بزنید، session تلگرام باقی می‌ماند و بار بعد بدون پرسیدن شماره وارد می‌شوید.</small>'
+                ],
+                buttonText: 'فهمیدم'
             });
-            if (!ok) return;
-
-            // ⚠️ نکته: Telegram Login URL بدون bot_id خطای «bot_id required» می‌دهد.
-            //    پس bot_id را در URL می‌گذاریم تا تلگرام صفحه‌ی session را نشان دهد.
-            const url = buildTelegramLoginUrl();
-            window.open(url, '_blank', 'noopener,noreferrer');
         });
     }
 }
