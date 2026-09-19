@@ -1993,6 +1993,7 @@
     }
 }
 
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LAYER: overrides
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2358,7 +2359,6 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ⚠️ فاز ۵ گام ۱: استایل Export/Import
-   این بخش در انتهای components.css اضافه شود.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer overrides {
@@ -2657,11 +2657,7 @@
         background: var(--accent-cyan-soft);
     }
 
-    /* ═══ Mobile ═══ */
-/* ═══════════════════════════════════════════════════════════════════════════
-   ⚠️ تنظیمات settings-trigger در موبایل
-   ═══════════════════════════════════════════════════════════════════════════ */
-
+    /* ═══ تنظیمات settings-trigger در موبایل ═══ */
     @media (max-width: 900px) {
         .settings-trigger {
             inset-block-start: 4px;
@@ -2669,7 +2665,7 @@
             width: 40px;
             height: 40px;
         }
-}
+    }
 
     @media (max-width: 600px) {
         .sound-mode {
@@ -2689,6 +2685,255 @@
 
         .sound-preset-select-row label {
             margin-bottom: 4px;
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ فاز ۶ گام ۲: استایل مودال «حساب من» + Telegram Login
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer overrides {
+    /* ═══ Auth Options (حالت وارد نشده) ═══ */
+    .auth-options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 14px 0;
+    }
+
+    .auth-option-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 48px;
+        padding: 12px 18px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .auth-option-btn--disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        position: relative;
+    }
+
+    .auth-option-btn--disabled:hover {
+        transform: none;
+    }
+
+    .auth-option-soon {
+        display: inline-block;
+        margin-inline-start: 6px;
+        padding: 2px 8px;
+        border-radius: var(--radius-pill);
+        background: var(--accent-yellow-soft);
+        border: 1px solid var(--accent-yellow-border);
+        color: var(--accent-yellow);
+        font-size: 0.68rem;
+        font-weight: 800;
+    }
+
+    /* ═══ Auth Hint / Note ═══ */
+    .auth-hint {
+        display: block;
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        line-height: 1.7;
+    }
+
+    .auth-note {
+        margin: 12px 0 0;
+        padding: 10px 12px;
+        border-inline-start: 3px solid var(--accent-cyan);
+        border-radius: var(--radius-sm);
+        background: var(--accent-cyan-soft);
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        line-height: 1.8;
+    }
+
+    /* ═══ Auth User Info (حالت وارد شده) ═══ */
+    .auth-user-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 14px 0;
+        padding: 12px 14px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--surface-soft);
+    }
+
+    .auth-user-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 0.86rem;
+        color: var(--text-muted);
+    }
+
+    .auth-user-row span {
+        flex: 0 0 auto;
+        font-weight: 600;
+    }
+
+    .auth-user-row strong {
+        flex: 1 1 auto;
+        text-align: end;
+        color: var(--text-primary);
+        font-weight: 700;
+        overflow-wrap: anywhere;
+    }
+
+    /* ═══ Auth TTL Block ═══ */
+    .auth-ttl-block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 14px 0;
+        padding: 12px 14px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--surface-soft);
+    }
+
+    .auth-ttl-label {
+        color: var(--text-secondary);
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .auth-ttl-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .auth-ttl-row .sort-select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .auth-ttl-row .btn-small {
+        flex: 0 0 auto;
+        min-height: 36px;
+        padding-inline: 16px;
+    }
+
+    .auth-remaining {
+        margin-top: 4px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--border-subtle);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .auth-remaining strong {
+        color: var(--accent-cyan);
+        font-weight: 700;
+    }
+
+    /* ═══ Auth Warning / Error ═══ */
+    .auth-warning {
+        margin: 12px 0;
+        padding: 10px 12px;
+        border-inline-start: 3px solid var(--accent-yellow);
+        border-radius: var(--radius-sm);
+        background: var(--accent-yellow-soft);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        line-height: 1.8;
+    }
+
+    .auth-error {
+        margin: 12px 0 0;
+        padding: 10px 12px;
+        border-inline-start: 3px solid var(--accent-pink);
+        border-radius: var(--radius-sm);
+        background: var(--accent-pink-soft);
+        color: var(--accent-pink);
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.8;
+    }
+
+    /* ═══ Auth Actions ═══ */
+    .auth-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 14px;
+    }
+
+    .auth-logout-btn {
+        width: 100%;
+        margin: 0;
+        padding: 12px 18px;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    /* ═══ Account Status (تنظیمات) ═══ */
+    .account-status {
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: var(--radius-pill);
+        white-space: nowrap;
+    }
+
+    .account-status.is-logged-out {
+        color: var(--text-muted);
+        background: var(--bg-4);
+        border: 1px solid var(--border-subtle);
+    }
+
+    .account-status.is-logged-in {
+        color: var(--accent-green);
+        background: var(--accent-green-soft);
+        border: 1px solid var(--accent-green-border);
+    }
+
+    /* ═══ Light theme overrides ═══ */
+    html.theme-light .auth-user-info,
+    html.theme-light .auth-ttl-block {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+
+    html.theme-light .auth-note {
+        background: rgba(8, 145, 178, 0.08);
+    }
+
+    html.theme-light .auth-warning {
+        background: rgba(217, 119, 6, 0.08);
+    }
+
+    /* ═══ Mobile ═══ */
+    @media (max-width: 600px) {
+        .auth-user-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+        }
+
+        .auth-user-row strong {
+            text-align: start;
+            width: 100%;
+        }
+
+        .auth-ttl-row {
+            flex-wrap: wrap;
+        }
+
+        .auth-ttl-row .btn-small {
+            flex: 1 1 100%;
         }
     }
 }

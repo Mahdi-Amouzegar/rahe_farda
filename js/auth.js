@@ -280,11 +280,16 @@ export function buildTelegramLoginUrl(returnTo) {
         ? (location.origin + location.pathname)
         : '');
 
+    // ⚠️ نکته: پارامتر `logout=1` باعث می‌شود تلگرام session قبلی را پاک
+    //    کند و کاربر مجبور شود دوباره شماره‌اش را وارد کند.
+    //    بدون این پارامتر، تلگرام ممکن است از session قبلی استفاده کند
+    //    و بدون پرسیدن شماره، دوباره کاربر را وارد کند.
     const params = new URLSearchParams({
         bot_id: TELEGRAM_BOT_ID,
         origin,
         return_to: finalReturnTo,
         request_access: 'write',
+        logout: '1',
     });
 
     return `${TELEGRAM_OAUTH_URL}?${params.toString()}`;
@@ -713,11 +718,50 @@ export function formatExpiry(expiresAt) {
     const days = daysUntilExpiry(expiresAt);
     if (!Number.isFinite(days)) return '—';
     if (days < 0) return 'منقضی شده';
-    if (days < 1) return 'کمتر از ۱ روز';
+    if (days < 1) {
+        const hours = Math.max(1, Math.floor(days * 24));
+        return `کمتر از ${toFa(hours)} ساعت`;
+    }
     if (days < 30) return `${toFa(Math.floor(days))} روز`;
-    if (days < 365) return `${toFa(Math.floor(days / 30))} ماه`;
-    return `${toFa(Math.floor(days / 365))} سال`;
+
+    // ─── برای بازه‌های بلندتر، هم ماه و هم روز را نشان بده ───
+    if (days < 365) {
+        const months = Math.floor(days / 30);
+        const remainingDays = Math.floor(days - months * 30);
+        if (remainingDays > 0) {
+            return `${toFa(months)} ماه و ${toFa(remainingDays)} روز`;
+        }
+        return `${toFa(months)} ماه`;
+    }
+
+    // ─── بیش از یک سال ───
+    const years = Math.floor(days / 365);
+    const remainingAfterYears = days - years * 365;
+    const months = Math.floor(remainingAfterYears / 30);
+    if (months > 0) {
+        return `${toFa(years)} سال و ${toFa(months)} ماه`;
+    }
+    return `${toFa(years)} سال`;
 }
+
+/**
+ * برچسب فارسی برای یک TTL به روز.
+ *
+ * @param {number} days — ۳۰، ۹۰، ۱۸۰، ۳۶۵
+ * @returns {string}
+ */
+export function ttlLabel(days) {
+    if (days === 30) return '۱ ماه';
+    if (days === 90) return '۳ ماه';
+    if (days === 180) return '۶ ماه';
+    if (days === 365) return '۱ سال';
+    return `${toFa(days)} روز`;
+}
+
+/**
+ * لیست مقادیر مجاز TTL (هماهنگ با ALLOWED_TTL_DAYS در Worker).
+ */
+export const ALLOWED_TTL_DAYS = [30, 90, 180, 365];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Init

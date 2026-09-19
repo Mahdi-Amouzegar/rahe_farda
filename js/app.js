@@ -159,7 +159,10 @@ import {
     logout as logoutAuth,
     getAuthState,
     getCurrentUser,
-    formatExpiry
+    formatExpiry,
+    refreshToken,
+    ttlLabel,
+    ALLOWED_TTL_DAYS
 } from './auth.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -262,6 +265,12 @@ function closeAuthModal() {
  * حالت ۱ (وارد نشده): دو دکمه — [ورود با تلگرام] فعال + [ورود با کد همگام‌سازی] غیرفعال
  * حالت ۲ (وارد شده): اطلاعات کاربر + دکمه‌ی خروج
  */
+/**
+ * رندر محتوای مودال بر اساس وضعیت auth.
+ *
+ * حالت ۱ (وارد نشده): دو دکمه — [ورود با تلگرام] فعال + [ورود با کد همگام‌سازی] غیرفعال
+ * حالت ۲ (وارد شده): اطلاعات کاربر + انتخاب TTL + زمان مانده دقیق + دکمه‌ی خروج
+ */
 function renderAuthModal() {
     const body = document.getElementById('authModalBody');
     if (!body) return;
@@ -292,12 +301,10 @@ function renderAuthModal() {
             <div class="auth-error" id="authError" style="display:none;" role="alert"></div>
         `;
 
-        // دکمه‌ی ورود با تلگرام
         const tgBtn = document.getElementById('authTelegramBtn');
         if (tgBtn) {
             tgBtn.addEventListener('click', () => {
                 const url = buildTelegramLoginUrl();
-                // ⚠️ Redirect به تلگرام — کاربر بعد از تأیید با پارامترها برمی‌گردد
                 window.location.href = url;
             });
         }
@@ -309,31 +316,93 @@ function renderAuthModal() {
     const displayName = user.displayName || 'کاربر';
     const username = user.telegramUsername ? `@${user.telegramUsername}` : '—';
     const expiryText = formatExpiry(auth.expiresAt);
+    const currentTtl = user.tokenTtlDays || 90;
     const warning = auth.shouldWarnExpiry
-        ? `<div class="auth-warning">⚠️ توکن شما به‌زودی منقضی می‌شود (${expiryText} باقی‌مانده). لطفاً دوباره وارد شوید.</div>`
+        ? `<div class="auth-warning">⚠️ توکن شما به‌زودی منقضی می‌شود (${expiryText} باقی‌مانده). لطفاً تمدید کنید.</div>`
         : '';
+
+    // ساخت dropdown TTL
+    const ttlOptionsHtml = ALLOWED_TTL_DAYS.map(d => {
+        const selected = (d === currentTtl) ? ' selected' : '';
+        return `<option value="${d}"${selected}>${ttlLabel(d)}</option>`;
+    }).join('');
 
     body.innerHTML = `
         <div class="auth-user-info">
             <div class="auth-user-row"><span>نام:</span> <strong>${escapeHtml(displayName)}</strong></div>
             <div class="auth-user-row"><span>نام کاربری:</span> <strong dir="ltr">${escapeHtml(username)}</strong></div>
-            <div class="auth-user-row"><span>اعتبار توکن:</span> <strong>${escapeHtml(expiryText)}</strong></div>
+        </div>
+
+        <div class="auth-ttl-block">
+            <label class="auth-ttl-label" for="authTtlSelect">مدت اعتبار توکن:</label>
+            <div class="auth-ttl-row">
+                <select id="authTtlSelect" class="sort-select" aria-label="انتخاب مدت اعتبار">
+                    ${ttlOptionsHtml}
+                </select>
+                <button type="button" class="btn-small" id="authApplyTtlBtn">اعمال</button>
+            </div>
+            <div class="auth-remaining">
+                ⏳ زمان باقی‌مانده: <strong>${escapeHtml(expiryText)}</strong>
+            </div>
+        </div>
+
+        <div class="auth-user-info">
             <div class="auth-user-row"><span>کد همگام‌سازی:</span> <strong>${user.hasSyncCode ? '✓ فعال' : '— در گام بعدی قابل ساخت'}</strong></div>
         </div>
+
         ${warning}
+
         <div class="auth-actions">
             <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">خروج از حساب</button>
         </div>
     `;
 
+    // ─── دکمه‌ی خروج با confirm modal سفارشی ───
     const logoutBtn = document.getElementById('authLogoutBtn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            const ok = window.confirm('از حساب خارج می‌شوید؟ داده‌های محلی شما حفظ می‌شود.');
+        logoutBtn.addEventListener('click', async () => {
+            const ok = await showConfirmModal({
+                title: 'خروج از حساب',
+                message: 'از حساب خارج می‌شوید؟ داده‌های محلی شما حفظ می‌شود.',
+                confirmText: 'خروج',
+                cancelText: 'انصراف',
+                danger: true
+            });
             if (!ok) return;
             logoutAuth();
             renderAuthModal();
             updateAccountStatusText();
+        });
+    }
+
+    // ─── دکمه‌ی اعمال TTL ───
+    const applyTtlBtn = document.getElementById('authApplyTtlBtn');
+    const ttlSelect = document.getElementById('authTtlSelect');
+    if (applyTtlBtn && ttlSelect) {
+        applyTtlBtn.addEventListener('click', async () => {
+            const newTtl = parseInt(ttlSelect.value, 10);
+            if (!Number.isFinite(newTtl)) return;
+            if (newTtl === currentTtl) {
+                // نیازی به تغییر نیست
+                return;
+            }
+            applyTtlBtn.disabled = true;
+            applyTtlBtn.textContent = '...';
+            try {
+                const result = await refreshToken({ tokenTtlDays: newTtl });
+                if (result.ok) {
+                    renderAuthModal();
+                    updateAccountStatusText();
+                } else {
+                    alert(result.error || 'خطا در تمدید توکن');
+                    applyTtlBtn.disabled = false;
+                    applyTtlBtn.textContent = 'اعمال';
+                }
+            } catch (err) {
+                alert('خطا در تمدید توکن');
+                applyTtlBtn.disabled = false;
+                applyTtlBtn.textContent = 'اعمال';
+            }
         });
     }
 }
