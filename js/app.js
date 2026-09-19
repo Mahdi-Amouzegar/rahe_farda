@@ -406,21 +406,30 @@ function renderAuthModal() {
             }
         });
     }
-        // ─── دکمه‌ی «قطع اتصال از تلگرام» ───
+    // ─── دکمه‌ی «قطع اتصال از تلگرام» ───
     // ⚠️ این دکمه برای کاربرانی است که می‌خواهند با حساب تلگرام دیگری وارد شوند.
     //    session تلگرام را در سمت تلگرام پاک می‌کند (کاربر باید در صفحه‌ی
-    //    oauth.telegram.org دکمه‌ی Logout را بزند).
+    //    oauth.telegram.org دکمه‌ی Log out را بزند).
     //    (طبق D-009 در DECISIONS.md)
     const disconnectBtn = document.getElementById('authDisconnectBtn');
     if (disconnectBtn) {
-        disconnectBtn.addEventListener('click', () => {
-            const ok = window.confirm(
-                'برای قطع اتصال کامل از تلگرام، در صفحه‌ای که باز می‌شود روی دکمه‌ی «Log out» کلیک کنید.\n\n' +
-                'این کار برای زمانی است که می‌خواهید با حساب تلگرام دیگری وارد شوید.\n\n' +
-                'آیا به آن صفحه بروید؟'
-            );
+        disconnectBtn.addEventListener('click', async () => {
+            const ok = await showConfirmModal({
+                title: 'قطع اتصال از تلگرام',
+                message:
+                    'برای قطع اتصال کامل از تلگرام، در صفحه‌ای که باز می‌شود ' +
+                    'روی دکمه‌ی «Log out» کلیک کنید.\n\n' +
+                    'این کار برای زمانی است که می‌خواهید با حساب تلگرام دیگری وارد شوید.',
+                confirmText: 'باز کن',
+                cancelText: 'انصراف',
+                danger: false
+            });
             if (!ok) return;
-            window.open('https://oauth.telegram.org/auth', '_blank', 'noopener,noreferrer');
+
+            // ⚠️ نکته: Telegram Login URL بدون bot_id خطای «bot_id required» می‌دهد.
+            //    پس bot_id را در URL می‌گذاریم تا تلگرام صفحه‌ی session را نشان دهد.
+            const url = buildTelegramLoginUrl();
+            window.open(url, '_blank', 'noopener,noreferrer');
         });
     }
 }
