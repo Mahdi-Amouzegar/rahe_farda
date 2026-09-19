@@ -3,7 +3,7 @@
 <html lang="fa" dir="rtl" data-lang="fa">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://api.open-meteo.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://unpkg.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com; connect-src 'self' https://unpkg.com https://worldtimeapi.org https://timeapi.io https://worldclockapi.com https://routing.openstreetmap.de https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://api.open-meteo.com https://*.workers.dev; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن. بدون حساب کاربری، حتی آفلاین.">
     <meta name="theme-color" content="#f0f3f8">
@@ -95,6 +95,20 @@
                                 <div class="settings-row"><span>استفاده روی دستگاه</span><button class="btn-small" id="installBtn" type="button" style="display: none;">⬇ نصب اپلیکیشن</button><span class="settings-note" id="installStatus">نصب از مرورگر در دسترس است</span></div>
                                 <div class="settings-row"><span>اطلاعات و داده‌ها</span><button class="btn-small" id="privacyBtn" type="button" title="حریم خصوصی شما">🔒 حریم خصوصی</button></div>
                                 <div class="settings-row"><span>پشتیبان‌گیری</span><button class="btn-small" id="exportBtn" type="button" title="ذخیره‌ی نسخه‌ی پشتیبان از داده‌ها">📤 پشتیبان‌گیری</button><button class="btn-small" id="importBtn" type="button" title="بازیابی از فایل پشتیبان">📥 بازیابی از پشتیبان</button></div>
+                            </section>
+                            <!-- ═══════════════════════════════════════════════════════════════
+                                 ⚠️ فاز ۶ گام ۲: کارت «حساب و همگام‌سازی»
+                                 ═══════════════════════════════════════════════════════════════ -->
+                            <section class="settings-card settings-card-wide" aria-labelledby="accountSettingsTitle">
+                                <h3 id="accountSettingsTitle">حساب و همگام‌سازی</h3>
+                                <div class="settings-row">
+                                    <span>وضعیت حساب</span>
+                                    <span class="account-status" id="accountStatusText" aria-live="polite">وارد نشده‌اید</span>
+                                    <button class="btn-small" id="authOpenBtn" type="button" aria-label="باز کردن مودال حساب کاربری">👤 حساب من</button>
+                                </div>
+                                <div class="settings-row">
+                                    <span class="settings-note">برای همگام‌سازی بین دستگاه‌ها، ابتدا با تلگرام وارد شوید. اطلاعات شما همچنان روی همین دستگاه می‌ماند.</span>
+                                </div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="reminderSettingsTitle">
                                 <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
@@ -619,6 +633,20 @@
                 <button class="btn-add picker-confirm" id="weatherModalOk" type="button">بستن</button>
             </div>
             <div class="weather-attribution">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ⚠️ فاز ۶ گام ۲: مودال «حساب من»
+         محتوای authModalBody به صورت داینامیک توسط app.js پر می‌شود.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="picker-overlay" id="authModal" style="display: none;">
+        <div class="picker" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+            <div class="picker-title" id="authModalTitle">👤 حساب من</div>
+            <div id="authModalBody"></div>
+            <div class="picker-actions">
+                <button class="btn-clear" id="authModalClose" type="button">بستن</button>
+            </div>
         </div>
     </div>
 

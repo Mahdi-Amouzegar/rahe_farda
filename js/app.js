@@ -1,12 +1,13 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// app.js -- event wiring + boot (ESM entry point) — فاز ۵ گام ۵
+// app.js -- event wiring + boot (ESM entry point) — فاز ۶ گام ۲
 //
 // ⚠️ این نسخه:
 //   - wireEvents() مستقیم برای همه listenerها
 //   - DueChipsManager جایگزین _dueHome
 //   - setMapHelpers (رفع circular import)
 //   - Export/Import
-//   - ⚠️ جدید: initNetworkMonitor, initSyncQueue, initHeaderStatus, initPWA
+//   - initNetworkMonitor, initSyncQueue, initHeaderStatus, initPWA
+//   - ⚠️ فاز ۶ گام ۲: initAuth, restoreSession, authModal (Telegram Redirect-based)
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -142,11 +143,24 @@ import { initMapSearch } from './map-search.js';
 import { bindWeatherModal } from './weather-modal.js';
 import { events, EV } from './events.js';
 
-// ⚠️ فاز ۵ گام ۵ — ماژول‌های جدید
+// ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
 import { initSyncQueue, getQueueSize as getSyncQueueSize } from './sync-queue.js';
 import { initPWA, updateBadge } from './pwa.js';
 import { initHeaderStatus, updateHeaderStatus } from './header-status.js';
+
+// ⚠️ فاز ۶ گام ۲ — احراز هویت (Redirect-based)
+import {
+    initAuth,
+    restoreSession,
+    handleTelegramRedirect,
+    buildTelegramLoginUrl,
+    loginWithTelegram,
+    logout as logoutAuth,
+    getAuthState,
+    getCurrentUser,
+    formatExpiry
+} from './auth.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DueChipsManager — جایگزین _dueHome
@@ -210,6 +224,143 @@ class DueChipsManager {
 const dueChipsManager = new DueChipsManager();
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Auth Modal — فاز ۶ گام ۲ (Redirect-based)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _authTrapCleanup = null;
+
+/**
+ * باز کردن مودال «حساب من».
+ */
+function openAuthModal() {
+    const modal = document.getElementById('authModal');
+    if (!modal) return;
+
+    renderAuthModal();
+
+    modal.style.display = 'flex';
+    if (_authTrapCleanup) _authTrapCleanup();
+    _authTrapCleanup = trapFocus(modal);
+    setTimeout(() => document.getElementById('authModalClose')?.focus(), 60);
+}
+
+/**
+ * بستن مودال «حساب من».
+ */
+function closeAuthModal() {
+    if (_authTrapCleanup) {
+        _authTrapCleanup();
+        _authTrapCleanup = null;
+    }
+    const modal = document.getElementById('authModal');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * رندر محتوای مودال بر اساس وضعیت auth.
+ *
+ * حالت ۱ (وارد نشده): دو دکمه — [ورود با تلگرام] فعال + [ورود با کد همگام‌سازی] غیرفعال
+ * حالت ۲ (وارد شده): اطلاعات کاربر + دکمه‌ی خروج
+ */
+function renderAuthModal() {
+    const body = document.getElementById('authModalBody');
+    if (!body) return;
+
+    const auth = getAuthState();
+
+    if (!auth.loggedIn) {
+        // ─── حالت ۱: وارد نشده ───
+        body.innerHTML = `
+            <p class="modal-message">
+                برای همگام‌سازی بین دستگاه‌ها، یکی از روش‌های زیر را انتخاب کنید.
+                <br><small class="auth-hint">اطلاعات شما همچنان روی همین دستگاه می‌ماند. همگام‌سازی به‌صورت پیش‌فرض خاموش است.</small>
+            </p>
+            <div class="auth-options">
+                <button type="button" class="btn-add auth-option-btn" id="authTelegramBtn">
+                    <span aria-hidden="true">📱</span>
+                    <span>ورود با حساب تلگرام</span>
+                </button>
+                <button type="button" class="btn-small auth-option-btn auth-option-btn--disabled" id="authSyncCodeBtn" disabled aria-disabled="true" title="به‌زودی در گام بعدی فعال می‌شود">
+                    <span aria-hidden="true">🔑</span>
+                    <span>ورود با کد همگام‌سازی</span>
+                    <small class="auth-option-soon">به‌زودی</small>
+                </button>
+            </div>
+            <p class="auth-note">
+                💡 کد همگام‌سازی برای ورود سریع در دستگاه‌های بعدی است و پس از اولین ورود با تلگرام در دسترس قرار می‌گیرد.
+            </p>
+            <div class="auth-error" id="authError" style="display:none;" role="alert"></div>
+        `;
+
+        // دکمه‌ی ورود با تلگرام
+        const tgBtn = document.getElementById('authTelegramBtn');
+        if (tgBtn) {
+            tgBtn.addEventListener('click', () => {
+                const url = buildTelegramLoginUrl();
+                // ⚠️ Redirect به تلگرام — کاربر بعد از تأیید با پارامترها برمی‌گردد
+                window.location.href = url;
+            });
+        }
+        return;
+    }
+
+    // ─── حالت ۲: وارد شده ───
+    const user = auth.user || {};
+    const displayName = user.displayName || 'کاربر';
+    const username = user.telegramUsername ? `@${user.telegramUsername}` : '—';
+    const expiryText = formatExpiry(auth.expiresAt);
+    const warning = auth.shouldWarnExpiry
+        ? `<div class="auth-warning">⚠️ توکن شما به‌زودی منقضی می‌شود (${expiryText} باقی‌مانده). لطفاً دوباره وارد شوید.</div>`
+        : '';
+
+    body.innerHTML = `
+        <div class="auth-user-info">
+            <div class="auth-user-row"><span>نام:</span> <strong>${escapeHtml(displayName)}</strong></div>
+            <div class="auth-user-row"><span>نام کاربری:</span> <strong dir="ltr">${escapeHtml(username)}</strong></div>
+            <div class="auth-user-row"><span>اعتبار توکن:</span> <strong>${escapeHtml(expiryText)}</strong></div>
+            <div class="auth-user-row"><span>کد همگام‌سازی:</span> <strong>${user.hasSyncCode ? '✓ فعال' : '— در گام بعدی قابل ساخت'}</strong></div>
+        </div>
+        ${warning}
+        <div class="auth-actions">
+            <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">خروج از حساب</button>
+        </div>
+    `;
+
+    const logoutBtn = document.getElementById('authLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            const ok = window.confirm('از حساب خارج می‌شوید؟ داده‌های محلی شما حفظ می‌شود.');
+            if (!ok) return;
+            logoutAuth();
+            renderAuthModal();
+            updateAccountStatusText();
+        });
+    }
+}
+
+/**
+ * آپدیت متن وضعیت حساب در تنظیمات.
+ */
+function updateAccountStatusText() {
+    const el = document.getElementById('accountStatusText');
+    if (!el) return;
+
+    const auth = getAuthState();
+    if (!auth.loggedIn) {
+        el.textContent = 'وارد نشده‌اید';
+        el.classList.remove('is-logged-in');
+        el.classList.add('is-logged-out');
+        return;
+    }
+
+    const user = auth.user || {};
+    const name = user.displayName || 'کاربر';
+    el.textContent = `وارد شده‌اید — ${name}`;
+    el.classList.remove('is-logged-out');
+    el.classList.add('is-logged-in');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // wireEvents
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -243,9 +394,28 @@ function wireEvents() {
         else if (action === 'new-series') setKind('series');
     });
 
-    // ⚠️ فاز ۵: کلیک روی نشانگر (فاز ۶ modal باز می‌کند)
+    // ⚠️ فاز ۵: کلیک روی نشانگر وضعیت
     events.on('header-status:clicked', () => {
         // فعلاً: هیچ‌کاری — در فاز ۶ می‌تواند modal باز کند
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠️ فاز ۶ گام ۲: listenerهای auth
+    // ═══════════════════════════════════════════════════════════════════════
+    events.on('auth:login', () => {
+        updateAccountStatusText();
+    });
+    events.on('auth:logout', () => {
+        updateAccountStatusText();
+    });
+    events.on('auth:token-refreshed', () => {
+        updateAccountStatusText();
+    });
+    events.on('auth:expired', () => {
+        updateAccountStatusText();
+    });
+    events.on('auth:error', ({ message }) => {
+        console.warn('[auth]', message);
     });
 }
 
@@ -625,6 +795,8 @@ function toggleSettings(force) {
         settingsTrapCleanup?.();
         settingsTrapCleanup = trapFocus(settingsModal);
         setTimeout(() => settingsCloseBtn?.focus(), 60);
+        // ⚠️ فاز ۶ گام ۲: آپدیت وضعیت حساب هنگام باز شدن
+        updateAccountStatusText();
     } else {
         settingsTrapCleanup?.();
         settingsTrapCleanup = null;
@@ -636,6 +808,19 @@ settingsBtn?.addEventListener('click', () => toggleSettings());
 settingsCloseBtn?.addEventListener('click', () => toggleSettings(false));
 settingsModal?.addEventListener('click', event => {
     if (event.target === settingsModal) toggleSettings(false);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ فاز ۶ گام ۲: حساب من — دکمه و مودال
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById('authOpenBtn')?.addEventListener('click', () => {
+    // بستن تنظیمات و باز کردن مودال auth
+    toggleSettings(false);
+    setTimeout(() => openAuthModal(), 100);
+});
+document.getElementById('authModalClose')?.addEventListener('click', closeAuthModal);
+document.getElementById('authModal')?.addEventListener('click', e => {
+    if (e.target.id === 'authModal') closeAuthModal();
 });
 
 document.getElementById('heroDescToggle').addEventListener('click', async () => {
@@ -665,6 +850,7 @@ document.getElementById('privacyBtn').addEventListener('click', async () => {
             '<strong>همگام‌سازی زمان</strong> با سرورهای عمومی (timeapi.io، worldclockapi.com) فقط برای اصلاح ساعت دستگاه است و هیچ اطلاعاتی ارسال نمی‌کند.',
             '<strong>پیش‌بینی هوا</strong> از Open-Meteo دریافت می‌شود و فقط مختصات مکان و تاریخ درخواست را می‌فرستد. هیچ اطلاعاتی از وظایف شما ارسال نمی‌شود.',
             '<strong>نام مکان</strong> با Nominatim (OpenStreetMap) دریافت می‌شود؛ فقط مختصات ارسال می‌شود و نام شهر برگردانده می‌شود.',
+            '<strong>ورود با تلگرام</strong> فقط برای همگام‌سازی اختیاری است. اگر وارد نشوید، هیچ اطلاعاتی به سرور ارسال نمی‌شود.',
             '<strong>پشتیبان‌گیری:</strong> از دکمه‌ی «📤 پشتیبان‌گیری» در تنظیمات می‌توانید یک فایل JSON بسازید.',
             'برای پاک کردن کامل داده‌ها، از سطل زباله استفاده کنید یا داده‌های سایت را از تنظیمات مرورگر حذف کنید.'
         ],
@@ -1462,6 +1648,10 @@ document.addEventListener('keydown', e => {
     if (exportModal && exportModal.style.display === 'flex') { closeExportModal(); return; }
     if (importModal && importModal.style.display === 'flex') { closeImportModal(); return; }
 
+    // ⚠️ فاز ۶: بستن مودال auth با Escape
+    const authModal = document.getElementById('authModal');
+    if (authModal && authModal.style.display === 'flex') { closeAuthModal(); return; }
+
     const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal', 'weatherModal'];
     for (const id of stacked) {
         const el = document.getElementById(id);
@@ -1885,6 +2075,9 @@ initSyncQueue();
 initHeaderStatus();
 initPWA();
 
+// ⚠️ فاز ۶ گام ۲: راه‌اندازی auth
+initAuth();
+
 // ⚠️ loadPendingChanges دیگر لازم نیست — initSyncQueue کار می‌کند
 // اما برای سازگاری نگه داشته شده:
 loadPendingChanges();
@@ -1910,6 +2103,9 @@ applyMapVisibility();
 applyDisplaySettings();
 applyProMode();
 
+// ⚠️ فاز ۶ گام ۲: آپدیت وضعیت حساب در UI
+updateAccountStatusText();
+
 attachSmartSuggest(input, 'taskInput');
 attachSmartSuggest(document.getElementById('descInput'), 'descInput');
 
@@ -1926,9 +2122,34 @@ loadTasks().then(async () => {
     startReminderLoop();
     bindWeatherModal();
 
+    // ⚠️ فاز ۶ گام ۲: پردازش callback تلگرام (اگر از oauth.telegram.org برگشتیم)
+    try {
+        const handled = await handleTelegramRedirect();
+        if (handled.handled) {
+            if (handled.ok) {
+                console.log('[auth] Telegram redirect handled successfully');
+            } else {
+                console.warn('[auth] Telegram redirect failed:', handled.error);
+            }
+        }
+    } catch (err) {
+        console.warn('[auth] handleTelegramRedirect failed:', err);
+    }
+
+    // ⚠️ فاز ۶ گام ۲: بازیابی session (اگر توکن قبلی داریم)
+    try {
+        const restored = await restoreSession();
+        if (restored.restored) {
+            console.log('[auth] session restored for user:', restored.user?.id);
+        }
+    } catch (err) {
+        console.warn('[auth] restoreSession failed:', err);
+    }
+
     // ⚠️ فاز ۵: به‌روزرسانی badge بعد از load
     updateBadge({ immediate: true });
     updateHeaderStatus({ immediate: true });
+    updateAccountStatusText();
 });
 
 if (import.meta.env.DEV) {
