@@ -86,7 +86,7 @@ const EXPIRY_WARNING_DAYS = 3;
  */
 const TELEGRAM_CALLBACK_PARAMS = [
     'id', 'first_name', 'last_name', 'username',
-    'photo_url', 'auth_date', 'hash'
+    'photo_url', 'auth_date', 'hash', 'tgAuthResult'
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -302,9 +302,56 @@ export function buildTelegramLoginUrl(returnTo) {
 export function parseTelegramCallbackParams(url) {
     if (typeof location === 'undefined' && !url) return null;
 
+    const finalUrl = url || location.href;
+
+    // ─── روش ۱: hash با فرمت tgAuthResult=<base64_json> ───
+    // تلگرام در برخی پیاده‌سازی‌های Login URL، داده را در hash می‌فرستد
+    // به شکل: #tgAuthResult=<base64-encoded-json>
+    const hashMatch = finalUrl.match(/[#&]tgAuthResult=([A-Za-z0-9_\-+/=]+)/);
+    if (hashMatch) {
+        try {
+            // base64url → base64 → decode
+            let b64 = hashMatch[1].replace(/-/g, '+').replace(/_/g, '/');
+            // padding
+            while (b64.length % 4 !== 0) b64 += '=';
+            // atob → bytes → utf-8
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const json = new TextDecoder('utf-8').decode(bytes);
+            const parsed = JSON.parse(json);
+
+            if (!parsed || typeof parsed !== 'object') return null;
+            if (!parsed.hash || !parsed.auth_date) return null;
+
+            const id = Number(parsed.id);
+            const authDate = Number(parsed.auth_date);
+            if (!Number.isFinite(id) || !Number.isFinite(authDate)) return null;
+
+            const payload = {
+                id,
+                auth_date: authDate,
+                hash: String(parsed.hash),
+            };
+            if (parsed.first_name) payload.first_name = String(parsed.first_name);
+            if (parsed.last_name) payload.last_name = String(parsed.last_name);
+            if (parsed.username) payload.username = String(parsed.username);
+            if (parsed.photo_url) payload.photo_url = String(parsed.photo_url);
+
+            return payload;
+        } catch (err) {
+            console.warn('[auth] Failed to parse tgAuthResult hash:', err);
+            return null;
+        }
+    }
+
+    // ─── روش ۲: query string با پارامترهای تکی ───
+    // (روش کلاسیک Telegram Login Widget)
     let urlObj;
     try {
-        urlObj = new URL(url || location.href);
+        urlObj = new URL(finalUrl);
     } catch {
         return null;
     }
@@ -345,14 +392,24 @@ export function cleanTelegramParamsFromUrl() {
     try {
         const url = new URL(location.href);
         let changed = false;
+
+        // ─── پاک کردن query params ───
         for (const key of TELEGRAM_CALLBACK_PARAMS) {
             if (url.searchParams.has(key)) {
                 url.searchParams.delete(key);
                 changed = true;
             }
         }
+
+        // ─── پاک کردن hash (اگر tgAuthResult دارد) ───
+        let cleanHash = url.hash;
+        if (cleanHash && /tgAuthResult=/.test(cleanHash)) {
+            cleanHash = '';
+            changed = true;
+        }
+
         if (changed) {
-            const clean = url.pathname + (url.search ? url.search : '') + url.hash;
+            const clean = url.pathname + (url.search ? url.search : '') + cleanHash;
             history.replaceState({}, '', clean);
         }
     } catch { /* silent */ }
