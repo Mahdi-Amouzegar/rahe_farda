@@ -31,8 +31,12 @@
 //                          - handler برای periodicsync
 //                          - handler برای sync (Background Sync)
 //                          - پیام‌های SW ↔ main thread (شروع)
+//   v1.5.1.0-2026-09-19 — فاز ۶ گام ۲: Telegram Login UI + auth modal
+//                          - js/auth.js (کامل)
+//                          - js/app.js (renderAuthModal + TTL dropdown)
+//                          - public/css/components.css (استایل‌های auth)
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE = 'rahefarda-v1.5.0.0-2026-09-18';
+const CACHE = 'rahefarda-v1.5.1.0-2026-09-19';
 
 const ASSETS = [
   './',

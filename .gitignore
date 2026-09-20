@@ -44,3 +44,7 @@ worker/dist/
 # Worker (در ریپوی جداگانه: rahe-farda-worker)
 worker/
 dist/
+
+# اسناد معماری (local only — آپلود نمی‌شن)
+ARCHITECTURE_*.md
+PHASES*.md
