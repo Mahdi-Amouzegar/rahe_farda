@@ -48,3 +48,4 @@ dist/
 # اسناد معماری (local only — آپلود نمی‌شن)
 ARCHITECTURE_*.md
 PHASES*.md
+CHANGELOG.md
