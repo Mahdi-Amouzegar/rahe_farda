@@ -24,6 +24,39 @@ import {
     getQueue as getSyncQueue,
     clearQueue as clearSyncQueue
 } from './sync-queue.js';
+import {
+    enqueueUpload as enqueueMediaUpload,
+} from './media-upload.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ثابت‌های Media (Stage D)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ چرا این‌ها اینجا تعریف می‌شوند؟
+//   - media.js تابع‌های پردازش را دارد، ولی ثابت‌های محدودیت اینجا لازم است
+//   - جلوگیری از circular import (media.js از store.js import نمی‌کند)
+//   - مقادیر باید با media.js هم‌خوانی داشته باشند
+
+/**
+ * حداکثر تعداد عکس در هر task.
+ * ⚠️ باید با MEDIA_LIMITS.MAX_MEDIA_PER_TASK در Worker هم‌خوان باشد.
+ */
+const MAX_PHOTOS_PER_TASK = 8;
+
+/**
+ * حداکثر طول dataUrl در IndexedDB.
+ *
+ * ⚠️ در Stage D، عکس‌ها هنوز به ParsPack نمی‌روند.
+ *    به‌جای آن، dataUrl در photos[].dataUrl ذخیره می‌شود.
+ *
+ * ⚠️ محاسبه: یک dataUrl base64 حدود ۱.۳۳ برابر حجم اصلی است.
+ *    اگر عکس اصلی تا ۵MB باشد (ورودی)، dataUrl تا ۶.۷MB می‌شود.
+ *    عدد ۱۰MB سقف امن است (کمی محافظه‌کارانه).
+ *
+ * ⚠️ در Stage E، photos[].dataUrl با mediaIds[] جایگزین می‌شود
+ *    و این محدودیت بی‌معنی می‌شود.
+ */
+const MAX_PHOTO_DATAURL_LENGTH = 10 * 1024 * 1024; // 10MB
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Map helpers — set by app.js during boot
@@ -87,7 +120,14 @@ function invoke(name, ...args) {
 const IDB_NAME = 'spaceTodoDB';
 const IDB_STORE = 'tasks';
 const IDB_TRASH = 'trash';
-const IDB_VERSION = 3;
+/**
+ * ⚠️ تاریخچه:
+ *   ۱ → فقط tasks
+ *   ۲ → + trash
+ *   ۳ → + sync_queue
+ *   ۴ → + media_uploads (Stage E)
+ */
+const IDB_VERSION = 4;
 const useIDB = typeof indexedDB !== 'undefined';
 let idbPromise = null;
 
@@ -110,6 +150,14 @@ function idbOpen() {
                     const syncStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
                     syncStore.createIndex('status', 'status', { unique: false });
                     syncStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
+                // ⚠️ Stage E: اضافه‌کردن media_uploads به onupgradeneeded
+                // (تا اگر store.js اول باز کند، media_uploads هم ساخته شود)
+                if (!db.objectStoreNames.contains('media_uploads')) {
+                    const mediaStore = db.createObjectStore('media_uploads', { keyPath: 'mediaId' });
+                    mediaStore.createIndex('status', 'status', { unique: false });
+                    mediaStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    mediaStore.createIndex('taskId', 'taskId', { unique: false });
                 }
             };
             req.onsuccess = () => resolve(req.result);
@@ -270,9 +318,37 @@ export function sanitizeTask(t) {
         recurDays: Array.isArray(t.recurDays) ? [...new Set(t.recurDays.map(x => Math.floor(+x)).filter(x => x >= 0 && x <= 31))].slice(0, 31) : [],
         archived: Boolean(t.archived),
         photos: Array.isArray(t.photos) ? t.photos
-            .filter(p => p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image') && p.dataUrl.length < 1500000)
-            .slice(0, 8)
-            .map(p => ({ id: typeof p.id !== 'undefined' ? p.id : uid(), dataUrl: p.dataUrl, addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString() }))
+            .filter(p => p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image') && p.dataUrl.length < MAX_PHOTO_DATAURL_LENGTH)
+            .slice(0, MAX_PHOTOS_PER_TASK)
+            .map(p => {
+                const out = {
+                    id: typeof p.id !== 'undefined' ? p.id : uid(),
+                    dataUrl: p.dataUrl,
+                    addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString(),
+                };
+                // ⚠️ فیلدهای Stage D (اختیاری)
+                if (typeof p.contentType === 'string') out.contentType = p.contentType;
+                if (Number.isFinite(+p.sizeBytes)) out.sizeBytes = Math.floor(+p.sizeBytes);
+                if (Number.isFinite(+p.width)) out.width = Math.floor(+p.width);
+                if (Number.isFinite(+p.height)) out.height = Math.floor(+p.height);
+                return out;
+            })
+            : [],
+        /**
+         * ⚠️ Stage E: mediaIds — اشاره به media_objects در D1.
+         *
+         * این آرایه، شناسه‌های عکس‌های آپلودشده در سرور است.
+         * در Stage E، موازی با photos.dataUrl نگه داشته می‌شود.
+         * در مرحله‌ی بعدی (پس از Stage E)، photos.dataUrl حذف می‌شود
+         * و فقط mediaIds می‌ماند.
+         *
+         * ⚠️ قاعده: هر mediaId باید UUID معتبر باشد.
+         * ⚠️ حداکثر MAX_PHOTOS_PER_TASK (۸).
+         */
+        mediaIds: Array.isArray(t.mediaIds)
+            ? t.mediaIds
+                .filter(id => typeof id === 'string' && id.length > 0 && id.length < 100)
+                .slice(0, MAX_PHOTOS_PER_TASK)
             : [],
         location: validLoc(t.location)
     };
@@ -444,6 +520,13 @@ async function saveTaskAndEnqueue(task, parent) {
         tx.oncomplete = () => {
             events.emit(EV.TASK_SAVED, { task, parent: parent || null });
             events.emit(EV.SYNC_ENQUEUED, { op });
+
+            // ⚠️ Stage E: enqueue عکس‌های آپلودنشده در صف media
+            // (اگر task عکس‌های جدید دارد که هنوز mediaId ندارند)
+            enqueueNewPhotosForTask(target).catch(err => {
+                console.warn('[store] enqueueNewPhotosForTask failed:', err);
+            });
+
             resolve();
         };
         tx.onerror = () => {
@@ -453,6 +536,69 @@ async function saveTaskAndEnqueue(task, parent) {
     });
 }
 
+/**
+ * ⚠️ Stage E: افزودن عکس‌های جدید (که هنوز mediaId ندارند) به صف آپلود.
+ *
+ * این تابع:
+ *   1. عکس‌های task که dataUrl دارند ولی هنوز در media_uploads نیستند را می‌گیرد
+ *   2. برای هرکدام یک upload record می‌سازد
+ *
+ * ⚠️ این تابع async است ولی await نمی‌شود (fire-and-forget).
+ *
+ * ⚠️ Blob: برای ساخت Blob از dataUrl، از fetch استفاده می‌کنیم.
+ *    این در همه‌ی مرورگرهای مدرن کار می‌کند.
+ *
+ * @param {object} task
+ */
+async function enqueueNewPhotosForTask(task) {
+    if (!task || !Array.isArray(task.photos) || task.photos.length === 0) {
+        return;
+    }
+    if (!state.sync.enabled || !state.sync.authToken) {
+        // ─── اگر auth فعال نیست، هیچ کاری نمی‌کنیم ───
+        // در این حالت، عکس‌ها فقط لوکال می‌مانند.
+        return;
+    }
+
+    // ─── گرفتن mediaIdهای فعلی task ───
+    const existingMediaIds = new Set(
+        Array.isArray(task.mediaIds) ? task.mediaIds : []
+    );
+
+    for (const photo of task.photos) {
+        // ⚠️ اگر photo.id قبلاً در mediaIds است، رد کن
+        if (existingMediaIds.has(photo.id)) continue;
+        if (!photo.id || !photo.dataUrl) continue;
+        if (typeof photo.contentType !== 'string' || typeof photo.sizeBytes !== 'number') {
+            // ⚠️ عکس‌های قدیمی (Stage D) بدون contentType/sizeBytes
+            // نمی‌توانند آپلود شوند. باید دوباره پردازش شوند.
+            continue;
+        }
+
+        // ─── تبدیل dataUrl به Blob ───
+        let blob;
+        try {
+            const res = await fetch(photo.dataUrl);
+            blob = await res.blob();
+        } catch (err) {
+            console.warn('[store] failed to convert dataUrl to blob:', err);
+            continue;
+        }
+
+        // ─── enqueue در media-upload ───
+        try {
+            await enqueueMediaUpload({
+                mediaId: photo.id,
+                taskId: task.id,
+                contentType: photo.contentType,
+                sizeBytes: photo.sizeBytes,
+                blob,
+            });
+        } catch (err) {
+            console.warn('[store] enqueueMediaUpload failed:', err);
+        }
+    }
+}
 export function saveTask(task, parent) {
     if (!task || typeof task.id === 'undefined') {
         return Promise.reject(new Error('saveTask: invalid task'));

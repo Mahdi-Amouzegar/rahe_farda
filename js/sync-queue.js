@@ -38,8 +38,16 @@ const IDB_NAME = 'spaceTodoDB';
 /** نام object store برای صف sync */
 const IDB_SYNC_QUEUE = 'sync_queue';
 
-/** نسخه‌ی IDB (باید هم‌خوان با store.js باشد) */
-const IDB_VERSION = 3;
+/**
+ * نسخه‌ی IDB (باید هم‌خوان با store.js و media-upload.js باشد).
+ *
+ * ⚠️ تاریخچه:
+ *   ۱ → فقط tasks
+ *   ۲ → + trash
+ *   ۳ → + sync_queue
+ *   ۴ → + media_uploads (Stage E)
+ */
+const IDB_VERSION = 4;
 
 /** حداکثر تعداد op در صف (جلوگیری از پر شدن IDB) */
 const MAX_QUEUE_SIZE = 1000;
@@ -133,6 +141,15 @@ function openDb() {
                 const store = db.createObjectStore(IDB_SYNC_QUEUE, { keyPath: 'id' });
                 store.createIndex('status', 'status', { unique: false });
                 store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+            // ⚠️ Stage E: Object store صف آپلود Media
+            // (توسط media-upload.js استفاده می‌شود، ولی اینجا هم
+            //  چک می‌کنیم که اگر نبود، بسازیم)
+            if (!db.objectStoreNames.contains('media_uploads')) {
+                const mediaStore = db.createObjectStore('media_uploads', { keyPath: 'mediaId' });
+                mediaStore.createIndex('status', 'status', { unique: false });
+                mediaStore.createIndex('timestamp', 'timestamp', { unique: false });
+                mediaStore.createIndex('taskId', 'taskId', { unique: false });
             }
         };
         req.onsuccess = () => {

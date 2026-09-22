@@ -651,6 +651,57 @@
     .detail-page .detail-section[data-detail-section="plan-dates"] .loc-btns {
         flex-wrap: wrap;
     }
+    /* ═══ Stage E: Photo Upload Badges ═══ */
+    .photo-thumb {
+        position: relative;
+    }
+
+    .photo-upload-badge {
+        position: absolute;
+        top: 4px;
+        inset-inline-end: 4px;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1;
+        pointer-events: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .photo-upload-badge--pending {
+        background: var(--accent-yellow-soft);
+        border: 1px solid var(--accent-yellow-border);
+        color: var(--accent-yellow);
+    }
+
+    .photo-upload-badge--uploading {
+        background: var(--accent-cyan-soft);
+        border: 1px solid var(--accent-cyan-border);
+        color: var(--accent-cyan);
+        animation: photo-badge-pulse 1.5s ease-in-out infinite;
+    }
+
+    .photo-upload-badge--uploaded {
+        background: var(--accent-green-soft);
+        border: 1px solid var(--accent-green-border);
+        color: var(--accent-green);
+    }
+
+    .photo-upload-badge--failed {
+        background: var(--accent-pink-soft);
+        border: 1px solid var(--accent-pink-border);
+        color: var(--accent-pink);
+    }
+
+    @keyframes photo-badge-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

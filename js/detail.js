@@ -11,6 +11,17 @@ import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
 import { faShort, hasSessionAt, parseFaDateTime } from './sessions.js';
 import {
+    processImageFile,
+    validateImageFile,
+    formatBytes,
+    MAX_PHOTOS_PER_TASK,
+} from './media.js';
+import {
+    getUploadStatus,
+    cancelUpload,
+    retryFailedUploads,
+} from './media-upload.js';
+import {
     ensureMapVisible,
     switchToTab,
     mapHint,
@@ -307,7 +318,7 @@ export function openDetail(id) {
     updateCallBtn();
     renderDetailSessions();
     call('refreshSavedLocationUI');
-    renderDetailPhotos();
+        renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
     renderTimer();
     clearInterval(timerTick);
     timerTick = setInterval(() => { if (getDetailTask()) renderTimer(); }, 60000);
@@ -444,37 +455,76 @@ export function renderDetailSessions() {
 // Photos
 // ═══════════════════════════════════════════════════════════════════════════
 
-function downscale(dataUrl, maxDim, quality, cb) {
-    const img = new Image();
-    img.onload = () => {
-        try {
-            const r = Math.min(1, maxDim / Math.max(img.width, img.height));
-            const c = document.createElement('canvas');
-            c.width = Math.max(1, Math.round(img.width * r));
-            c.height = Math.max(1, Math.round(img.height * r));
-            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-            cb(c.toDataURL('image/jpeg', quality));
-        } catch {
-            cb(null);
-        }
-    };
-    img.onerror = () => cb(null);
-    img.src = dataUrl;
-}
-
-function renderDetailPhotos() {
+async function renderDetailPhotos() {
     const task = getDetailTask();
     if (!task) return;
     const list = task.photos || [];
     const countEl = document.getElementById('photoCount');
-    if (countEl) countEl.textContent = list.length ? `(${toFa(list.length)})` : '';
+    if (countEl) {
+        countEl.textContent = list.length
+            ? `(${toFa(list.length)} / ${toFa(MAX_PHOTOS_PER_TASK)})`
+            : '';
+    }
     const grid = document.getElementById('photoGrid');
     if (!grid) return;
-    grid.innerHTML = list.length ? list.map(p => `
-        <div class="photo-thumb">
-            <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="تصویر وظیفه" loading="lazy">
+
+    if (list.length === 0) {
+        grid.innerHTML = '<div class="session-empty">عکسی ثبت نشده است.</div>';
+        return;
+    }
+
+    // ─── گرفتن وضعیت upload برای هر عکس ───
+    // ⚠️ اگر state.sync.enabled نباشد، همه‌ی uploadها صرف‌نظر می‌شوند.
+    const statuses = await Promise.all(
+        list.map(async p => {
+            if (!state.sync.enabled) return null;
+            try {
+                return await getUploadStatus(p.id);
+            } catch {
+                return null;
+            }
+        })
+    );
+
+    grid.innerHTML = list.map((p, idx) => {
+        const upload = statuses[idx];
+        const sizeLabel = p.sizeBytes ? formatBytes(p.sizeBytes) : '';
+        const title = sizeLabel ? `حجم: ${sizeLabel}` : '';
+
+        // ─── وضعیت آپلود ───
+        const uploadState = upload ? upload.status : null;
+        const uploadBadge = renderUploadBadge(uploadState);
+
+        return `
+        <div class="photo-thumb photo-thumb--${uploadState || 'local'}">
+            <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="تصویر وظیفه" loading="lazy" title="${escapeHtml(title)}">
+            ${uploadBadge}
             <button data-photo-del="${escapeHtml(String(p.id))}" aria-label="حذف عکس">✕</button>
-        </div>`).join('') : '<div class="session-empty">عکسی ثبت نشده است.</div>';
+        </div>`;
+    }).join('');
+}
+
+/**
+ * رندر badge وضعیت آپلود.
+ *
+ * @param {string|null} status — 'pending' | 'uploading' | 'uploaded' | 'failed' | null
+ * @returns {string} HTML
+ */
+function renderUploadBadge(status) {
+    if (!status) return '';
+
+    switch (status) {
+        case 'pending':
+            return '<span class="photo-upload-badge photo-upload-badge--pending" title="در انتظار آپلود" aria-label="در انتظار آپلود">⏳</span>';
+        case 'uploading':
+            return '<span class="photo-upload-badge photo-upload-badge--uploading" title="در حال آپلود" aria-label="در حال آپلود">⬆</span>';
+        case 'uploaded':
+            return '<span class="photo-upload-badge photo-upload-badge--uploaded" title="آپلود شده" aria-label="آپلود شده">✓</span>';
+        case 'failed':
+            return '<span class="photo-upload-badge photo-upload-badge--failed" title="آپلود ناموفق" aria-label="آپلود ناموفق">⚠</span>';
+        default:
+            return '';
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -615,6 +665,32 @@ const debouncedSaveUrl = debounce(() => {
     saveTasks();
     flashSaved();
 }, 300);
+
+/**
+ * تبدیل Blob به dataUrl.
+ *
+ * ⚠️ چرا dataUrl و نه Blob مستقیم؟
+ *   - در Stage D، ما هنوز upload به ParsPack نداریم
+ *   - dataUrl را در IndexedDB ذخیره می‌کنیم (سازگار با `sanitizeTask` فعلی)
+ *   - در Stage E، این تابع با ذخیره‌ی Blob در IDB جایگزین می‌شود
+ *
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('خطا در تبدیل Blob به dataUrl'));
+            }
+        };
+        reader.onerror = () => reject(new Error('خطا در خواندن Blob'));
+        reader.readAsDataURL(blob);
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Bind inputs
@@ -875,43 +951,111 @@ export function bindDetailInputs() {
     }
 
     const photoInput = document.getElementById('photoInput');
-    photoInput.addEventListener('change', () => {
+    photoInput.addEventListener('change', async () => {
         const task = getDetailTask();
         if (!task) { photoInput.value = ''; return; }
+
         task.photos = task.photos || [];
-        const files = [...photoInput.files].slice(0, Math.max(0, 8 - task.photos.length));
-        photoInput.value = '';
-        if (!files.length) {
-            flashSaved(task.photos.length >= 8 ? 'سقف ۸ عکس' : 'فایلی انتخاب نشد');
+
+        // ─── چک سقف ───
+        const remaining = MAX_PHOTOS_PER_TASK - task.photos.length;
+        if (remaining <= 0) {
+            photoInput.value = '';
+            flashSaved(`سقف ${toFa(MAX_PHOTOS_PER_TASK)} عکس`);
             return;
         }
-        let pending = files.length;
-        const doneOne = () => {
-            if (--pending !== 0) return;
+
+        // ─── انتخاب فایل‌ها ───
+        const files = [...photoInput.files].slice(0, remaining);
+        photoInput.value = '';
+
+        if (!files.length) {
+            flashSaved('فایلی انتخاب نشد');
+            return;
+        }
+
+        // ─── پردازش هر فایل ───
+        let successCount = 0;
+        let failureCount = 0;
+        const errors = [];
+
+        // ⚠️ نمایش loading
+        flashSaved('در حال پردازش عکس‌ها...');
+
+        for (const file of files) {
+            // ─── اعتبارسنجی سبک ───
+            const validation = validateImageFile(file);
+            if (!validation.ok) {
+                failureCount++;
+                errors.push(validation.reason);
+                continue;
+            }
+
+            // ─── پردازش (WebP + downscale در صورت لزوم) ───
+            try {
+                const result = await processImageFile(file);
+
+                // ⚠️ در Stage D، هنوز mediaId نداریم.
+                //    عکس را با dataUrl موقت نگه می‌داریم.
+                //    در Stage E، این با mediaId جایگزین می‌شود.
+
+                // ─── تبدیل Blob به dataUrl موقت ───
+                const dataUrl = await blobToDataUrl(result.blob);
+
+                task.photos.push({
+                    id: uid(),
+                    dataUrl,
+                    addedAt: new Date().toISOString(),
+                    // ⚠️ فیلدهای جدید برای Stage E
+                    contentType: result.contentType,
+                    sizeBytes: result.sizeBytes,
+                    width: result.width,
+                    height: result.height,
+                });
+
+                successCount++;
+            } catch (err) {
+                failureCount++;
+                errors.push(err instanceof Error ? err.message : 'خطای پردازش');
+            }
+        }
+
+        // ─── ذخیره و رندر ───
+        if (successCount > 0) {
             saveTasks();
-            renderDetailPhotos();
+            await renderDetailPhotos();
             call('render');
-            flashSaved();
-        };
-        files.forEach(f => {
-            if (!f.type.startsWith('image/')) return doneOne();
-            const rd = new FileReader();
-            rd.onload = () => downscale(rd.result, 1024, 0.72, url => {
-                if (url) task.photos.push({ id: uid(), dataUrl: url, addedAt: new Date().toISOString() });
-                doneOne();
-            });
-            rd.onerror = doneOne;
-            rd.readAsDataURL(f);
-        });
+        }
+
+        // ─── پیام نهایی ───
+        if (failureCount === 0) {
+            flashSaved(`${toFa(successCount)} عکس اضافه شد`);
+        } else if (successCount === 0) {
+            flashSaved(`هیچ عکسی اضافه نشد: ${errors[0] || 'خطای نامشخص'}`);
+        } else {
+            flashSaved(`${toFa(successCount)} عکس اضافه شد، ${toFa(failureCount)} رد شد`);
+        }
     });
-    document.getElementById('photoGrid').addEventListener('click', e => {
+    document.getElementById('photoGrid').addEventListener('click', async e => {
         const del = e.target.closest('[data-photo-del]');
         if (del) {
             const task = getDetailTask();
             if (!task) return;
-            task.photos = (task.photos || []).filter(p => String(p.id) !== del.dataset.photoDel);
+            const photoId = del.dataset.photoDel;
+
+            // ⚠️ Stage E: اگر این عکس در صف آپلود است، لغو کن
+            try {
+                await cancelUpload(photoId);
+            } catch {
+                // silent — اگر upload نبود، مشکلی نیست
+            }
+
+            task.photos = (task.photos || []).filter(p => String(p.id) !== String(photoId));
+            // ⚠️ Stage E: حذف از mediaIds هم
+            task.mediaIds = (task.mediaIds || []).filter(id => String(id) !== String(photoId));
+
             saveTasks();
-            renderDetailPhotos();
+            await renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
             call('render');
             flashSaved('عکس حذف شد');
             return;
@@ -945,6 +1089,30 @@ export function bindDetailInputs() {
     });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ Stage E: event listeners برای وضعیت آپلود Media
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// وقتی یک عکس آپلود می‌شود یا شکست می‌خورد، detail.js باید
+// renderDetailPhotos را دوباره صدا بزند (اگر detail باز است).
+
+events.on('media:upload-complete', ({ taskId }) => {
+    if (String(state.currentDetailId) === String(taskId)) {
+        renderDetailPhotos().catch(() => {});
+    }
+});
+
+events.on('media:upload-failed', ({ taskId }) => {
+    if (String(state.currentDetailId) === String(taskId)) {
+        renderDetailPhotos().catch(() => {});
+    }
+});
+
+events.on('media:upload-enqueued', ({ taskId }) => {
+    if (String(state.currentDetailId) === String(taskId)) {
+        renderDetailPhotos().catch(() => {});
+    }
+});
 // ═══════════════════════════════════════════════════════════════════════════
 // ⚠️ گام ۱۵: SHIM‌ها حذف شدند
 // ═══════════════════════════════════════════════════════════════════════════
