@@ -49,3 +49,5 @@ dist/
 ARCHITECTURE_*.md
 PHASES*.md
 CHANGELOG.md
+# سند انتقال (local only)
+HANDOFF.md
