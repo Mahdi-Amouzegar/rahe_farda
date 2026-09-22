@@ -87,7 +87,7 @@ function invoke(name, ...args) {
 const IDB_NAME = 'spaceTodoDB';
 const IDB_STORE = 'tasks';
 const IDB_TRASH = 'trash';
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const useIDB = typeof indexedDB !== 'undefined';
 let idbPromise = null;
 
@@ -103,6 +103,13 @@ function idbOpen() {
                 }
                 if (!db.objectStoreNames.contains(IDB_TRASH)) {
                     db.createObjectStore(IDB_TRASH, { keyPath: 'id' });
+                }
+                // ⚠️ Phase 4: اضافه‌کردن sync_queue به onupgradeneeded
+                // (تا اگر store.js اول باز کند، sync_queue هم ساخته شود)
+                if (!db.objectStoreNames.contains('sync_queue')) {
+                    const syncStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
+                    syncStore.createIndex('status', 'status', { unique: false });
+                    syncStore.createIndex('timestamp', 'timestamp', { unique: false });
                 }
             };
             req.onsuccess = () => resolve(req.result);
@@ -280,29 +287,35 @@ export function sanitizeTask(t) {
  *
  * @param {object} entry
  */
+/**
+ * افزودن یک تغییر به صف sync (async).
+ *
+ * ⚠️ در Phase 4، این تابع async است چون syncEnqueue حالا
+ *    به IndexedDB می‌نویسد.
+ *
+ * ⚠️ ما این تابع را await نمی‌کنیم چون caller نمی‌خواهد صبر کند.
+ *    عملیات در پس‌زمینه انجام می‌شود.
+ */
 function enqueueChange(entry) {
     if (!entry || !entry.type) return;
-    try {
-        // انطباق با فرمت syncQueue: id → entityId
-        syncEnqueue({
-            type: entry.type,
-            entityId: String(entry.id ?? entry.entityId ?? ''),
-            entityType: entry.parentId ? 'child' : 'task',
-            data: entry.data || null,
-            parentId: entry.parentId ? String(entry.parentId) : null
-        });
-    } catch (err) {
+    syncEnqueue({
+        type: entry.type,
+        entityId: String(entry.id ?? entry.entityId ?? ''),
+        entityType: entry.parentId ? 'child' : 'task',
+        data: entry.data || null,
+        parentId: entry.parentId ? String(entry.parentId) : null
+    }).catch(err => {
         console.error('enqueueChange failed:', err);
-    }
+    });
 }
 
 /**
  * پاک کردن صف (برای بعد از import موفق).
  */
 export function clearPendingChanges() {
-    try {
-        clearSyncQueue();
-    } catch { /* silent */ }
+    clearSyncQueue().catch(err => {
+        console.warn('clearPendingChanges failed:', err);
+    });
     state.pendingChanges = [];
     events.emit('sync:queue-cleared');
 }
@@ -311,9 +324,9 @@ export function clearPendingChanges() {
  * خواندن صف (برای دیباگ).
  * @returns {object[]}
  */
-export function getPendingChanges() {
+export async function getPendingChanges() {
     try {
-        return getSyncQueue();
+        return await getSyncQueue();
     } catch {
         return [];
     }
@@ -324,14 +337,12 @@ export function getPendingChanges() {
  * ⚠️ در فاز ۵ گام ۵، این کار توسط initSyncQueue() انجام می‌شود.
  * این تابع فقط برای سازگاری نگه داشته شده.
  */
+/**
+ * @deprecated — در Phase 4، initSyncQueue خودش IDB را بارگذاری می‌کند.
+ * این تابع فقط برای backward-compat نگه داشته شده و no-op است.
+ */
 export function loadPendingChanges() {
-    // no-op — initSyncQueue این کار را انجام می‌دهد
-    // اما اگر state.pendingChanges مورد نیاز باشد، از syncQueue کپی می‌کنیم
-    try {
-        state.pendingChanges = getSyncQueue();
-    } catch {
-        state.pendingChanges = [];
-    }
+    // no-op
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -352,34 +363,105 @@ export async function loadTasks() {
         .map(sanitizeTask);
 }
 
-export function saveTask(task, parent) {
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Transactional Outbox (Phase 4) ───
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ چرا این تابع؟
+//   در نسخه‌ی قبلی، saveTask و enqueueChange دو تراکنش جدا بودند:
+//     ۱. idbPut(task)        ← تراکنش ۱
+//     ۲. syncEnqueue(op)     ← تراکنش ۲
+//   اگر بین ۱ و ۲ مرورگر crash کند، task ذخیره می‌شود ولی op از دست می‌رود.
+//
+//   این تابع هر دو را در یک transaction انجام می‌دهد:
+//     BEGIN TRANSACTION [tasks, sync_queue]
+//       ۱. put(task)
+//       ۲. put(op)
+//     COMMIT
+//
+//   حالا یا هر دو ذخیره می‌شوند یا هیچ‌کدام.
+
+/**
+ * ذخیره‌ی یک task + enqueue در یک transaction (async).
+ *
+ * @param {object} task — task برای ذخیره
+ * @param {object|null} parent — parent (اگر child باشد)
+ * @returns {Promise<void>}
+ */
+async function saveTaskAndEnqueue(task, parent) {
     if (!task || typeof task.id === 'undefined') {
-        return Promise.reject(new Error('saveTask: invalid task'));
+        throw new Error('saveTaskAndEnqueue: invalid task');
     }
     invalidateTaskIndex();
 
     const target = parent || task;
 
-    const p = useIDB
-        ? idbPut(IDB_STORE, target)
-        : (function () {
-            try {
-                localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
-                return Promise.resolve();
-            } catch (e) {
-                return Promise.reject(e);
-            }
-        })();
-
-    p.then(() => {
-        enqueueChange({
+    if (!useIDB) {
+        // Fallback: بدون IDB
+        try {
+            localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
+        } catch (e) {
+            throw e;
+        }
+        await syncEnqueue({
             type: 'save',
-            id: target.id,
+            entityId: String(target.id),
+            entityType: parent ? 'child' : 'task',
             data: target,
-            parentId: parent ? parent.id : null
+            parentId: parent ? String(parent.id) : null,
         });
-        events.emit(EV.TASK_SAVED, { task, parent: parent || null });
-    }).catch(err => {
+        return;
+    }
+
+    // ─── IDB Transactional ───
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([IDB_STORE, 'sync_queue'], 'readwrite');
+        const taskStore = tx.objectStore(IDB_STORE);
+        const queueStore = tx.objectStore('sync_queue');
+
+        // ۱. put task
+        taskStore.put(target);
+
+        // ۲. put op
+        const op = {
+            id: uid(),
+            type: 'save',
+            entityId: String(target.id),
+            entityType: parent ? 'child' : 'task',
+            data: target,
+            parentId: parent ? String(parent.id) : null,
+            timestamp: new Date().toISOString(),
+            deviceId: state.sync?.deviceId || 'unknown',
+            schemaVersion: SCHEMA_VERSION,
+            retries: 0,
+            lastError: null,
+            status: 'pending',
+            enqueuedAt: new Date().toISOString(),
+        };
+        queueStore.put(op);
+
+        tx.oncomplete = () => {
+            events.emit(EV.TASK_SAVED, { task, parent: parent || null });
+            events.emit(EV.SYNC_ENQUEUED, { op });
+            resolve();
+        };
+        tx.onerror = () => {
+            console.error('saveTaskAndEnqueue failed', tx.error);
+            reject(tx.error);
+        };
+    });
+}
+
+export function saveTask(task, parent) {
+    if (!task || typeof task.id === 'undefined') {
+        return Promise.reject(new Error('saveTask: invalid task'));
+    }
+
+    // ⚠️ Phase 4: استفاده از saveTaskAndEnqueue (transactional)
+    const p = saveTaskAndEnqueue(task, parent);
+
+    p.catch(err => {
         console.error('saveTask failed', err);
         events.emit(EV.STORAGE_ERROR, {
             message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'

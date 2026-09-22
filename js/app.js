@@ -54,7 +54,6 @@ import {
     setMapHelpers,
     exportTasks,
     importTasks,
-    loadPendingChanges,
     getPendingChanges
 } from './store.js';
 import {
@@ -2164,16 +2163,16 @@ wireEvents();
 
 // ⚠️ فاز ۵ گام ۵: راه‌اندازی شبکه، صف sync، PWA، نشانگر وضعیت
 startNetworkMonitor();
-initSyncQueue();
+initSyncQueue().catch(err => {
+    console.error('[app] initSyncQueue failed:', err);
+});
 initHeaderStatus();
 initPWA();
 
 // ⚠️ فاز ۶ گام ۲: راه‌اندازی auth
 initAuth();
 
-// ⚠️ loadPendingChanges دیگر لازم نیست — initSyncQueue کار می‌کند
-// اما برای سازگاری نگه داشته شده:
-loadPendingChanges();
+// ⚠️ Phase 4: loadPendingChanges حذف شد (چون initSyncQueue خودش IDB را بارگذاری می‌کند)
 
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
@@ -2252,6 +2251,7 @@ if (import.meta.env.DEV) {
         saveTasks,
         render,
         events,
-        getPendingChanges
+        getPendingChanges: async () => await getPendingChanges(),
+        getSyncQueueSize: async () => await getSyncQueueSize(),
     };
 }

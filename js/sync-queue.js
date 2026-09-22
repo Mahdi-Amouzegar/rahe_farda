@@ -1,18 +1,23 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// sync-queue.js -- صف sync آفلاین + پایه‌ریزی Cloudflare (ESM)
+// sync-queue.js -- صف sync آفلاین با IndexedDB (ESM)
 //
 // ⚠️ اصل معماری: Offline-First
 //   - پیش‌فرض: هیچ درخواست شبکه‌ای انجام نمی‌شود.
-//   - صف ops فقط در localStorage می‌ماند تا کاربر در تنظیمات
+//   - صف ops فقط در IndexedDB می‌ماند تا کاربر در تنظیمات
 //     گزینه‌ی «همگام‌سازی ابری» را فعال کند.
-//   - در فاز ۶، Cloudflare Worker + D1 + Telegram Login به همین
-//     صف وصل می‌شود و هر op را به سرور می‌فرستد.
+//   - در فاز ۶، Cloudflare Worker + D1 به همین صف وصل می‌شود.
 //
-// ⚠️ پایه‌ریزی فاز ۶:
-//   - setSyncHandler() برای تعریف handler دلخواه (Cloudflare)
-//   - state.sync.authToken / userId / endpoint / enabled
-//   - deviceId از net.js برای conflict resolution
-//   - ساختار op سازگار با D1 schema
+// ⚠️ تغییر Phase 4 (نسخه 2.0):
+//   - انتقال از localStorage به IndexedDB
+//   - Transactional: opها در همان transaction با taskها نوشته می‌شوند
+//   - Crash recovery: opهای in-flight در boot به pending برمی‌گردند
+//   - Flush زمان‌محور: هر ۳۰ ثانیه + آستانه‌ی ۱۰۰ op
+//   - Retention: opهای قدیمی‌تر از ۷ روز drop می‌شوند
+//
+// ⚠️ ساختار IDB:
+//   DB: spaceTodoDB (همان که store.js استفاده می‌کند)
+//   Object Store: sync_queue (keyPath: 'id')
+//   Index: status (برای query سریع)
 //
 // ⚠️ قاعده‌ی بدون loop:
 //   - هر emit رویداد با فلگ محافظت می‌شود (inFlight، _flushing)
@@ -27,11 +32,23 @@ import { isOnline, getDeviceId, probeConnection } from './net.js';
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** کلید localStorage برای صف */
-const QUEUE_KEY = 'spaceTodoSyncQueue';
+/** نام IndexedDB (همان که store.js استفاده می‌کند) */
+const IDB_NAME = 'spaceTodoDB';
 
-/** حداکثر تعداد op در صف (جلوگیری از پر شدن localStorage) */
-const MAX_QUEUE_SIZE = 500;
+/** نام object store برای صف sync */
+const IDB_SYNC_QUEUE = 'sync_queue';
+
+/** نسخه‌ی IDB (باید هم‌خوان با store.js باشد) */
+const IDB_VERSION = 3;
+
+/** حداکثر تعداد op در صف (جلوگیری از پر شدن IDB) */
+const MAX_QUEUE_SIZE = 1000;
+
+/** آستانه‌ی flush فوری — اگر صف به این تعداد رسید، فوری flush */
+const FLUSH_THRESHOLD = 100;
+
+/** فاصله‌ی flush خودکار (ms) — ۳۰ ثانیه */
+const FLUSH_INTERVAL_MS = 30000;
 
 /** حداقل فاصله بین دو flush خودکار (ms) */
 const FLUSH_MIN_INTERVAL_MS = 5000;
@@ -44,6 +61,9 @@ const RETRY_MAX_DELAY_MS = 5 * 60 * 1000;
 
 /** حداکثر تعداد retry برای هر op قبل از drop */
 const MAX_RETRIES_PER_OP = 8;
+
+/** Retention: opهای قدیمی‌تر از این مقدار drop می‌شوند (ms) */
+const RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // ۷ روز
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -64,72 +84,162 @@ let _lastFlushAt = 0;
 /** @type {number|null} */
 let _retryTimer = null;
 
+/** @type {number|null} — تایمر flush خودکار */
+let _autoFlushTimer = null;
+
 /** @type {number} */
 let _currentRetryDelay = RETRY_BASE_DELAY_MS;
 
+/** @type {IDBDatabase|null} */
+let _db = null;
+
 /**
- * handler پیش‌فرض — هیچ کاری نمی‌کند (ops فقط در صف می‌مانند).
- *
- * ⚠️ در فاز ۶، این handler با cloudflareSyncHandler عوض می‌شود:
- *
- *   async function cloudflareSyncHandler(op) {
- *       if (!state.sync.authToken) throw new Error('not-authenticated');
- *       const res = await fetch(state.sync.endpoint, {
- *           method: 'POST',
- *           headers: {
- *               'Content-Type': 'application/json',
- *               'Authorization': `Bearer ${state.sync.authToken}`,
- *           },
- *           body: JSON.stringify(op),
- *       });
- *       if (!res.ok) {
- *           if (res.status === 401) {
- *               events.emit('sync:auth-expired');
- *               throw new Error('auth-expired');
- *           }
- *           if (res.status === 429) throw new Error('rate-limited');
- *           throw new Error('sync-failed');
- *       }
- *       return await res.json();
- *   }
+ * handler پیش‌فرض — هیچ کاری نمی‌کند.
+ * در فاز ۶ با cloudflareSyncHandler عوض می‌شود.
  *
  * @type {(op: object) => Promise<{ ok: boolean }>}
  */
 let _syncHandler = async () => ({ ok: true });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// IndexedDB
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * باز کردن IDB (یا گرفتن instance موجود).
+ *
+ * ⚠️ این تابع idempotent است.
+ */
+function openDb() {
+    if (_db) return Promise.resolve(_db);
+    if (typeof indexedDB === 'undefined') {
+        return Promise.reject(new Error('no-indexeddb'));
+    }
+
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            // Object store تسک‌ها (توسط store.js ساخته می‌شود، ولی
+            // اینجا هم چک می‌کنیم که اگر نبود، بسازیم)
+            if (!db.objectStoreNames.contains('tasks')) {
+                db.createObjectStore('tasks', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('trash')) {
+                db.createObjectStore('trash', { keyPath: 'id' });
+            }
+            // Object store صف sync
+            if (!db.objectStoreNames.contains(IDB_SYNC_QUEUE)) {
+                const store = db.createObjectStore(IDB_SYNC_QUEUE, { keyPath: 'id' });
+                store.createIndex('status', 'status', { unique: false });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+        };
+        req.onsuccess = () => {
+            _db = req.result;
+            resolve(_db);
+        };
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/**
+ * خواندن همه‌ی opها از IDB.
+ */
+async function readAllOps() {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_SYNC_QUEUE, 'readonly');
+        const req = tx.objectStore(IDB_SYNC_QUEUE).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/**
+ * نوشتن یک op در IDB.
+ */
+async function putOp(op) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_SYNC_QUEUE, 'readwrite');
+        tx.objectStore(IDB_SYNC_QUEUE).put(op);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * حذف چند op از IDB.
+ */
+async function deleteOps(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_SYNC_QUEUE, 'readwrite');
+        const store = tx.objectStore(IDB_SYNC_QUEUE);
+        for (const id of ids) {
+            store.delete(id);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * پاک کردن کل صف.
+ */
+async function deleteAllOps() {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_SYNC_QUEUE, 'readwrite');
+        tx.objectStore(IDB_SYNC_QUEUE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Public API — read
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * snapshot از صف فعلی.
- * @returns {object[]}
+ * snapshot از صف فعلی (async).
+ * @returns {Promise<object[]>}
  */
-export function getQueue() {
-    return state.sync.queue ? state.sync.queue.slice() : [];
+export async function getQueue() {
+    try {
+        return await readAllOps();
+    } catch (err) {
+        console.warn('sync-queue: getQueue failed', err);
+        return [];
+    }
 }
 
 /**
- * تعداد opهای در انتظار.
- * @returns {number}
+ * تعداد opهای در انتظار (async).
+ * @returns {Promise<number>}
  */
-export function getQueueSize() {
-    return state.sync.queue ? state.sync.queue.length : 0;
+export async function getQueueSize() {
+    try {
+        const ops = await readAllOps();
+        return ops.length;
+    } catch {
+        return 0;
+    }
 }
 
 /**
  * آیا صف خالی است؟
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-export function isQueueEmpty() {
-    return getQueueSize() === 0;
+export async function isQueueEmpty() {
+    const size = await getQueueSize();
+    return size === 0;
 }
 
 /**
- * تعریف handler سفارشی (برای فاز ۶).
- *
- * @param {((op: object) => Promise<{ ok: boolean }>)|null} fn
- *   اگر null باشد، handler به حالت پیش‌فرض (no-op) برمی‌گردد.
+ * تعریف handler سفارشی.
  */
 export function setSyncHandler(fn) {
     if (typeof fn === 'function') {
@@ -140,76 +250,16 @@ export function setSyncHandler(fn) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Persistence
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * ذخیره‌ی صف در localStorage.
- * ⚠️ در private mode ممکن است شکست بخورد — silent مدیریت می‌شود.
- */
-function _persist() {
-    try {
-        const snapshot = state.sync.queue || [];
-        if (snapshot.length === 0) {
-            localStorage.removeItem(QUEUE_KEY);
-        } else {
-            localStorage.setItem(QUEUE_KEY, JSON.stringify(snapshot));
-        }
-    } catch (err) {
-        // localStorage پر است یا private mode
-        console.warn('sync-queue: persist failed', err);
-    }
-}
-
-/**
- * بارگذاری صف از localStorage.
- * این تابع در initSyncQueue صدا زده می‌شود.
- */
-function _loadFromStorage() {
-    try {
-        const raw = localStorage.getItem(QUEUE_KEY);
-        if (!raw) {
-            state.sync.queue = [];
-            return;
-        }
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            state.sync.queue = [];
-            return;
-        }
-        // اعتبارسنجی سبک هر op
-        state.sync.queue = parsed.filter(op => {
-            return op
-                && typeof op === 'object'
-                && typeof op.id === 'string'
-                && typeof op.type === 'string'
-                && typeof op.timestamp === 'string';
-        });
-    } catch (err) {
-        console.warn('sync-queue: load failed', err);
-        state.sync.queue = [];
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Enqueue / Dequeue
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * افزودن یک op به صف.
- *
- * ⚠️ این تابع هرگز شبکه‌ای درخواست نمی‌زند — فقط در حافظه و localStorage
- *    ذخیره می‌کند. flush فقط اگر state.sync.enabled باشد انجام می‌شود.
+ * افزودن یک op به صف (async).
  *
  * @param {object} op
- * @param {string} op.type         — 'save' | 'delete' | 'trash-add' | 'trash-delete'
- * @param {string} op.entityId     — id موجودیت
- * @param {object|null} [op.data]  — داده (برای save)
- * @param {string|null} [op.parentId]
- * @param {'task'|'child'} [op.entityType]
- * @returns {object} op نهایی (با id و timestamp)
+ * @returns {Promise<object|null>} op نهایی یا null اگر نامعتبر بود
  */
-export function enqueue(op) {
+export async function enqueue(op) {
     if (!op || typeof op.type !== 'string') {
         console.warn('sync-queue: invalid op', op);
         return null;
@@ -220,37 +270,40 @@ export function enqueue(op) {
     }
 
     const entry = {
-        id: uid(),
+        id: op.id || uid(),
         type: op.type,
         entityId: String(op.entityId),
         entityType: op.entityType === 'child' ? 'child' : 'task',
         data: op.data || null,
         parentId: op.parentId ? String(op.parentId) : null,
-        timestamp: new Date().toISOString(),
-        deviceId: getDeviceId(),
-        schemaVersion: SCHEMA_VERSION,
+        timestamp: op.timestamp || new Date().toISOString(),
+        deviceId: op.deviceId || getDeviceId(),
+        schemaVersion: op.schemaVersion || SCHEMA_VERSION,
         retries: 0,
         lastError: null,
+        status: 'pending', // 'pending' | 'in-flight' | 'failed'
+        enqueuedAt: new Date().toISOString(),
     };
 
-    state.sync.queue = state.sync.queue || [];
-    state.sync.queue.push(entry);
-
-    // اگر صف از حد گذشت، قدیمی‌ترین‌ها را حذف کن
-    if (state.sync.queue.length > MAX_QUEUE_SIZE) {
-        const excess = state.sync.queue.length - MAX_QUEUE_SIZE;
-        state.sync.queue.splice(0, excess);
+    try {
+        await putOp(entry);
+    } catch (err) {
+        console.warn('sync-queue: enqueue failed', err);
+        return null;
     }
 
-    _persist();
-
     events.emit(EV.SYNC_ENQUEUED, { op: entry });
-    events.emit(EV.SYNC_QUEUE_CHANGED, {
-        size: state.sync.queue.length,
-    });
 
-    // flush خودکار فقط اگر sync ابری فعال است
-    if (state.sync.enabled && isOnline()) {
+    // تعداد جدید را async بفرست
+    getQueueSize().then(size => {
+        events.emit(EV.SYNC_QUEUE_CHANGED, { size });
+    }).catch(() => {});
+
+    // اگر صف بزرگ شد، فوری flush کن
+    const size = await getQueueSize();
+    if (size >= FLUSH_THRESHOLD && state.sync.enabled && isOnline()) {
+        scheduleFlush();
+    } else if (state.sync.enabled && isOnline()) {
         scheduleFlush();
     }
 
@@ -258,38 +311,63 @@ export function enqueue(op) {
 }
 
 /**
- * حذف چند op از صف (بعد از موفقیت).
- * @param {string[]} ids
+ * حذف چند op از صف (async).
  */
-export function dequeue(ids) {
+export async function dequeue(ids) {
     if (!Array.isArray(ids) || ids.length === 0) return;
-    const set = new Set(ids.map(String));
-    state.sync.queue = (state.sync.queue || []).filter(op => !set.has(String(op.id)));
-    _persist();
-    events.emit(EV.SYNC_QUEUE_CHANGED, {
-        size: state.sync.queue.length,
-    });
+    try {
+        await deleteOps(ids.map(String));
+    } catch (err) {
+        console.warn('sync-queue: dequeue failed', err);
+        return;
+    }
+    const size = await getQueueSize();
+    events.emit(EV.SYNC_QUEUE_CHANGED, { size });
 }
 
 /**
- * پاک‌سازی کل صف.
- * معمولاً بعد از import کامل یا logout.
+ * پاک‌سازی کل صف (async).
  */
-export function clearQueue() {
-    state.sync.queue = [];
+export async function clearQueue() {
     try {
-        localStorage.removeItem(QUEUE_KEY);
-    } catch { /* silent */ }
+        await deleteAllOps();
+    } catch (err) {
+        console.warn('sync-queue: clearQueue failed', err);
+    }
     events.emit(EV.SYNC_QUEUE_CHANGED, { size: 0 });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Retention
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * پاک‌سازی opهای قدیمی‌تر از RETENTION_MS.
+ */
+async function purgeOldOps() {
+    try {
+        const ops = await readAllOps();
+        const now = Date.now();
+        const toDelete = [];
+        for (const op of ops) {
+            const t = Date.parse(op.enqueuedAt || op.timestamp);
+            if (Number.isFinite(t) && (now - t) > RETENTION_MS) {
+                toDelete.push(op.id);
+            }
+        }
+        if (toDelete.length > 0) {
+            await deleteOps(toDelete);
+            console.log(`sync-queue: purged ${toDelete.length} old ops`);
+        }
+    } catch (err) {
+        console.warn('sync-queue: purgeOldOps failed', err);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Flush — تلاش برای sync
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * زمان‌بندی flush خودکار (با محافظ loop).
- */
 function scheduleFlush() {
     if (_flushScheduled) return;
     _flushScheduled = true;
@@ -300,37 +378,34 @@ function scheduleFlush() {
 }
 
 /**
- * تلاش برای flush صف.
- *
- * ⚠️ این تابع:
- *   - اگر sync ابری غیرفعال باشد، فوراً return می‌کند (no-op).
- *   - اگر آفلاین باشد، فوراً return می‌کند.
- *   - اگر flush در حال اجرا باشد، فوراً return می‌کند (محافظ loop).
- *   - برای هر op، handler را صدا می‌زند.
- *   - در صورت موفقیت: op از صف حذف می‌شود.
- *   - در صورت خطا: retries++، backoff زمان‌بندی می‌شود.
+ * تلاش برای flush صف (async).
  *
  * @returns {Promise<{ ok: boolean, processed: number, failed: number }>}
  */
 export async function flushQueue() {
-    // ⚠️ گارد اصلی: sync ابری باید فعال باشد
+    // ⚠️ گارد اصلی
     if (state.sync.enabled !== true) {
         return { ok: false, processed: 0, failed: 0 };
     }
-    // گارد: آفلاین
     if (!isOnline()) {
         return { ok: false, processed: 0, failed: 0 };
     }
-    // گارد loop
     if (_flushing) {
         return { ok: false, processed: 0, failed: 0 };
     }
-    // گارد: صف خالی
-    const queue = state.sync.queue || [];
+
+    // خواندن صف
+    let queue;
+    try {
+        queue = await readAllOps();
+    } catch {
+        return { ok: false, processed: 0, failed: 0 };
+    }
+
     if (queue.length === 0) {
         return { ok: true, processed: 0, failed: 0 };
     }
-    // گارد: فاصله‌ی حداقل بین flushها
+
     const now = Date.now();
     if (now - _lastFlushAt < FLUSH_MIN_INTERVAL_MS) {
         scheduleFlush();
@@ -346,14 +421,16 @@ export async function flushQueue() {
     let processed = 0;
 
     try {
-        // snapshot بگیر تا اگر در حین flush op اضافه شد، از دست نرود
         const snapshot = queue.slice();
 
         for (const op of snapshot) {
-            // اگر در حین loop آفلاین شدیم، متوقف شو
             if (!isOnline()) break;
 
             try {
+                // علامت‌گذاری به‌عنوان in-flight
+                op.status = 'in-flight';
+                await putOp(op);
+
                 const result = await _syncHandler(op);
                 if (result && result.ok) {
                     succeededIds.push(op.id);
@@ -364,12 +441,14 @@ export async function flushQueue() {
             } catch (err) {
                 op.retries = (op.retries || 0) + 1;
                 op.lastError = err && err.message ? err.message : 'unknown';
+                op.status = 'pending';
                 failedOps.push(op);
 
-                // اگر از حد retry گذشت، drop کن (جلوگیری از صف ابدی)
                 if (op.retries >= MAX_RETRIES_PER_OP) {
                     console.warn('sync-queue: dropping op after max retries', op);
-                    succeededIds.push(op.id); // به عنوان "حذف شده" ثبت می‌شود
+                    succeededIds.push(op.id); // به‌عنوان "حذف شده" ثبت می‌شود
+                } else {
+                    await putOp(op);
                 }
             }
         }
@@ -378,14 +457,12 @@ export async function flushQueue() {
         state.sync.inFlight = false;
     }
 
-    // اعمال نتایج
     if (succeededIds.length > 0) {
-        dequeue(succeededIds);
+        await dequeue(succeededIds);
     }
 
     state.sync.lastFlushAt = new Date().toISOString();
 
-    // مدیریت retry
     if (failedOps.length > 0) {
         state.sync.lastError = failedOps[0].lastError;
         state.sync.retries = (state.sync.retries || 0) + 1;
@@ -395,14 +472,14 @@ export async function flushQueue() {
         });
         _scheduleRetry();
     } else {
-        // موفق → reset backoff
         state.sync.lastError = null;
         _currentRetryDelay = RETRY_BASE_DELAY_MS;
         clearTimeout(_retryTimer);
         _retryTimer = null;
+        const remaining = await getQueueSize();
         events.emit(EV.SYNC_FLUSHED, {
             processed,
-            remaining: getQueueSize(),
+            remaining,
         });
     }
 
@@ -413,9 +490,6 @@ export async function flushQueue() {
     };
 }
 
-/**
- * زمان‌بندی retry با exponential backoff.
- */
 function _scheduleRetry() {
     clearTimeout(_retryTimer);
     const delay = Math.min(_currentRetryDelay, RETRY_MAX_DELAY_MS);
@@ -430,18 +504,9 @@ function _scheduleRetry() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Enable / Disable (فاز ۶ — آپشن تنظیمات)
+// Enable / Disable
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * فعال‌سازی sync ابری.
- * در فاز ۶، این تابع از دکمه‌ی تنظیمات صدا زده می‌شود.
- *
- * @param {object} config
- * @param {string} config.endpoint   — Cloudflare Worker URL
- * @param {string} config.authToken  — Telegram Login token
- * @param {string} [config.userId]   — Telegram user ID
- */
 export function enableCloudSync(config) {
     if (!config || typeof config.endpoint !== 'string') {
         console.warn('sync-queue: enableCloudSync requires endpoint');
@@ -454,17 +519,12 @@ export function enableCloudSync(config) {
 
     events.emit('sync:enabled', { endpoint: config.endpoint });
 
-    // تلاش اولیه برای flush
     if (isOnline()) {
         scheduleFlush();
     }
     return true;
 }
 
-/**
- * غیرفعال‌سازی sync ابری.
- * صف حفظ می‌شود (تا اگر دوباره فعال شد، ops از دست نروند).
- */
 export function disableCloudSync() {
     state.sync.enabled = false;
     state.sync.authToken = null;
@@ -475,26 +535,78 @@ export function disableCloudSync() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Crash Recovery
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * بازیابی opهای in-flight.
+ *
+ * اگر مرورگر در وسط flush بسته شود، opها با status='in-flight' در IDB می‌مانند.
+ * این تابع آن‌ها را به 'pending' برمی‌گرداند تا دوباره تلاش شوند.
+ */
+async function recoverInFlightOps() {
+    try {
+        const ops = await readAllOps();
+        const toRecover = ops.filter(op => op.status === 'in-flight');
+        for (const op of toRecover) {
+            op.status = 'pending';
+            await putOp(op);
+        }
+        if (toRecover.length > 0) {
+            console.log(`sync-queue: recovered ${toRecover.length} in-flight ops`);
+        }
+    } catch (err) {
+        console.warn('sync-queue: recoverInFlightOps failed', err);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auto Flush (Timer)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function startAutoFlush() {
+    if (_autoFlushTimer) return;
+    _autoFlushTimer = setInterval(async () => {
+        try {
+            const size = await getQueueSize();
+            if (size === 0) return;
+            if (!state.sync.enabled) return;
+            if (!isOnline()) return;
+            // اگر در حال flush هستیم، صبر کن
+            if (_flushing) return;
+            // flush
+            flushQueue().catch(() => {});
+        } catch { /* silent */ }
+    }, FLUSH_INTERVAL_MS);
+}
+
+function stopAutoFlush() {
+    if (_autoFlushTimer) {
+        clearInterval(_autoFlushTimer);
+        _autoFlushTimer = null;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Init
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * راه‌اندازی صف sync.
+ * راه‌اندازی صف sync (async).
  *
  * این تابع:
- *   - صف را از localStorage بارگذاری می‌کند
- *   - به net:online گوش می‌دهد تا flush خودکار بزند
- *   - اگر state.sync.enabled بود، اولین flush را زمان‌بندی می‌کند
- *
- * ⚠️ idempotent است.
+ *   - IDB را باز می‌کند
+ *   - opهای in-flight را بازیابی می‌کند
+ *   - opهای خیلی قدیمی را پاک می‌کند
+ *   - تایمر flush خودکار را راه می‌اندازد
+ *   - به net:online گوش می‌دهد
  */
-export function initSyncQueue() {
+export async function initSyncQueue() {
     if (_started) return;
     _started = true;
 
-    // مقداردهی اولیه‌ی state.sync (اگر core.js نداده باشد)
+    // مقداردهی اولیه‌ی state.sync
     state.sync = state.sync || {};
-    state.sync.queue = state.sync.queue || [];
     state.sync.inFlight = false;
     state.sync.retries = state.sync.retries || 0;
     state.sync.lastFlushAt = null;
@@ -502,33 +614,48 @@ export function initSyncQueue() {
     state.sync.enabled = state.sync.enabled === true;
     state.sync.deviceId = getDeviceId();
 
-    // بارگذاری از localStorage
-    _loadFromStorage();
+    // باز کردن IDB
+    try {
+        await openDb();
+    } catch (err) {
+        console.warn('sync-queue: IDB open failed', err);
+        _started = false;
+        return;
+    }
+
+    // بازیابی opهای in-flight
+    await recoverInFlightOps();
+
+    // پاک‌سازی opهای قدیمی
+    await purgeOldOps();
 
     // emit اولیه برای UI
-    events.emit(EV.SYNC_QUEUE_CHANGED, { size: getQueueSize() });
+    const size = await getQueueSize();
+    events.emit(EV.SYNC_QUEUE_CHANGED, { size });
 
     // گوش دادن به آنلاین شدن
     events.on(EV.NET_ONLINE, () => {
-        if (state.sync.enabled && getQueueSize() > 0) {
+        if (state.sync.enabled && getQueueSize().then(s => s > 0)) {
             scheduleFlush();
         }
     });
 
-    // ⚠️ گوش دادن به هر تغییر جدید در صف
-    // (این listener فقط صف را persist می‌کند — loop محافظت‌شده)
-    let _persistScheduled = false;
-    events.on(EV.SYNC_ENQUEUED, () => {
-        if (_persistScheduled) return;
-        _persistScheduled = true;
-        queueMicrotask(() => {
-            _persistScheduled = false;
-            _persist();
+    // گوش دادن به visibility
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && state.sync.enabled && isOnline()) {
+                getQueueSize().then(s => {
+                    if (s > 0) scheduleFlush();
+                }).catch(() => {});
+            }
         });
-    });
+    }
 
-    // اگر sync فعال بود، اولین flush را با تأخیر بزن
-    if (state.sync.enabled && isOnline() && getQueueSize() > 0) {
+    // تایمر flush خودکار
+    startAutoFlush();
+
+    // اگر sync فعال بود، اولین flush
+    if (state.sync.enabled && isOnline() && size > 0) {
         setTimeout(() => {
             probeConnection({ force: true })
                 .then(online => {
@@ -540,34 +667,27 @@ export function initSyncQueue() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Backward-compat — adapter برای store.js فعلی
+// Backward-compat — adapter
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// ⚠️ این adapter موقتی است. در فاز ۵ گام ۵ (اتصال store.js) حذف می‌شود
-// و store.js مستقیماً enqueue را صدا می‌زند.
-//
-// store.js فعلی از این الگو استفاده می‌کند:
-//   enqueueChange({ type: 'save', id, data, parentId })
-//
-// اما sync-queue از این الگو استفاده می‌کند:
-//   enqueue({ type: 'save', entityId, data, parentId, entityType })
-//
-// adapter این تبدیل را انجام می‌دهد.
 
 /**
- * تبدیل entry قدیمی store.js به op جدید sync-queue.
- * @param {object} oldEntry
- * @returns {object|null}
+ * تبدیل entry قدیمی store.js به op جدید.
  */
 export function adaptStoreEntry(oldEntry) {
     if (!oldEntry || typeof oldEntry !== 'object') return null;
-    const { type, id, data, parentId } = oldEntry;
+    const { type, id, data, parentId, timestamp } = oldEntry;
     if (!type || id === undefined) return null;
     return {
+        id: oldEntry.opId || uid(),
         type,
         entityId: String(id),
         entityType: parentId ? 'child' : 'task',
         data: data || null,
         parentId: parentId ? String(parentId) : null,
+        timestamp: timestamp || new Date().toISOString(),
     };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// پایان sync-queue.js
+// ═══════════════════════════════════════════════════════════════════════════
