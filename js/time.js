@@ -2,6 +2,7 @@
 // time.js -- server-corrected clock (ESM)
 
 import { state } from './core.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -70,14 +71,14 @@ export async function syncServerTime() {
 
         try {
             // نمایش وضعیت در حال اتصال (۱/۳)، (۲/۳)، ...
-            icon.title = `در حال اتصال (${i + 1}/${sources.length}) — ${source.label}...`;
+            icon.title = i18nT('header.timeSource.connectingIndex', { i: i + 1, n: sources.length, source: source.label });
 
             const ms = await source.fn(ctrl.signal);
             if (!Number.isFinite(ms)) continue;
 
             state.timeOffsetMs = ms - Date.now();
             icon.textContent = '🕐';
-            icon.title = `✓ زمان آنلاین (${source.label}) — همگام با سرور اینترنتی`;
+            icon.title = i18nT('header.timeSource.online', { source: source.label });
             icon.classList.remove('offline');
             icon.classList.add('online');
             return;
@@ -90,7 +91,7 @@ export async function syncServerTime() {
 
     // همه‌ی سرورها ناموفق بودند — آفلاین
     icon.textContent = '🕐';
-    icon.title = '⚠ آفلاین — مبنا ساعت دستگاه است';
+    icon.title = i18nT('header.timeSource.offline');
     icon.classList.remove('online');
     icon.classList.add('offline');
 }
