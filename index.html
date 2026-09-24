@@ -23,7 +23,7 @@
             if (meta) meta.content = effective === 'light' ? '#f0f3f8' : '#0a0a1a';
         })();
     </script>
-    <title>راه فردا | برنامه‌ریزی شخصی و مدیریت کارها</title>
+    <title data-i18n="app.title">راه فردا | برنامه‌ریزی شخصی و مدیریت کارها</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
     <link rel="manifest" href="./manifest.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -45,144 +45,134 @@
     <div class="container">
         <div class="app-shell">
             <div class="right-flow-container">
-                <button class="btn-small map-context-toggle map-divider-toggle" id="mapToggle" type="button" aria-label="نمایش یا پنهان کردن نقشه" title="نمایش یا پنهان کردن نقشه">🗺 نقشه: روشن</button>
+                <button class="btn-small map-context-toggle map-divider-toggle" id="mapToggle" type="button" data-i18n-aria-label="map.mapToggle.aria" data-i18n-title="map.mapToggle.title" aria-label="نمایش یا پنهان کردن نقشه" title="نمایش یا پنهان کردن نقشه">🗺 نقشه: روشن</button>
                 <div class="right-flow">
                     <div class="header">
                         <img class="site-logo" src="icons/logo.png" alt="لوگوی برنامه" onerror="this.style.display='none'">
                         <div class="header-main">
-                            <h1>راه فردا</h1>
-                            <button class="tagline-toggle" id="heroDescToggle" type="button">کارهایت، زمانت، مسیرت.</button>
+                            <h1 data-i18n="app.title">راه فردا</h1>
+                            <button class="tagline-toggle" id="heroDescToggle" type="button" data-i18n="app.tagline">کارهایت، زمانت، مسیرت.</button>
                         </div>
                         <div class="header-side">
                             <p class="today-line">
                                 <span id="todayLine"></span>
-                                <span class="time-source-icon" id="timeSourceIcon" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
-                                <!-- ═══════════════════════════════════════════════════════════
-                                     ⚠️ فاز ۵ گام ۵: نشانگر وضعیت آنلاین/آفلاین + صف sync
-                                     ═══════════════════════════════════════════════════════════ -->
-                                <button class="status-indicator" id="headerStatusIndicator" type="button" data-status="unknown" aria-label="در حال بررسی اتصال" title="در حال بررسی…">
+                                <span class="time-source-icon" id="timeSourceIcon" data-i18n-title="header.timeSource.connecting" data-i18n-aria-label="header.timeSource.aria" title="در حال اتصال..." aria-label="وضعیت زمان">🕐</span>
+                                <button class="status-indicator" id="headerStatusIndicator" type="button" data-status="unknown" data-i18n-title="header.status.unknown" data-i18n-aria-label="header.status.unknown" aria-label="در حال بررسی اتصال" title="در حال بررسی…">
                                     <span class="status-icon" aria-hidden="true">○</span>
                                     <span class="status-badge" hidden></span>
                                 </button>
                             </p>
                             <div class="header-actions">
-                                <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
+                                <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" data-i18n-aria-label="header.settings" data-i18n-title="header.settings" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mobile-tabs" role="tablist" aria-label="انتخاب نما">
-                        <button class="mobile-tab active" data-tab="tasks" role="tab" type="button">📋 وظایف</button>
-                        <button class="mobile-tab" data-tab="map" role="tab" type="button">🗺 نقشه</button>
+                    <div class="mobile-tabs" role="tablist" data-i18n-aria-label="tabs.ariaSelect" aria-label="انتخاب نما">
+                        <button class="mobile-tab active" data-tab="tasks" role="tab" type="button" data-i18n="tabs.tasks">📋 وظایف</button>
+                        <button class="mobile-tab" data-tab="map" role="tab" type="button" data-i18n="tabs.map">🗺 نقشه</button>
                     </div>
 
                     <div class="picker-overlay settings-overlay" id="settingsModal" hidden>
                         <section class="settings-panel settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
                         <div class="settings-panel-head">
-                            <div><span class="settings-kicker">شخصی‌سازی</span><h2 id="settingsTitle">تنظیمات</h2><p>رفتار، ظاهر و اعلان‌های راه فردا را مدیریت کنید.</p></div>
-                            <button class="settings-close" id="settingsCloseBtn" type="button" aria-label="بستن تنظیمات">×</button>
+                            <div><span class="settings-kicker" data-i18n="settings.kicker">شخصی‌سازی</span><h2 id="settingsTitle" data-i18n="settings.title">تنظیمات</h2><p data-i18n="settings.description">رفتار، ظاهر و اعلان‌های راه فردا را مدیریت کنید.</p></div>
+                            <button class="settings-close" id="settingsCloseBtn" type="button" data-i18n-aria-label="settings.close" aria-label="بستن تنظیمات">×</button>
                         </div>
                         <div class="settings-grid">
                             <section class="settings-card" aria-labelledby="appearanceSettingsTitle">
-                                <h3 id="appearanceSettingsTitle">ظاهر و زبان</h3>
+                                <h3 id="appearanceSettingsTitle" data-i18n="settings.sections.appearance.title">ظاهر و زبان</h3>
                                 <div class="settings-row">
-                                    <span>حالت نمایش</span><button class="btn-small theme-btn" id="themeBtn" type="button" aria-label="تغییر حالت نمایش" title="حالت نمایش: خودکار">🖥 خودکار</button>
+                                    <span data-i18n="settings.sections.appearance.theme">حالت نمایش</span><button class="btn-small theme-btn" id="themeBtn" type="button" data-i18n-aria-label="theme.labelAuto" data-i18n-title="theme.labelAuto" aria-label="تغییر حالت نمایش" title="حالت نمایش: خودکار">🖥 خودکار</button>
                                 </div>
-                                <div class="settings-row"><span>زبان رابط</span><button class="btn-small lang-btn" id="langBtn" type="button" aria-label="تغییر زبان" title="تغییر زبان">🌐 FA</button></div>
+                                <div class="settings-row"><span data-i18n="settings.sections.appearance.language">زبان رابط</span><button class="btn-small lang-btn" id="langBtn" type="button" data-i18n-aria-label="language.switchTo" data-i18n-title="language.switchTo" aria-label="تغییر زبان" title="تغییر زبان">🌐 FA</button></div>
                             </section>
                             <section class="settings-card" aria-labelledby="appSettingsTitle">
-                                <h3 id="appSettingsTitle">برنامه و حریم خصوصی</h3>
-                                <div class="settings-row"><span>استفاده روی دستگاه</span><button class="btn-small" id="installBtn" type="button" style="display: none;">⬇ نصب اپلیکیشن</button><span class="settings-note" id="installStatus">نصب از مرورگر در دسترس است</span></div>
-                                <div class="settings-row"><span>اطلاعات و داده‌ها</span><button class="btn-small" id="privacyBtn" type="button" title="حریم خصوصی شما">🔒 حریم خصوصی</button></div>
-                                <div class="settings-row"><span>پشتیبان‌گیری</span><button class="btn-small" id="exportBtn" type="button" title="ذخیره‌ی نسخه‌ی پشتیبان از داده‌ها">📤 پشتیبان‌گیری</button><button class="btn-small" id="importBtn" type="button" title="بازیابی از فایل پشتیبان">📥 بازیابی از پشتیبان</button></div>
+                                <h3 id="appSettingsTitle" data-i18n="settings.sections.app.title">برنامه و حریم خصوصی</h3>
+                                <div class="settings-row"><span data-i18n="settings.sections.app.deviceUsage">استفاده روی دستگاه</span><button class="btn-small" id="installBtn" type="button" style="display: none;" data-i18n="settings.sections.app.install">⬇ نصب اپلیکیشن</button><span class="settings-note" id="installStatus" data-i18n="settings.sections.app.installStatus">نصب از مرورگر در دسترس است</span></div>
+                                <div class="settings-row"><span data-i18n="settings.sections.app.dataPrivacy">اطلاعات و داده‌ها</span><button class="btn-small" id="privacyBtn" type="button" data-i18n="settings.sections.app.privacy" data-i18n-title="settings.sections.app.privacy" title="حریم خصوصی شما">🔒 حریم خصوصی</button></div>
+                                <div class="settings-row"><span data-i18n="settings.sections.app.backup">پشتیبان‌گیری</span><button class="btn-small" id="exportBtn" type="button" data-i18n="settings.sections.app.backupButton" data-i18n-title="settings.sections.app.backupButtonTitle" title="ذخیره‌ی نسخه‌ی پشتیبان از داده‌ها">📤 پشتیبان‌گیری</button><button class="btn-small" id="importBtn" type="button" data-i18n="settings.sections.app.restoreButton" data-i18n-title="settings.sections.app.restoreButtonTitle" title="بازیابی از فایل پشتیبان">📥 بازیابی از پشتیبان</button></div>
                             </section>
-                            <!-- ═══════════════════════════════════════════════════════════════
-                                 ⚠️ فاز ۶ گام ۲: کارت «حساب و همگام‌سازی»
-                                 ═══════════════════════════════════════════════════════════════ -->
                             <section class="settings-card settings-card-wide" aria-labelledby="accountSettingsTitle">
-                                <h3 id="accountSettingsTitle">حساب و همگام‌سازی</h3>
+                                <h3 id="accountSettingsTitle" data-i18n="settings.sections.account.title">حساب و همگام‌سازی</h3>
                                 <div class="settings-row">
-                                    <span>وضعیت حساب</span>
+                                    <span data-i18n="settings.sections.account.statusLabel">وضعیت حساب</span>
                                     <span class="account-status" id="accountStatusText" aria-live="polite">وارد نشده‌اید</span>
-                                    <button class="btn-small" id="authOpenBtn" type="button" aria-label="باز کردن مودال حساب کاربری">👤 حساب من</button>
+                                    <button class="btn-small" id="authOpenBtn" type="button" data-i18n="settings.sections.account.openButton" data-i18n-aria-label="auth.openAriaLabel" aria-label="باز کردن مودال حساب کاربری">👤 حساب من</button>
                                 </div>
                                 <div class="settings-row">
-                                    <span class="settings-note">برای همگام‌سازی بین دستگاه‌ها، ابتدا با تلگرام وارد شوید. اطلاعات شما همچنان روی همین دستگاه می‌ماند.</span>
+                                    <span class="settings-note" data-i18n="settings.sections.account.note">برای همگام‌سازی بین دستگاه‌ها، ابتدا با تلگرام وارد شوید. اطلاعات شما همچنان روی همین دستگاه می‌ماند.</span>
                                 </div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="reminderSettingsTitle">
-                                <h3 id="reminderSettingsTitle">یادآورها و اعلان‌ها</h3>
-                                <div class="settings-row"><label><input type="checkbox" id="setRemindOn"> یادآور جلسات</label><label>چند دقیقه قبل؟ <select id="setRemindMin" class="sort-select"><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60" selected>۱ ساعت</option><option value="180">۳ ساعت</option><option value="1440">۱ روز</option></select></label></div>
-                                <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> خلاصه صبحگاهی</label></div>
+                                <h3 id="reminderSettingsTitle" data-i18n="settings.sections.reminders.title">یادآورها و اعلان‌ها</h3>
+                                <div class="settings-row"><label><input type="checkbox" id="setRemindOn"> <span data-i18n="settings.sections.reminders.remindOn">یادآور جلسات</span></label><label><span data-i18n="settings.sections.reminders.remindBefore">چند دقیقه قبل؟</span> <select id="setRemindMin" class="sort-select"><option value="15" data-i18n="settings.sections.reminders.minutes15">۱۵ دقیقه</option><option value="30" data-i18n="settings.sections.reminders.minutes30">۳۰ دقیقه</option><option value="60" selected data-i18n="settings.sections.reminders.hour1">۱ ساعت</option><option value="180" data-i18n="settings.sections.reminders.hour3">۳ ساعت</option><option value="1440" data-i18n="settings.sections.reminders.day1">۱ روز</option></select></label></div>
+                                <div class="settings-row"><label><input type="checkbox" id="setDigestOn"> <span data-i18n="settings.sections.reminders.digestOn">خلاصه صبحگاهی</span></label></div>
 
-                                <!-- ⚠️ فاز ۵ گام ۳: بخش صدای یادآور سه‌حالته -->
                                 <div class="settings-row">
-                                    <label><input type="checkbox" id="setSoundOn"> صدای یادآور (کلید اصلی)</label>
-                                    <span class="settings-note">اگر خاموش باشد، هیچ صدایی پخش نمی‌شود.</span>
+                                    <label><input type="checkbox" id="setSoundOn"> <span data-i18n="sound.master">صدای یادآور (کلید اصلی)</span></label>
+                                    <span class="settings-note" data-i18n="sound.masterHint">اگر خاموش باشد، هیچ صدایی پخش نمی‌شود.</span>
                                 </div>
 
                                 <div class="sound-modes" id="soundModesWrap">
-                                    <!-- حالت ۱: ریتم پیش‌فرض -->
                                     <div class="sound-mode">
                                         <label class="sound-mode-toggle">
                                             <input type="checkbox" id="setSoundDefault">
                                             <span class="sound-mode-label">
-                                                <strong>🔔 ریتم پیش‌فرض</strong>
-                                                <small>دو نت ملایم با Web Audio API</small>
+                                                <strong data-i18n="sound.default.title">🔔 ریتم پیش‌فرض</strong>
+                                                <small data-i18n="sound.default.hint">دو نت ملایم با Web Audio API</small>
                                             </span>
                                         </label>
-                                        <button class="btn-small sound-test-btn" id="testSoundDefaultBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                        <button class="btn-small sound-test-btn" id="testSoundDefaultBtn" type="button" data-i18n="sound.test" data-i18n-title="sound.test" title="پخش آزمایشی">▶ تست</button>
                                     </div>
 
-                                    <!-- حالت ۲: ریتم‌های آماده -->
                                     <div class="sound-mode">
                                         <label class="sound-mode-toggle">
                                             <input type="checkbox" id="setSoundPresetOn">
                                             <span class="sound-mode-label">
-                                                <strong>🎵 ریتم آماده</strong>
-                                                <small>یک فایل صوتی از لیست زیر</small>
+                                                <strong data-i18n="sound.preset.title">🎵 ریتم آماده</strong>
+                                                <small data-i18n="sound.preset.hint">یک فایل صوتی از لیست زیر</small>
                                             </span>
                                         </label>
-                                        <button class="btn-small sound-test-btn" id="testSoundPresetBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                        <button class="btn-small sound-test-btn" id="testSoundPresetBtn" type="button" data-i18n="sound.test" data-i18n-title="sound.test" title="پخش آزمایشی">▶ تست</button>
                                     </div>
                                     <div class="settings-row sound-preset-select-row">
-                                        <label for="setSoundPreset">انتخاب ریتم:</label>
-                                        <select id="setSoundPreset" class="sort-select" aria-label="انتخاب ریتم آماده">
-                                            <option value="">— هیچ‌کدام —</option>
+                                        <label for="setSoundPreset" data-i18n="sound.preset.select">انتخاب ریتم:</label>
+                                        <select id="setSoundPreset" class="sort-select" data-i18n-aria-label="sound.preset.select" aria-label="انتخاب ریتم آماده">
+                                            <option value="" data-i18n="sound.preset.none">— هیچ‌کدام —</option>
                                         </select>
                                     </div>
 
-                                    <!-- حالت ۳: TTS -->
                                     <div class="sound-mode">
                                         <label class="sound-mode-toggle">
                                             <input type="checkbox" id="setSoundTtsOn">
                                             <span class="sound-mode-label">
-                                                <strong>🗣 خواندن عنوان (TTS)</strong>
-                                                <small>با speechSynthesis مرورگر</small>
+                                                <strong data-i18n="sound.tts.title">🗣 خواندن عنوان (TTS)</strong>
+                                                <small data-i18n="sound.tts.hint">با speechSynthesis مرورگر</small>
                                             </span>
                                         </label>
-                                        <button class="btn-small sound-test-btn" id="testSoundTtsBtn" type="button" title="پخش آزمایشی">▶ تست</button>
+                                        <button class="btn-small sound-test-btn" id="testSoundTtsBtn" type="button" data-i18n="sound.test" data-i18n-title="sound.test" title="پخش آزمایشی">▶ تست</button>
                                     </div>
                                     <div class="settings-row sound-preset-select-row" id="soundTtsVoiceRow" style="display: none;">
-                                        <label for="setSoundTtsVoice">انتخاب voice:</label>
-                                        <select id="setSoundTtsVoice" class="sort-select" aria-label="انتخاب voice">
-                                            <option value="">— پیش‌فرض مرورگر —</option>
+                                        <label for="setSoundTtsVoice" data-i18n="sound.tts.selectVoice">انتخاب voice:</label>
+                                        <select id="setSoundTtsVoice" class="sort-select" data-i18n-aria-label="sound.tts.selectVoice" aria-label="انتخاب voice">
+                                            <option value="" data-i18n="sound.tts.defaultVoice">— پیش‌فرض مرورگر —</option>
                                         </select>
                                     </div>
                                 </div>
                             </section>
                             <section class="settings-card settings-card-wide permissions-card" aria-labelledby="permissionsTitle">
-                                <h3 id="permissionsTitle">مجوزهای سیستم</h3>
-                                <p class="settings-note">وضعیت دسترسی‌های مرورگر را جداگانه بررسی و آزمایش کنید.</p>
+                                <h3 id="permissionsTitle" data-i18n="settings.sections.permissions.title">مجوزهای سیستم</h3>
+                                <p class="settings-note" data-i18n="settings.sections.permissions.description">وضعیت دسترسی‌های مرورگر را جداگانه بررسی و آزمایش کنید.</p>
                                 <div class="permission-grid">
-                                    <div class="permission-item"><div><strong>اعلان‌ها</strong><span id="permissionNotifStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionNotifBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionNotifTestBtn" type="button">تست</button></div>
-                                    <div class="permission-item"><div><strong>موقعیت مکانی</strong><span id="permissionLocationStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionLocationBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionLocationTestBtn" type="button">تست</button></div>
-                                    <div class="permission-item"><div><strong>میکروفون</strong><span id="permissionMicStatus">در حال بررسی…</span></div><button class="btn-small" id="permissionMicBtn" type="button">فعال‌سازی</button><button class="btn-small" id="permissionMicTestBtn" type="button">تست</button></div>
+                                    <div class="permission-item"><div><strong data-i18n="settings.sections.permissions.notifications">اعلان‌ها</strong><span id="permissionNotifStatus" data-i18n="settings.sections.permissions.statusUnknown">در حال بررسی…</span></div><button class="btn-small" id="permissionNotifBtn" type="button" data-i18n="settings.sections.permissions.enable">فعال‌سازی</button><button class="btn-small" id="permissionNotifTestBtn" type="button" data-i18n="settings.sections.permissions.test">تست</button></div>
+                                    <div class="permission-item"><div><strong data-i18n="settings.sections.permissions.location">موقعیت مکانی</strong><span id="permissionLocationStatus" data-i18n="settings.sections.permissions.statusUnknown">در حال بررسی…</span></div><button class="btn-small" id="permissionLocationBtn" type="button" data-i18n="settings.sections.permissions.enable">فعال‌سازی</button><button class="btn-small" id="permissionLocationTestBtn" type="button" data-i18n="settings.sections.permissions.test">تست</button></div>
+                                    <div class="permission-item"><div><strong data-i18n="settings.sections.permissions.microphone">میکروفون</strong><span id="permissionMicStatus" data-i18n="settings.sections.permissions.statusUnknown">در حال بررسی…</span></div><button class="btn-small" id="permissionMicBtn" type="button" data-i18n="settings.sections.permissions.enable">فعال‌سازی</button><button class="btn-small" id="permissionMicTestBtn" type="button" data-i18n="settings.sections.permissions.test">تست</button></div>
                                 </div>
                             </section>
                             <section class="settings-card settings-card-wide" aria-labelledby="advancedSettingsTitle">
-                                <h3 id="advancedSettingsTitle">تجربه حرفه‌ای</h3>
-                                <div class="settings-row"><label><input type="checkbox" id="setProMode"> حالت حرفه‌ای (گزینه‌های پیشرفته همیشه در دسترس)</label><span class="settings-note">این گزینه داده‌ها یا قابلیت‌ها را حذف نمی‌کند.</span></div>
+                                <h3 id="advancedSettingsTitle" data-i18n="settings.sections.advanced.title">تجربه حرفه‌ای</h3>
+                                <div class="settings-row"><label><input type="checkbox" id="setProMode"> <span data-i18n="settings.sections.advanced.proMode">حالت حرفه‌ای (گزینه‌های پیشرفته همیشه در دسترس)</span></label><span class="settings-note" data-i18n="settings.sections.advanced.proModeNote">این گزینه داده‌ها یا قابلیت‌ها را حذف نمی‌کند.</span></div>
                             </section>
                         </div>
                         </section>
@@ -190,50 +180,50 @@
 
                     <div class="layout">
                         <div class="panel active" id="panelTasks">
-                            <section class="task-zone create-zone" aria-label="افزودن">
-                                <h2 class="task-zone-title">افزودن</h2>
-                                <div class="kind3" role="group" aria-label="نوع مورد جدید">
-                                    <button class="kind3-btn active" data-kind="task" type="button">📝 یک کار</button>
-                                    <button class="kind3-btn" data-kind="plan" type="button">📂 یک برنامه</button>
-                                    <button class="kind3-btn" data-kind="series" type="button">📅 یک دوره</button>
+                            <section class="task-zone create-zone" data-i18n-aria-label="tasks.add" aria-label="افزودن">
+                                <h2 class="task-zone-title" data-i18n="tasks.add">افزودن</h2>
+                                <div class="kind3" role="group" data-i18n-aria-label="tasks.kind.aria" aria-label="نوع مورد جدید">
+                                    <button class="kind3-btn active" data-kind="task" type="button" data-i18n="tasks.kind.task">📝 یک کار</button>
+                                    <button class="kind3-btn" data-kind="plan" type="button" data-i18n="tasks.kind.plan">📂 یک برنامه</button>
+                                    <button class="kind3-btn" data-kind="series" type="button" data-i18n="tasks.kind.series">📅 یک دوره</button>
                                 </div>
                                 <div class="input-section">
-                                    <input type="text" id="taskInput" placeholder="کار جدید را بنویسید..." maxlength="200" autocomplete="off" aria-label="متن وظیفه جدید">
-                                    <button class="btn-icon mic-btn" id="micBtn" type="button" aria-label="ورود صوتی">🎤</button>
+                                    <input type="text" id="taskInput" data-i18n-placeholder="tasks.newPlaceholder" placeholder="کار جدید را بنویسید..." maxlength="200" autocomplete="off" data-i18n-aria-label="tasks.new" aria-label="متن وظیفه جدید">
+                                    <button class="btn-icon mic-btn" id="micBtn" type="button" data-i18n-aria-label="tasks.details.micAria" aria-label="ورود صوتی">🎤</button>
                                 </div>
                                 <div class="smart-chip" id="smartChip" style="display: none;">
                                     <span id="smartChipText"></span>
-                                    <button id="smartAccept" type="button">✓ اضافه کن</button>
-                                    <button id="smartDismiss" type="button" aria-label="بی‌خیال">✕</button>
+                                    <button id="smartAccept" type="button" data-i18n="tasks.smartSuggest.accept">✓ اضافه کن</button>
+                                    <button id="smartDismiss" type="button" data-i18n-aria-label="tasks.smartSuggest.dismissAria" aria-label="بی‌خیال">✕</button>
                                 </div>
                                 <div class="due-row">
-                                    <button class="due-btn" id="dueBtn" type="button" aria-label="تعیین سررسید برای وظیفه جدید">📅 <span>تعیین سررسید (اختیاری)</span></button>
-                                    <button class="due-btn" id="locBtn" type="button" aria-label="انتخاب محل روی نقشه">📍 انتخاب محل روی نقشه</button>
+                                    <button class="due-btn" id="dueBtn" type="button" data-i18n-aria-label="tasks.due.setAria" aria-label="تعیین سررسید برای وظیفه جدید"><span data-i18n="tasks.due.setButton">📅 تعیین سررسید (اختیاری)</span></button>
+                                    <button class="due-btn" id="locBtn" type="button" data-i18n-aria-label="tasks.due.pickLocationAria" aria-label="انتخاب محل روی نقشه"><span data-i18n="tasks.due.pickLocation">📍 انتخاب محل روی نقشه</span></button>
                                 </div>
                                 <div class="due-chips" id="dueChips" style="display: none;"></div>
                                 <div class="loc-chip" id="locChip" style="display: none;">
                                     <span id="locChipText"></span>
-                                    <button type="button" data-locclear aria-label="حذف محل">✕</button>
+                                    <button type="button" data-locclear data-i18n-aria-label="tasks.due.pickLocation" aria-label="حذف محل">✕</button>
                                 </div>
                                 <div id="planDatesWrap" style="display: none;">
                                     <div class="child-add" style="margin-bottom: 8px;">
-                                        <button class="due-btn" id="planStartBtn" type="button">📅 تاریخ شروع</button>
-                                        <button class="due-btn" id="planEndBtn" type="button">📅 تاریخ پایان</button>
-                                        <button class="due-clear" id="planDatesClear" type="button" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
+<button class="due-btn" id="planStartBtn" type="button" data-i18n="detail.sections.planDates.startButton">📅 تاریخ شروع</button>
+<button class="due-btn" id="planEndBtn" type="button" data-i18n="detail.sections.planDates.endButton">📅 تاریخ پایان</button>
+                                        <button class="due-clear" id="planDatesClear" type="button" data-i18n-aria-label="detail.sections.planDates.clearAria" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
                                     </div>
                                     <div class="loc-line" id="planDatesLine" style="display: none;"></div>
                                 </div>
                                 <div id="seriesRecurWrap" style="display: none;">
-                                    <div class="field-label" style="margin-bottom: 6px;">تکرار دوره</div>
+                                    <div class="field-label" style="margin-bottom: 6px;" data-i18n="tasks.series.recurTitle">تکرار دوره</div>
                                     <div class="recur-list" id="seriesRecurList">
-                                        <button type="button" data-srecur="hourly">ساعتی</button>
-                                        <button type="button" data-srecur="daily" class="on">روزانه</button>
-                                        <button type="button" data-srecur="weekly">هفتگی</button>
-                                        <button type="button" data-srecur="monthly">ماهانه</button>
-                                        <button type="button" data-srecur="hourlyN">هر چند ساعت...</button>
-                                        <button type="button" data-srecur="weeklyDays">روزهای هفته...</button>
-                                        <button type="button" data-srecur="monthlyDays">روزهای ماه...</button>
-                                        <button type="button" data-srecur="dates">تاریخ سررسید</button>
+                                        <button type="button" data-srecur="hourly" data-i18n="tasks.series.hourly">ساعتی</button>
+                                        <button type="button" data-srecur="daily" class="on" data-i18n="tasks.series.daily">روزانه</button>
+                                        <button type="button" data-srecur="weekly" data-i18n="tasks.series.weekly">هفتگی</button>
+                                        <button type="button" data-srecur="monthly" data-i18n="tasks.series.monthly">ماهانه</button>
+                                        <button type="button" data-srecur="hourlyN" data-i18n="tasks.series.hourlyN">هر چند ساعت...</button>
+                                        <button type="button" data-srecur="weeklyDays" data-i18n="tasks.series.weeklyDays">روزهای هفته...</button>
+                                        <button type="button" data-srecur="monthlyDays" data-i18n="tasks.series.monthlyDays">روزهای ماه...</button>
+                                        <button type="button" data-srecur="dates" data-i18n="tasks.series.dates">تاریخ سررسید</button>
                                     </div>
                                     <div id="seriesSubHours" style="display: none;">
                                         <div class="chip-row" style="margin-bottom: 8px;">
@@ -244,7 +234,7 @@
                                             <button type="button" class="day-chip" data-snh="12">۱۲</button>
                                             <button type="button" class="day-chip" data-snh="24">۲۴</button>
                                         </div>
-                                        <label class="more-row"><span>هر چند ساعت؟</span><input type="number" id="seriesN" min="1" max="168" value="8"></label>
+                                        <label class="more-row"><span data-i18n="tasks.series.everyNHours">هر چند ساعت؟</span><input type="number" id="seriesN" min="1" max="168" value="8"></label>
                                     </div>
                                     <div id="seriesSubWeek" style="display: none;">
                                         <div class="chip-row">
@@ -261,86 +251,86 @@
                                         <div class="chip-row" id="seriesMonthChips"></div>
                                     </div>
                                     <div id="dueChipsSlot"></div>
-                                    <button class="due-btn" id="seriesAddDate" type="button" style="display: none;">＋ افزودن تاریخ سررسید</button>
+                                    <button class="due-btn" id="seriesAddDate" type="button" style="display: none;" data-i18n="tasks.series.addDate">＋ افزودن تاریخ سررسید</button>
                                     <div class="field-error" id="seriesError"></div>
                                 </div>
                                 <details class="more-details" id="moreDetails">
-                                    <summary>＋ جزئیات بیشتر</summary>
+                                    <summary data-i18n="tasks.details.summary">＋ جزئیات بیشتر</summary>
                                     <div class="more-grid">
-                                        <label class="more-row"><span>اولویت</span>
-                                            <select id="prioritySelect" class="priority-select" aria-label="سطح اولویت">
-                                                <option value="low">اولویت کم</option>
-                                                <option value="medium" selected>اولویت متوسط</option>
-                                                <option value="high">اولویت زیاد</option>
+                                        <label class="more-row"><span data-i18n="tasks.details.priority">اولویت</span>
+                                            <select id="prioritySelect" class="priority-select" data-i18n-aria-label="tasks.details.priorityAria" aria-label="سطح اولویت">
+                                                <option value="low" data-i18n="tasks.priority.low">اولویت کم</option>
+                                                <option value="medium" selected data-i18n="tasks.priority.medium">اولویت متوسط</option>
+                                                <option value="high" data-i18n="tasks.priority.high">اولویت زیاد</option>
                                             </select>
                                         </label>
-                                        <label class="more-row"><span>توضیح</span>
-                                            <span class="text-input-with-mic"><input type="text" id="descInput" maxlength="200" placeholder="توضیح کوتاه..." aria-label="توضیح"><button class="btn-icon mic-btn" data-mic-target="descInput" type="button" aria-label="ورود صوتی برای توضیح">🎤</button></span>
+                                        <label class="more-row"><span data-i18n="tasks.details.description">توضیح</span>
+                                            <span class="text-input-with-mic"><input type="text" id="descInput" maxlength="200" data-i18n-placeholder="tasks.details.descriptionPlaceholder" placeholder="توضیح کوتاه..." data-i18n-aria-label="tasks.details.descriptionAria" aria-label="توضیح"><button class="btn-icon mic-btn" data-mic-target="descInput" type="button" data-i18n-aria-label="tasks.details.micAria" aria-label="ورود صوتی برای توضیح">🎤</button></span>
                                         </label>
                                     </div>
                                 </details>
                                 <div id="planKidsWrap" style="display: none;">
                                     <div class="due-chips" id="planKidChips" style="display: none;"></div>
                                     <div class="child-add">
-                                        <span class="text-input-with-mic"><input type="text" class="child-input" id="planKidInput" placeholder="کار جدید..." maxlength="200" aria-label="عنوان کار جدید"><button class="btn-icon mic-btn" data-mic-target="planKidInput" type="button" aria-label="ورود صوتی برای زیرکار">🎤</button></span>
-                                        <button class="btn-add btn-child-add" id="planKidAdd" type="button">افزودن</button>
+                                        <span class="text-input-with-mic"><input type="text" class="child-input" id="planKidInput" data-i18n-placeholder="tasks.plan.newChildPlaceholder" placeholder="کار جدید..." maxlength="200" data-i18n-aria-label="tasks.plan.newChildAria" aria-label="عنوان کار جدید"><button class="btn-icon mic-btn" data-mic-target="planKidInput" type="button" data-i18n-aria-label="tasks.plan.micChildAria" aria-label="ورود صوتی برای زیرکار">🎤</button></span>
+                                        <button class="btn-add btn-child-add" id="planKidAdd" type="button" data-i18n="tasks.plan.addChild">افزودن</button>
                                     </div>
                                 </div>
-                                <button class="due-btn template-toggle" id="templateBtn" type="button" style="display: none;">📁 ساخت برنامه از قالب آماده</button>
+                                <button class="due-btn template-toggle" id="templateBtn" type="button" style="display: none;" data-i18n="tasks.plan.fromTemplate">📁 ساخت برنامه از قالب آماده</button>
                                 <div class="form-actions">
-                                    <button class="btn-add" id="addBtn">افزودن کار</button>
+                                    <button class="btn-add" id="addBtn" data-i18n="tasks.addButton.task">افزودن کار</button>
                                 </div>
                             </section>
 
-                            <section class="task-zone list-zone" aria-label="جستجوی وظایف">
-                                <h2 class="task-zone-title">جستجوی وظایف</h2>
+                            <section class="task-zone list-zone" data-i18n-aria-label="tasks.search.title" aria-label="جستجوی وظایف">
+                                <h2 class="task-zone-title" data-i18n="tasks.search.title">جستجوی وظایف</h2>
                                 <div class="search-row">
                                     <span class="search-icon" aria-hidden="true">🔍</span>
-                                    <input type="search" id="searchInput" placeholder="جستجو در وظایف..." autocomplete="off" aria-label="جستجو در وظایف">
+                                    <input type="search" id="searchInput" data-i18n-placeholder="tasks.search.placeholder" placeholder="جستجو در وظایف..." autocomplete="off" data-i18n-aria-label="tasks.search.aria" aria-label="جستجو در وظایف">
                                 </div>
-                                <div class="filters" role="group" aria-label="فیلتر وظایف">
-                                    <button class="filter-btn active" data-filter="all">همه</button>
-                                    <button class="filter-btn" data-filter="active">انجام نشده</button>
-                                    <button class="filter-btn" data-filter="completed">انجام شده</button>
+                                <div class="filters" role="group" data-i18n-aria-label="tasks.filter.aria" aria-label="فیلتر وظایف">
+                                    <button class="filter-btn active" data-filter="all" data-i18n="tasks.filter.all">همه</button>
+                                    <button class="filter-btn" data-filter="active" data-i18n="tasks.filter.active">انجام نشده</button>
+                                    <button class="filter-btn" data-filter="completed" data-i18n="tasks.filter.completed">انجام شده</button>
                                     <button class="filter-btn" id="dayChip" type="button" style="display: none;"></button>
-                                    <button class="filter-btn" data-filter="hasloc">📍 محل‌دار</button>
-                                    <button class="filter-btn" data-filter="hasdue">📅 سررسیددار</button>
-                                    <button class="filter-btn" data-filter="archived">📦 بایگانی</button>
+                                    <button class="filter-btn" data-filter="hasloc" data-i18n="tasks.filter.hasloc">📍 محل‌دار</button>
+                                    <button class="filter-btn" data-filter="hasdue" data-i18n="tasks.filter.hasdue">📅 سررسیددار</button>
+                                    <button class="filter-btn" data-filter="archived" data-i18n="tasks.filter.archived">📦 بایگانی</button>
                                 </div>
                                 <div class="sort-row">
-                                    <label for="sortSelect">مرتب‌سازی:</label>
-                                    <select id="sortSelect" class="sort-select" title="نکته: در حالت «دستی» می‌توانید کارت‌ها را با درگ جابه‌جا کنید">
-                                        <option value="newest">جدیدترین</option>
-                                        <option value="due">نزدیک‌ترین سررسید</option>
-                                        <option value="oldest">قدیمی‌ترین</option>
-                                        <option value="alpha">الفبا</option>
-                                        <option value="manual">دستی (درگ)</option>
+                                    <label for="sortSelect" data-i18n="tasks.sort.label">مرتب‌سازی:</label>
+                                    <select id="sortSelect" class="sort-select" data-i18n-title="tasks.sort.title" title="نکته: در حالت «دستی» می‌توانید کارت‌ها را با درگ جابه‌جا کنید">
+                                        <option value="newest" data-i18n="tasks.sort.newest">جدیدترین</option>
+                                        <option value="due" data-i18n="tasks.sort.due">نزدیک‌ترین سررسید</option>
+                                        <option value="oldest" data-i18n="tasks.sort.oldest">قدیمی‌ترین</option>
+                                        <option value="alpha" data-i18n="tasks.sort.alpha">الفبا</option>
+                                        <option value="manual" data-i18n="tasks.sort.manual">دستی (درگ)</option>
                                     </select>
-                                    <button class="btn-small" id="calBtn" type="button">📅 تقویم</button>
-                                    <button class="btn-small" id="trashBtn" type="button">🗑 سطل<span id="trashCount"></span></button>
+                                    <button class="btn-small" id="calBtn" type="button" data-i18n="tasks.buttons.calendar">📅 تقویم</button>
+                                    <button class="btn-small" id="trashBtn" type="button"><span data-i18n="tasks.buttons.trash">🗑 سطل</span><span id="trashCount"></span></button>
                                 </div>
                                 <div class="progress-wrap">
                                     <div class="progress-label">
-                                        <span>پیشرفت انجام وظایف</span>
+                                        <span data-i18n="tasks.progress.label">پیشرفت انجام وظایف</span>
                                         <span class="pct" id="progressPct">۰٪</span>
                                     </div>
-                                    <div class="progress" role="progressbar" aria-label="درصد پیشرفت" aria-valuemin="0" aria-valuemax="100" id="progressBar">
+                                    <div class="progress" role="progressbar" data-i18n-aria-label="tasks.progress.aria" aria-label="درصد پیشرفت" aria-valuemin="0" aria-valuemax="100" id="progressBar">
                                         <div class="progress-fill" id="progressFill"></div>
                                     </div>
                                 </div>
                                 <div class="stats">
-                                    <span>کل: <span class="num" id="totalCount">۰</span></span>
-                                    <span>انجام شده: <span class="num" id="doneCount">۰</span></span>
-                                    <span>باقی‌مانده: <span class="num" id="remainCount">۰</span></span>
+                                    <span><span data-i18n="tasks.stats.total">کل:</span> <span class="num" id="totalCount">۰</span></span>
+                                    <span><span data-i18n="tasks.stats.done">انجام شده:</span> <span class="num" id="doneCount">۰</span></span>
+                                    <span><span data-i18n="tasks.stats.remaining">باقی‌مانده:</span> <span class="num" id="remainCount">۰</span></span>
                                 </div>
                                 <div class="task-list" id="taskList"></div>
                                 <div class="live-status" id="taskListStatus" role="status" aria-live="polite"></div>
                                 <div class="done-actions" id="doneActions" style="display: none;">
-                                    <button class="btn-clear" id="clearDone" type="button">پاک کردن انجام شده‌ها</button>
-                                    <button class="btn-clear" id="archiveDone" type="button">📦 بایگانی انجام‌شده‌ها</button>
+                                    <button class="btn-clear" id="clearDone" type="button" data-i18n="tasks.done.clearCompleted">پاک کردن انجام شده‌ها</button>
+                                    <button class="btn-clear" id="archiveDone" type="button" data-i18n="tasks.done.archiveDone">📦 بایگانی انجام‌شده‌ها</button>
                                 </div>
                                 <div class="insight-zone">
-                                    <h2 class="task-zone-title">گزارش پیشرفت</h2>
+                                    <h2 class="task-zone-title" data-i18n="tasks.insight.title">گزارش پیشرفت</h2>
                                     <div class="stats-box" id="statsBox"></div>
                                 </div>
                             </section>
@@ -349,29 +339,29 @@
 
                     <footer class="app-footer">
                         <div>
-                            <span>ساخته‌شده با ❤ توسط <a href="https://www.linkedin.com/in/mahdi-amouzegar/" target="_blank" rel="noopener">مهدی آموزگار</a></span>
+                            <span data-i18n="app.footer.madeWith">ساخته‌شده با ❤ توسط</span> <a href="https://www.linkedin.com/in/mahdi-amouzegar/" target="_blank" rel="noopener" data-i18n="app.footer.author">مهدی آموزگار</a>
                             <span class="app-footer__sep">·</span>
-                            <span class="donate-soon" title="به‌زودی: درگاه حمایت مالی">☕ حمایت مالی (به‌زودی)</span>
+                            <span class="donate-soon" data-i18n="app.footer.donateSoon" data-i18n-title="app.footer.donateSoon" title="به‌زودی: درگاه حمایت مالی">☕ حمایت مالی (به‌زودی)</span>
                         </div>
-                        <div class="app-footer__small">© <span id="copyYear">۱۴۰۵</span> — همه حقوق محفوظ است · 🔒 اطلاعات شما فقط روی همین دستگاه می‌ماند</div>
+                        <div class="app-footer__small" id="footerCopyright">© <span id="copyYear">۱۴۰۵</span> — همه حقوق محفوظ است · 🔒 اطلاعات شما فقط روی همین دستگاه می‌ماند</div>
                     </footer>
 
-                    <nav class="bottom-actions" aria-label="دسترسی سریع">
-                        <button class="bottom-action" type="button" data-action="new-task" aria-label="کار جدید">
+                    <nav class="bottom-actions" data-i18n-aria-label="bottomActions.ariaQuickAccess" aria-label="دسترسی سریع">
+                        <button class="bottom-action" type="button" data-action="new-task" data-i18n-aria-label="bottomActions.newTask" aria-label="کار جدید">
                             <span class="bottom-action-icon" aria-hidden="true">➕</span>
-                            <span class="bottom-action-label">کار جدید</span>
+                            <span class="bottom-action-label" data-i18n="bottomActions.newTask">کار جدید</span>
                         </button>
-                        <button class="bottom-action" type="button" data-action="new-plan" aria-label="برنامه جدید">
+                        <button class="bottom-action" type="button" data-action="new-plan" data-i18n-aria-label="bottomActions.newPlan" aria-label="برنامه جدید">
                             <span class="bottom-action-icon" aria-hidden="true">📂</span>
-                            <span class="bottom-action-label">برنامه جدید</span>
+                            <span class="bottom-action-label" data-i18n="bottomActions.newPlan">برنامه جدید</span>
                         </button>
-                        <button class="bottom-action" type="button" data-action="new-series" aria-label="دوره جدید">
+                        <button class="bottom-action" type="button" data-action="new-series" data-i18n-aria-label="bottomActions.newSeries" aria-label="دوره جدید">
                             <span class="bottom-action-icon" aria-hidden="true">📅</span>
-                            <span class="bottom-action-label">دوره جدید</span>
+                            <span class="bottom-action-label" data-i18n="bottomActions.newSeries">دوره جدید</span>
                         </button>
-                        <button class="bottom-action" type="button" data-action="open-settings" aria-label="تنظیمات">
+                        <button class="bottom-action" type="button" data-action="open-settings" data-i18n-aria-label="bottomActions.settings" aria-label="تنظیمات">
                             <span class="bottom-action-icon" aria-hidden="true">⚙</span>
-                            <span class="bottom-action-label">تنظیمات</span>
+                            <span class="bottom-action-label" data-i18n="bottomActions.settings">تنظیمات</span>
                         </button>
                     </nav>
                 </div>
@@ -379,62 +369,62 @@
 
             <div class="panel" id="panelMap">
                 <div class="map-head">
-                    <span class="map-title">🗺 نقشه محل وظایف</span>
+                    <span class="map-title" data-i18n="map.title">🗺 نقشه محل وظایف</span>
                     <div class="map-head-actions">
-                        <button class="btn-small" id="myLocBtn" type="button">📍 موقعیت من</button>
-                        <button class="btn-small" id="liveTrackBtn" type="button" aria-label="ردیابی موقعیت آنلاین" title="ردیابی موقعیت آنلاین">📡 ردیابی آنلاین</button>
-                        <button class="btn-small" id="fsBtn" type="button" aria-label="نقشه تمام‌صفحه">⛶</button>
-                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;">✕ مسیر</button>
+                        <button class="btn-small" id="myLocBtn" type="button" data-i18n="map.myLocation">📍 موقعیت من</button>
+                        <button class="btn-small" id="liveTrackBtn" type="button" data-i18n="map.liveTracking" data-i18n-aria-label="map.liveTracking" data-i18n-title="map.liveTracking" aria-label="ردیابی موقعیت آنلاین" title="ردیابی موقعیت آنلاین">📡 ردیابی آنلاین</button>
+                        <button class="btn-small" id="fsBtn" type="button" data-i18n-aria-label="map.fullscreen" aria-label="نقشه تمام‌صفحه">⛶</button>
+                        <button class="btn-small" id="routeClearBtn" type="button" style="display: none;" data-i18n="map.clearRoute">✕ مسیر</button>
                     </div>
                 </div>
                 <div class="map-search">
                     <div class="map-search-row">
                         <span class="map-search-icon" aria-hidden="true">🔍</span>
-                        <input type="search" id="mapSearchInput" placeholder="جستجوی مکان، آدرس، شهر..." autocomplete="off" aria-label="جستجوی مکان">
-                        <button class="btn-icon mic-btn map-search-mic" type="button" data-mic-target="mapSearchInput" aria-label="ورود صوتی برای جستجو">🎤</button>
-                        <button class="map-search-clear" id="mapSearchClear" type="button" aria-label="پاک کردن جستجو" style="display: none;">✕</button>
+                        <input type="search" id="mapSearchInput" data-i18n-placeholder="map.search.placeholder" placeholder="جستجوی مکان، آدرس، شهر..." autocomplete="off" data-i18n-aria-label="map.search.aria" aria-label="جستجوی مکان">
+                        <button class="btn-icon mic-btn map-search-mic" type="button" data-mic-target="mapSearchInput" data-i18n-aria-label="map.search.micAria" aria-label="ورود صوتی برای جستجو">🎤</button>
+                        <button class="map-search-clear" id="mapSearchClear" type="button" data-i18n-aria-label="map.search.clearAria" aria-label="پاک کردن جستجو" style="display: none;">✕</button>
                     </div>
                     <div class="map-search-results" id="mapSearchResults" style="display: none;"></div>
                 </div>
                 <div class="map-wrap">
-                    <div id="map" role="application" aria-label="نقشه تعاملی"></div>
+                    <div id="map" role="application" data-i18n-aria-label="map.panelAria" aria-label="نقشه تعاملی"></div>
                     <div class="map-hint" id="mapHint"></div>
-                    <button class="fs-exit" id="fsExit" type="button" style="display: none;">✕ بستن نقشه تمام‌صفحه</button>
+                    <button class="fs-exit" id="fsExit" type="button" style="display: none;" data-i18n="map.exitFullscreen">✕ بستن نقشه تمام‌صفحه</button>
                 </div>
                 <div class="mobile-pick-banner" id="mobilePickBanner" style="display: none;">
-                    <span class="mobile-pick-banner-text" id="mobilePickBannerText">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
-                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button">لغو</button>
+                    <span class="mobile-pick-banner-text" id="mobilePickBannerText" data-i18n="location.pickBanner">روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.</span>
+                    <button class="mobile-pick-banner-cancel" id="mobilePickBannerCancel" type="button" data-i18n="location.cancel">لغو</button>
                 </div>
-                <p class="map-note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
+                <p class="map-note" data-i18n="map.note">روی هر نقطه از نقشه کلیک کنید تا محل وظیفه جدید انتخاب و فرم ثبت باز شود. از دکمه لایه‌ها (بالا سمت چپ نقشه) حالت معمولی، تاریک یا ماهواره‌ای را انتخاب کنید.</p>
             </div>
         </div>
     </div>
 
-    <section class="detail-page" id="detailPage" style="display: none;" aria-label="جزئیات وظیفه">
+    <section class="detail-page" id="detailPage" style="display: none;" data-i18n-aria-label="detail.title" aria-label="جزئیات وظیفه">
         <div class="detail-inner">
             <div class="detail-header">
-                <button class="btn-icon" id="detailBack" aria-label="بازگشت به لیست">→</button>
-                <h2 id="detailTitle">جزئیات وظیفه</h2>
+                <button class="btn-icon" id="detailBack" data-i18n-aria-label="detail.back" aria-label="بازگشت به لیست">→</button>
+                <h2 id="detailTitle" data-i18n="detail.title">جزئیات وظیفه</h2>
             </div>
             <div class="detail-card">
                 <section class="detail-section detail-accordion basic" data-detail-section="basic" aria-labelledby="detailBasicTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">اصلی</span><h3 id="detailBasicTitle">اطلاعات اصلی</h3></div><span class="detail-section-status">ویرایش‌پذیر</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.basic.kicker">اصلی</span><h3 id="detailBasicTitle" data-i18n="detail.sections.basic.title">اطلاعات اصلی</h3></div><span class="detail-section-status" data-i18n="detail.sections.basic.status">ویرایش‌پذیر</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <label class="field"><span class="field-label">عنوان</span><input type="text" id="fTitle" maxlength="200" autocomplete="off"></label>
-                        <label class="field"><span class="field-label">سطح اولویت</span><select id="fPriority" class="sort-select"><option value="low">اولویت کم</option><option value="medium">اولویت متوسط</option><option value="high">اولویت زیاد</option></select></label>
-                        <div class="field pin-row"><input type="checkbox" id="fPin"><label class="field-label" for="fPin">📌 سنجاق به بالای لیست</label></div>
-                        <label class="field"><span class="field-label">توضیح بیشتر</span><textarea id="fDesc" rows="3" maxlength="1000" placeholder="مثلاً نام پزشک، علت مراجعه..."></textarea></label>
+                        <label class="field"><span class="field-label" data-i18n="detail.fields.title">عنوان</span><input type="text" id="fTitle" maxlength="200" autocomplete="off"></label>
+                        <label class="field"><span class="field-label" data-i18n="detail.fields.priority">سطح اولویت</span><select id="fPriority" class="sort-select"><option value="low" data-i18n="tasks.priority.low">اولویت کم</option><option value="medium" data-i18n="tasks.priority.medium">اولویت متوسط</option><option value="high" data-i18n="tasks.priority.high">اولویت زیاد</option></select></label>
+                        <div class="field pin-row"><input type="checkbox" id="fPin"><label class="field-label" for="fPin" data-i18n="detail.fields.pin">📌 سنجاق به بالای لیست</label></div>
+                        <label class="field"><span class="field-label" data-i18n="detail.fields.description">توضیح بیشتر</span><textarea id="fDesc" rows="3" maxlength="1000" data-i18n-placeholder="detail.fields.descriptionPlaceholder" placeholder="مثلاً نام پزشک، علت مراجعه..."></textarea></label>
                     </div>
                 </section>
 
                 <section class="detail-section detail-accordion plan-dates" data-detail-section="plan-dates" aria-labelledby="detailPlanDatesTitle" style="display: none;">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">بازه</span><h3 id="detailPlanDatesTitle">تاریخ شروع و پایان</h3></div><span class="detail-section-status">فقط برنامه</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.planDates.kicker">بازه</span><h3 id="detailPlanDatesTitle" data-i18n="detail.sections.planDates.title">تاریخ شروع و پایان</h3></div><span class="detail-section-status" data-i18n="detail.sections.planDates.status">فقط برنامه</span></div>
                     <div class="detail-section-body detail-accordion-body">
                         <div class="field">
                             <div class="loc-btns" style="flex-wrap: wrap;">
-                                <button class="due-btn" id="detailPlanStartBtn" type="button">📅 تاریخ شروع</button>
-                                <button class="due-btn" id="detailPlanEndBtn" type="button">📅 تاریخ پایان</button>
-                                <button class="due-clear" id="detailPlanDatesClear" type="button" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
+                                <button class="due-btn" id="detailPlanStartBtn" type="button" data-i18n="detail.sections.planDates.startButton">📅 تاریخ شروع</button>
+                                <button class="due-btn" id="detailPlanEndBtn" type="button" data-i18n="detail.sections.planDates.endButton">📅 تاریخ پایان</button>
+                                <button class="due-clear" id="detailPlanDatesClear" type="button" data-i18n-aria-label="detail.sections.planDates.clearAria" aria-label="حذف تاریخ‌ها" style="display: none;">✕</button>
                             </div>
                             <div class="loc-line" id="detailPlanDatesLine" style="margin-top: 8px; display: none;"></div>
                         </div>
@@ -443,183 +433,183 @@
 
                 <div class="smart-chip detail-smart-chip" id="detailSmartChip" style="display: none;">
                     <span id="detailSmartChipText"></span>
-                    <button id="detailSmartAccept" type="button">✓ اضافه کن</button>
-                    <button id="detailSmartDismiss" type="button" aria-label="بی‌خیال">✕</button>
+                    <button id="detailSmartAccept" type="button" data-i18n="tasks.smartSuggest.accept">✓ اضافه کن</button>
+                    <button id="detailSmartDismiss" type="button" data-i18n-aria-label="tasks.smartSuggest.dismissAria" aria-label="بی‌خیال">✕</button>
                 </div>
                 <section class="detail-section detail-accordion sessions" data-detail-section="sessions" aria-labelledby="detailSessionsTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">برنامه</span><h3 id="detailSessionsTitle">جلسه‌ها و تاریخ‌ها <span class="count-badge" id="sessCount" aria-label="تعداد جلسه‌ها"></span></h3></div><span class="detail-section-status">فعال</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.sessions.kicker">برنامه</span><h3 id="detailSessionsTitle"><span data-i18n="detail.sections.sessions.title">جلسه‌ها و تاریخ‌ها</span> <span class="count-badge" id="sessCount" data-i18n-aria-label="detail.sections.sessions.countAria" aria-label="تعداد جلسه‌ها"></span></h3></div><span class="detail-section-status" data-i18n="detail.sections.sessions.status">فعال</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button">＋ افزودن جلسه</button></div>
+                        <div class="field"><div class="session-list" id="sessList"></div><button class="due-btn" id="addSessionBtn" type="button" data-i18n="detail.sections.sessions.addButton">＋ افزودن جلسه</button></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion location" data-detail-section="location" aria-labelledby="detailLocationTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">مکان</span><h3 id="detailLocationTitle">محل روی نقشه</h3></div><span class="detail-section-status">مکان‌محور</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.location.kicker">مکان</span><h3 id="detailLocationTitle" data-i18n="detail.sections.location.title">محل روی نقشه</h3></div><span class="detail-section-status" data-i18n="detail.sections.location.status">مکان‌محور</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field" id="fLocField"><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" aria-label="حذف محل">✕</button></div></div>
+                        <div class="field" id="fLocField"><div class="loc-line" id="detailLocLine"></div><div class="loc-btns"><button class="due-btn" id="detailLocShow" type="button" data-i18n="detail.sections.location.show">نمایش روی نقشه</button><button class="due-btn" id="detailLocRoute" type="button" data-i18n="detail.sections.location.route">🧭 فاصله و مسیر</button><button class="due-btn" id="detailLocChange" type="button" data-i18n="detail.sections.location.change">تغییر محل</button><button class="due-clear" id="detailLocRemove" type="button" data-i18n-aria-label="detail.sections.location.removeAria" aria-label="حذف محل">✕</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion recurrence" data-detail-section="recurrence" aria-labelledby="detailRecurrenceTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">زمان‌بندی</span><h3 id="detailRecurrenceTitle">تکرار و زمان‌بندی</h3></div><span class="detail-section-status">پیشرفته</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.recurrence.kicker">زمان‌بندی</span><h3 id="detailRecurrenceTitle" data-i18n="detail.sections.recurrence.title">تکرار و زمان‌بندی</h3></div><span class="detail-section-status" data-i18n="detail.sections.recurrence.status">پیشرفته</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <label class="field"><select id="fRecur" class="sort-select"><option value="none">بدون تکرار</option><option value="daily">روزانه</option><option value="weekly">هفتگی</option><option value="monthly">ماهانه</option><option value="custom">هر چند روز...</option><option value="hourly">هر چند ساعت...</option><option value="weeklyDays">روزهای هفته...</option><option value="monthlyDays">روزهای ماه...</option></select></label>
-                        <div class="field" id="fRecurWeekRow" style="display: none;"><span class="field-label">کدام روزها؟</span><div class="chip-row" id="fRecurWeekChips"></div></div>
-                        <div class="field" id="fRecurMonthRow" style="display: none;"><span class="field-label">کدام روزهای ماه؟</span><div class="chip-row" id="fRecurMonthChips"></div></div>
-                        <div class="field" id="fRecurNRow" style="display: none;"><span class="field-label">هر چند روز؟</span><input type="number" id="fRecurN" min="1" max="365" value="2"></div>
+                        <label class="field"><select id="fRecur" class="sort-select"><option value="none" data-i18n="detail.sections.recurrence.none">بدون تکرار</option><option value="daily" data-i18n="detail.sections.recurrence.daily">روزانه</option><option value="weekly" data-i18n="detail.sections.recurrence.weekly">هفتگی</option><option value="monthly" data-i18n="detail.sections.recurrence.monthly">ماهانه</option><option value="custom" data-i18n="detail.sections.recurrence.custom">هر چند روز...</option><option value="hourly" data-i18n="detail.sections.recurrence.hourly">هر چند ساعت...</option><option value="weeklyDays" data-i18n="detail.sections.recurrence.weeklyDays">روزهای هفته...</option><option value="monthlyDays" data-i18n="detail.sections.recurrence.monthlyDays">روزهای ماه...</option></select></label>
+                        <div class="field" id="fRecurWeekRow" style="display: none;"><span class="field-label" data-i18n="detail.sections.recurrence.whichDays">کدام روزها؟</span><div class="chip-row" id="fRecurWeekChips"></div></div>
+                        <div class="field" id="fRecurMonthRow" style="display: none;"><span class="field-label" data-i18n="detail.sections.recurrence.whichMonthDays">کدام روزهای ماه؟</span><div class="chip-row" id="fRecurMonthChips"></div></div>
+                        <div class="field" id="fRecurNRow" style="display: none;"><span class="field-label" data-i18n="detail.sections.recurrence.everyNDays">هر چند روز؟</span><input type="number" id="fRecurN" min="1" max="365" value="2"></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion contact" data-detail-section="contact" aria-labelledby="detailContactTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">ارتباط</span><h3 id="detailContactTitle">تماس و منابع</h3></div><span class="detail-section-status">پیشرفته</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.contact.kicker">ارتباط</span><h3 id="detailContactTitle" data-i18n="detail.sections.contact.title">تماس و منابع</h3></div><span class="detail-section-status" data-i18n="detail.sections.contact.status">پیشرفته</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><label class="field-label" for="fPhone">تلفن تماس</label><input type="tel" id="fPhone" class="ltr" maxlength="20" placeholder="0912..." autocomplete="off"><a class="due-btn call-btn" id="fPhoneCall" href="#" style="display: none;">📞 تماس گرفتن</a><span class="field-error" id="fPhoneError"></span></div>
-                        <label class="field"><span class="field-label">آدرس پستی</span><textarea id="fAddr" rows="2" maxlength="500" placeholder="آدرس مطب یا محل..."></textarea></label>
-                        <div class="field"><label class="field-label" for="fUrl">آدرس اینترنتی</label><input type="url" id="fUrl" class="ltr" maxlength="300" placeholder="https://..." autocomplete="off" dir="ltr"><div class="link-row"><a class="field-link" id="fUrlOpen" href="#" target="_blank" rel="noopener" style="display: none;">باز کردن پیوند ↗</a><button class="due-btn" id="fUrlCopy" type="button" style="display: none;">📋 کپی لینک</button></div></div>
+                        <div class="field"><label class="field-label" for="fPhone" data-i18n="detail.sections.contact.phone">تلفن تماس</label><input type="tel" id="fPhone" class="ltr" maxlength="20" data-i18n-placeholder="detail.sections.contact.phonePlaceholder" placeholder="0912..." autocomplete="off"><a class="due-btn call-btn" id="fPhoneCall" href="#" style="display: none;" data-i18n="detail.sections.contact.callButton">📞 تماس گرفتن</a><span class="field-error" id="fPhoneError"></span></div>
+                        <label class="field"><span class="field-label" data-i18n="detail.sections.contact.address">آدرس پستی</span><textarea id="fAddr" rows="2" maxlength="500" data-i18n-placeholder="detail.sections.contact.addressPlaceholder" placeholder="آدرس مطب یا محل..."></textarea></label>
+                        <div class="field"><label class="field-label" for="fUrl" data-i18n="detail.sections.contact.url">آدرس اینترنتی</label><input type="url" id="fUrl" class="ltr" maxlength="300" data-i18n-placeholder="detail.sections.contact.urlPlaceholder" placeholder="https://..." autocomplete="off" dir="ltr"><div class="link-row"><a class="field-link" id="fUrlOpen" href="#" target="_blank" rel="noopener" style="display: none;" data-i18n="detail.sections.contact.urlOpen">باز کردن پیوند ↗</a><button class="due-btn" id="fUrlCopy" type="button" style="display: none;" data-i18n="detail.sections.contact.urlCopy">📋 کپی لینک</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion timer" data-detail-section="timer" aria-labelledby="detailTimerTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">تمرکز</span><h3 id="detailTimerTitle">زمان صرف‌شده</h3></div><span class="detail-section-status">اختیاری</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.timer.kicker">تمرکز</span><h3 id="detailTimerTitle" data-i18n="detail.sections.timer.title">زمان صرف‌شده</h3></div><span class="detail-section-status" data-i18n="detail.sections.timer.status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
-                        <div class="field"><div class="loc-btns"><span class="loc-line" id="timerLabel">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button">▶ شروع</button></div></div>
+                        <div class="field"><div class="loc-btns"><span class="loc-line" id="timerLabel" data-i18n="detail.sections.timer.initial">۰ دقیقه</span><button class="due-btn" id="timerToggle" type="button" data-i18n="detail.sections.timer.start">▶ شروع</button></div></div>
                     </div>
                 </section>
                 <section class="detail-section detail-accordion photos" data-detail-section="photos" aria-labelledby="detailPhotosTitle">
-                    <div class="detail-section-heading"><div><span class="detail-section-kicker">پیوست‌ها</span><h3 id="detailPhotosTitle">تصاویر و مدارک <span class="count-badge" id="photoCount" aria-label="تعداد تصاویر"></span></h3></div><span class="detail-section-status">اختیاری</span></div>
+                    <div class="detail-section-heading"><div><span class="detail-section-kicker" data-i18n="detail.sections.photos.kicker">پیوست‌ها</span><h3 id="detailPhotosTitle"><span data-i18n="detail.sections.photos.title">تصاویر و مدارک</span> <span class="count-badge" id="photoCount" data-i18n-aria-label="detail.sections.photos.countAria" aria-label="تعداد تصاویر"></span></h3></div><span class="detail-section-status" data-i18n="detail.sections.photos.status">اختیاری</span></div>
                     <div class="detail-section-body detail-accordion-body">
                         <div class="field">
                             <div class="photo-grid" id="photoGrid"></div>
                             <div class="photo-actions">
-                                <label class="due-btn photo-upload-btn" for="photoInput" style="cursor: pointer;">📁 افزودن از گالری</label>
+                                <label class="due-btn photo-upload-btn" for="photoInput" style="cursor: pointer;" data-i18n="detail.sections.photos.addFromGallery">📁 افزودن از گالری</label>
                                 <input type="file" id="photoInput" accept="image/*" multiple hidden>
-                                <label class="due-btn photo-upload-btn photo-camera-btn" for="photoCameraInput" style="cursor: pointer;">📷 گرفتن عکس</label>
+                                <label class="due-btn photo-upload-btn photo-camera-btn" for="photoCameraInput" style="cursor: pointer;" data-i18n="detail.sections.photos.takePhoto">📷 گرفتن عکس</label>
                                 <input type="file" id="photoCameraInput" accept="image/*" capture="environment" hidden>
                             </div>
                         </div>
                     </div>
                 </section>
-                <div class="detail-actions"><button class="btn-clear" id="detailDelete" type="button">حذف این وظیفه</button></div>
+                <div class="detail-actions"><button class="btn-clear" id="detailDelete" type="button" data-i18n="detail.delete">حذف این وظیفه</button></div>
                 <div class="save-hint" id="saveHint" aria-live="polite"></div>
             </div>
         </div>
     </section>
 
-    <section class="detail-page" id="trashPage" style="display: none;" aria-label="سطل زباله">
+    <section class="detail-page" id="trashPage" style="display: none;" data-i18n-aria-label="trash.aria" aria-label="سطل زباله">
         <div class="detail-inner">
             <div class="detail-header">
-                <button class="btn-icon" id="trashBack" aria-label="بازگشت به لیست">→</button>
-                <h2>🗑 سطل زباله</h2>
+                <button class="btn-icon" id="trashBack" data-i18n-aria-label="trash.back" aria-label="بازگشت به لیست">→</button>
+                <h2 data-i18n="trash.title">🗑 سطل زباله</h2>
             </div>
             <div class="detail-card">
                 <div class="session-list" id="trashList"></div>
-                <div class="detail-actions"><button class="btn-clear" id="trashEmpty" type="button">خالی کردن سطل</button></div>
+                <div class="detail-actions"><button class="btn-clear" id="trashEmpty" type="button" data-i18n="trash.emptyAll">خالی کردن سطل</button></div>
             </div>
         </div>
     </section>
 
-    <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button">بازگردانی</button></div>
-    <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="نمایش تصویر" tabindex="-1"><img id="lightboxImg" alt="تصویر وظیفه"></div>
+    <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button" data-i18n="snackbar.undo">بازگردانی</button></div>
+    <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" data-i18n-aria-label="detail.sections.photos.viewAlt" aria-label="نمایش تصویر" tabindex="-1"><img id="lightboxImg" data-i18n-aria-label="detail.sections.photos.viewAlt" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" style="display: none;">
-        <div class="picker" role="dialog" aria-modal="true" aria-label="خوش آمدید">
-            <div class="picker-title">👋 خوش آمدید</div>
-            <p class="welcome-text">این دستیار وظایف شماست — کاملاً آفلاین و خصوصی.<br>• عنوان را بنویسید و Enter بزنید<br>• با 📅 تاریخ، با 📍 محل اضافه کنید<br>• با «+ افزودن» کار، برنامه یا دوره بسازید</p>
-  <p class="storage-guidance">اطلاعات شما روی همین دستگاه و مرورگر ذخیره می‌شود. اگر مرورگر برای حذف خودکار داده‌های سایت تنظیم شده باشد، ممکن است اطلاعات برنامه‌ها و وظایف از بین برود.</p>
+        <div class="picker" role="dialog" aria-modal="true" data-i18n-aria-label="welcome.title" aria-label="خوش آمدید">
+            <div class="picker-title" data-i18n="welcome.title">👋 خوش آمدید</div>
+            <p class="welcome-text" data-i18n-html="welcome.text">این دستیار وظایف شماست — کاملاً آفلاین و خصوصی.<br>• عنوان را بنویسید و Enter بزنید<br>• با 📅 تاریخ، با 📍 محل اضافه کنید<br>• با «+ افزودن» کار، برنامه یا دوره بسازید</p>
+  <p class="storage-guidance" data-i18n="welcome.storageGuidance">اطلاعات شما روی همین دستگاه و مرورگر ذخیره می‌شود. اگر مرورگر برای حذف خودکار داده‌های سایت تنظیم شده باشد، ممکن است اطلاعات برنامه‌ها و وظایف از بین برود.</p>
             <div class="welcome-settings">
                 <div class="welcome-settings-row">
-                    <span class="welcome-settings-label">حالت نمایش:</span>
+                    <span class="welcome-settings-label" data-i18n="welcome.themeLabel">حالت نمایش:</span>
                     <div class="welcome-settings-buttons" id="welcomeThemeGroup">
-                        <button type="button" class="welcome-opt" data-theme="auto">🖥 خودکار</button>
-                        <button type="button" class="welcome-opt" data-theme="light">☀️ روشن</button>
-                        <button type="button" class="welcome-opt" data-theme="dark">🌙 تاریک</button>
+                        <button type="button" class="welcome-opt" data-theme="auto" data-i18n="theme.auto">🖥 خودکار</button>
+                        <button type="button" class="welcome-opt" data-theme="light" data-i18n="theme.light">☀️ روشن</button>
+                        <button type="button" class="welcome-opt" data-theme="dark" data-i18n="theme.dark">🌙 تاریک</button>
                     </div>
                 </div>
                 <div class="welcome-settings-row">
-                    <span class="welcome-settings-label">زبان:</span>
+                    <span class="welcome-settings-label" data-i18n="welcome.languageLabel">زبان:</span>
                     <div class="welcome-settings-buttons" id="welcomeLangGroup">
                         <button type="button" class="welcome-opt" data-lang="fa">🇮🇷 فارسی</button>
                         <button type="button" class="welcome-opt" data-lang="en">🇬🇧 English</button>
                     </div>
                 </div>
             </div>
-            <div class="picker-actions"><button class="btn-add picker-confirm" id="welcomeStart">شروع</button></div>
+            <div class="picker-actions"><button class="btn-add picker-confirm" id="welcomeStart" data-i18n="welcome.start">شروع</button></div>
         </div>
     </div>
 
     <div class="picker-overlay" id="templateModal" style="display: none;">
-        <div class="picker cal-wide" role="dialog" aria-modal="true" aria-label="ساخت برنامه از قالب">
-            <div class="picker-title">📁 ساخت برنامه از قالب</div>
+        <div class="picker cal-wide" role="dialog" aria-modal="true" data-i18n-aria-label="template.modalTitle" aria-label="ساخت برنامه از قالب">
+            <div class="picker-title" data-i18n="template.modalTitle">📁 ساخت برنامه از قالب</div>
             <div class="picker-actions tpl-actions">
-                <button class="btn-add picker-confirm" id="tplKidAdd" type="button" style="display: none;">افزودن زیرکار</button>
-                <button class="btn-add picker-confirm" id="tplBack" type="button" style="display: none;">→ بازگشت</button>
-                <button class="btn-add picker-confirm" id="tplCreate" type="button" style="display: none;">ایجاد برنامه</button>
-                <button class="btn-clear" id="tplClose">بستن</button>
+                <button class="btn-add picker-confirm" id="tplKidAdd" type="button" style="display: none;" data-i18n="template.addChild">افزودن زیرکار</button>
+                <button class="btn-add picker-confirm" id="tplBack" type="button" style="display: none;" data-i18n="template.back">→ بازگشت</button>
+                <button class="btn-add picker-confirm" id="tplCreate" type="button" style="display: none;" data-i18n="template.create">ایجاد برنامه</button>
+                <button class="btn-clear" id="tplClose" data-i18n="template.close">بستن</button>
             </div>
             <div id="tplList"></div>
             <div id="tplConfig" style="display: none;">
-                <label class="more-row"><span>نام برنامه</span><input type="text" id="tplName" maxlength="200"></label>
-                <div class="child-add" style="margin-top: 8px;"><button class="due-btn" id="tplStartBtn" type="button">📅 تاریخ شروع</button><button class="due-btn" id="tplEndBtn" type="button">📅 تاریخ پایان</button></div>
+                <label class="more-row"><span data-i18n="template.nameLabel">نام برنامه</span><input type="text" id="tplName" maxlength="200"></label>
+                <div class="child-add" style="margin-top: 8px;"><button class="due-btn" id="tplStartBtn" type="button" data-i18n="template.startDate">📅 تاریخ شروع</button><button class="due-btn" id="tplEndBtn" type="button" data-i18n="template.endDate">📅 تاریخ پایان</button></div>
                 <div class="loc-line" id="tplDatesLine" style="margin-top: 6px;"></div>
                 <div class="session-list" id="tplKids" style="margin: 10px 0;"></div>
-                <div class="child-add"><input type="text" class="child-input" id="tplKidInput" placeholder="کار جدید..." maxlength="200" aria-label="افزودن کار به قالب"></div>
+                <div class="child-add"><input type="text" class="child-input" id="tplKidInput" data-i18n-placeholder="template.newChildPlaceholder" placeholder="کار جدید..." maxlength="200" data-i18n-aria-label="template.childAria" aria-label="افزودن کار به قالب"></div>
             </div>
         </div>
     </div>
 
     <div class="picker-overlay" id="calOverlay" style="display: none;">
-        <div class="picker cal-wide" role="dialog" aria-modal="true" aria-label="تقویم جلسات">
-            <div class="picker-title">📅 تقویم جلسات</div>
-            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" aria-label="ماه قبل">‹</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" aria-label="ماه بعد">›</button></div>
+        <div class="picker cal-wide" role="dialog" aria-modal="true" data-i18n-aria-label="calendar.aria" aria-label="تقویم جلسات">
+            <div class="picker-title" data-i18n="calendar.title">📅 تقویم جلسات</div>
+            <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" data-i18n-aria-label="picker.prevMonth" aria-label="ماه قبل">‹</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" data-i18n-aria-label="picker.nextMonth" aria-label="ماه بعد">›</button></div>
             <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
             <div class="picker-days" id="calDays"></div>
-            <div class="picker-actions"><button class="btn-clear" id="calClose">بستن</button></div>
+            <div class="picker-actions"><button class="btn-clear" id="calClose" data-i18n="calendar.close">بستن</button></div>
         </div>
     </div>
 
     <div class="picker-overlay" id="pickerOverlay" style="display: none;">
-        <div class="picker" role="dialog" aria-modal="true" aria-label="انتخاب سررسید">
-            <div class="picker-title">انتخاب سررسید</div>
-            <div class="picker-chips"><button type="button" data-preset="evening">امروز عصر</button><button type="button" data-preset="tomorrow">فردا ۹ صبح</button><button type="button" data-preset="week">هفته بعد</button></div>
-            <div class="picker-nav"><button class="picker-nav-btn" id="pickerPrev" aria-label="ماه قبل">‹</button><div class="picker-month" id="pickerMonthLabel"></div><button class="picker-nav-btn" id="pickerNext" aria-label="ماه بعد">›</button></div>
+        <div class="picker" role="dialog" aria-modal="true" data-i18n-aria-label="picker.title" aria-label="انتخاب سررسید">
+            <div class="picker-title" data-i18n="picker.title">انتخاب سررسید</div>
+            <div class="picker-chips"><button type="button" data-preset="evening" data-i18n="picker.todayEvening">امروز عصر</button><button type="button" data-preset="tomorrow" data-i18n="picker.tomorrowMorning">فردا ۹ صبح</button><button type="button" data-preset="week" data-i18n="picker.nextWeek">هفته بعد</button></div>
+            <div class="picker-nav"><button class="picker-nav-btn" id="pickerPrev" data-i18n-aria-label="picker.prevMonth" aria-label="ماه قبل">‹</button><div class="picker-month" id="pickerMonthLabel"></div><button class="picker-nav-btn" id="pickerNext" data-i18n-aria-label="picker.nextMonth" aria-label="ماه بعد">›</button></div>
             <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
             <div class="picker-days" id="pickerDays"></div>
-            <div class="picker-time"><span>ساعت</span><select id="pickerHour" aria-label="ساعت سررسید"></select><span>:</span><select id="pickerMinute" aria-label="دقیقه سررسید"></select></div>
+            <div class="picker-time"><span data-i18n="picker.hour">ساعت</span><select id="pickerHour" data-i18n-aria-label="picker.hourAria" aria-label="ساعت سررسید"></select><span>:</span><select id="pickerMinute" data-i18n-aria-label="picker.minuteAria" aria-label="دقیقه سررسید"></select></div>
             <div class="picker-error" id="pickerError" aria-live="polite"></div>
-            <div class="picker-actions"><button class="btn-add picker-confirm" id="pickerConfirm">تأیید</button><button class="btn-clear" id="pickerRemove">حذف سررسید</button><button class="btn-clear" id="pickerCancel">انصراف</button></div>
+            <div class="picker-actions"><button class="btn-add picker-confirm" id="pickerConfirm" data-i18n="picker.confirm">تأیید</button><button class="btn-clear" id="pickerRemove" data-i18n="picker.remove">حذف سررسید</button><button class="btn-clear" id="pickerCancel" data-i18n="picker.cancel">انصراف</button></div>
         </div>
     </div>
 
     <div class="picker-overlay" id="namePromptModal" style="display: none;">
-        <div class="picker" role="dialog" aria-modal="true" aria-label="نام مکان">
-            <div class="picker-title" id="namePromptTitle">📌 نام این مکان</div>
-            <p class="name-prompt-hint" id="namePromptHint">یک نام کوتاه برای این مکان انتخاب کنید تا در لیست مکان‌های ذخیره‌شده دیده شود.</p>
+        <div class="picker" role="dialog" aria-modal="true" data-i18n-aria-label="location.namePrompt.title" aria-label="نام مکان">
+            <div class="picker-title" id="namePromptTitle" data-i18n="location.namePrompt.title">📌 نام این مکان</div>
+            <p class="name-prompt-hint" id="namePromptHint" data-i18n="location.namePrompt.hint">یک نام کوتاه برای این مکان انتخاب کنید تا در لیست مکان‌های ذخیره‌شده دیده شود.</p>
             <label class="more-row name-prompt-row">
-                <span>نام</span>
-                <input type="text" id="namePromptInput" maxlength="80" autocomplete="off" placeholder="مثلاً: خانه، مطب دکتر، محل کار...">
+                <span data-i18n="location.namePrompt.label">نام</span>
+                <input type="text" id="namePromptInput" maxlength="80" autocomplete="off" data-i18n-placeholder="location.namePrompt.placeholder" placeholder="مثلاً: خانه، مطب دکتر، محل کار...">
             </label>
             <div class="picker-error" id="namePromptError" aria-live="polite"></div>
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="namePromptConfirm" type="button">ذخیره</button>
-                <button class="btn-clear" id="namePromptCancel" type="button">انصراف</button>
+                <button class="btn-add picker-confirm" id="namePromptConfirm" type="button" data-i18n="location.namePrompt.save">ذخیره</button>
+                <button class="btn-clear" id="namePromptCancel" type="button" data-i18n="location.namePrompt.cancel">انصراف</button>
             </div>
         </div>
     </div>
 
     <div class="picker-overlay" id="nameConflictModal" style="display: none;">
-        <div class="picker" role="dialog" aria-modal="true" aria-label="نام تکراری">
-            <div class="picker-title">⚠️ نام تکراری</div>
-            <p class="name-prompt-hint" id="nameConflictText">این نام قبلاً برای مکان دیگری ذخیره شده است.</p>
+        <div class="picker" role="dialog" aria-modal="true" data-i18n-aria-label="location.conflict.title" aria-label="نام تکراری">
+            <div class="picker-title" data-i18n="location.conflict.title">⚠️ نام تکراری</div>
+            <p class="name-prompt-hint" id="nameConflictText" data-i18n="location.conflict.message">این نام قبلاً برای مکان دیگری ذخیره شده است.</p>
             <div class="picker-actions" style="flex-direction: column;">
-                <button class="btn-add picker-confirm" id="nameConflictReplace" type="button">نام مکان قبلی را جایگزین کن</button>
-                <button class="btn-add picker-confirm" id="nameConflictPickAnother" type="button">نام دیگری انتخاب کن</button>
-                <button class="btn-clear" id="nameConflictCancel" type="button">انصراف</button>
+                <button class="btn-add picker-confirm" id="nameConflictReplace" type="button" data-i18n="location.conflict.replace">نام مکان قبلی را جایگزین کن</button>
+                <button class="btn-add picker-confirm" id="nameConflictPickAnother" type="button" data-i18n="location.conflict.pickAnother">نام دیگری انتخاب کن</button>
+                <button class="btn-clear" id="nameConflictCancel" type="button" data-i18n="location.conflict.cancel">انصراف</button>
             </div>
         </div>
     </div>
 
     <div class="picker-overlay" id="savedLocationsModal" style="display: none;">
-        <div class="picker cal-wide" role="dialog" aria-modal="true" aria-label="مدیریت مکان‌های ذخیره‌شده">
-            <div class="picker-title">📌 مکان‌های ذخیره‌شده <span class="saved-locations-count" id="savedLocationsModalCount"></span></div>
+        <div class="picker cal-wide" role="dialog" aria-modal="true" data-i18n-aria-label="location.manageAria" aria-label="مدیریت مکان‌های ذخیره‌شده">
+            <div class="picker-title"><span data-i18n="location.savedLocations">📌 مکان‌های ذخیره‌شده</span> <span class="saved-locations-count" id="savedLocationsModalCount"></span></div>
             <div class="picker-actions tpl-actions" style="position: sticky; top: 0; z-index: 2;">
-                <button class="btn-add picker-confirm" id="savedLocationsAddNew" type="button">＋ افزودن مکان جدید از روی نقشه</button>
-                <button class="btn-clear" id="savedLocationsClose" type="button">بستن</button>
+                <button class="btn-add picker-confirm" id="savedLocationsAddNew" type="button" data-i18n="location.addNew">＋ افزودن مکان جدید از روی نقشه</button>
+                <button class="btn-clear" id="savedLocationsClose" type="button" data-i18n="common.close">بستن</button>
             </div>
             <div id="savedLocationsBody"></div>
         </div>
@@ -627,57 +617,50 @@
 
     <div class="picker-overlay" id="weatherModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="weatherModalTitle">
-            <div class="picker-title" id="weatherModalTitle">🌤️ پیش‌بینی هوا</div>
+            <div class="picker-title" id="weatherModalTitle" data-i18n="weather.modalTitle">🌤️ پیش‌بینی هوا</div>
             <div class="weather-content" id="weatherContent"></div>
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="weatherModalOk" type="button">بستن</button>
+                <button class="btn-add picker-confirm" id="weatherModalOk" type="button" data-i18n="common.close">بستن</button>
             </div>
-            <div class="weather-attribution">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></div>
+            <div class="weather-attribution"><span data-i18n="weather.attribution">داده‌های هوا از</span> <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></div>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         ⚠️ فاز ۶ گام ۲: مودال «حساب من»
-         محتوای authModalBody به صورت داینامیک توسط app.js پر می‌شود.
-         ═══════════════════════════════════════════════════════════════════ -->
     <div class="picker-overlay" id="authModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
-            <div class="picker-title" id="authModalTitle">👤 حساب من</div>
+            <div class="picker-title" id="authModalTitle" data-i18n="auth.modalTitle">👤 حساب من</div>
             <div id="authModalBody"></div>
             <div class="picker-actions">
-                <button class="btn-clear" id="authModalClose" type="button">بستن</button>
+                <button class="btn-clear" id="authModalClose" type="button" data-i18n="auth.modalClose">بستن</button>
             </div>
         </div>
     </div>
 
     <div class="picker-overlay" id="confirmModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-            <div class="picker-title" id="confirmModalTitle">تأیید</div>
+            <div class="picker-title" id="confirmModalTitle" data-i18n="modals.confirm.defaultTitle">تأیید</div>
             <p class="modal-message" id="confirmModalMessage"></p>
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="confirmModalOk" type="button">تأیید</button>
-                <button class="btn-clear" id="confirmModalCancel" type="button">انصراف</button>
+                <button class="btn-add picker-confirm" id="confirmModalOk" type="button" data-i18n="modals.confirm.defaultOk">تأیید</button>
+                <button class="btn-clear" id="confirmModalCancel" type="button" data-i18n="modals.confirm.defaultCancel">انصراف</button>
             </div>
         </div>
     </div>
 
     <div class="picker-overlay" id="infoModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
-            <div class="picker-title" id="infoModalTitle">اطلاعات</div>
+            <div class="picker-title" id="infoModalTitle" data-i18n="modals.info.defaultTitle">اطلاعات</div>
             <div class="modal-body" id="infoModalBody"></div>
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="infoModalOk" type="button">فهمیدم</button>
+                <button class="btn-add picker-confirm" id="infoModalOk" type="button" data-i18n="modals.info.defaultButton">فهمیدم</button>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         ⚠️ مودال Export (پشتیبان‌گیری)
-         ═══════════════════════════════════════════════════════════════════ -->
     <div class="picker-overlay" id="exportModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
-            <div class="picker-title" id="exportModalTitle">📤 پشتیبان‌گیری از داده‌ها</div>
-            <p class="modal-message">
+            <div class="picker-title" id="exportModalTitle" data-i18n="export.title">📤 پشتیبان‌گیری از داده‌ها</div>
+            <p class="modal-message" data-i18n="export.description">
                 یک فایل JSON از همه‌ی وظایف، برنامه‌ها، دوره‌ها و سطل زباله ساخته می‌شود.
                 می‌توانید آن را در جای امنی نگه دارید یا به دستگاه دیگری منتقل کنید.
             </p>
@@ -686,15 +669,15 @@
                 <label class="export-option">
                     <input type="checkbox" id="exportIncludePhotos">
                     <span>
-                        <strong>شامل تصاویر</strong>
-                        <small>حجم فایل را زیاد می‌کند (هر عکس تا ~۲۰۰KB).</small>
+                        <strong data-i18n="export.includePhotos">شامل تصاویر</strong>
+                        <small data-i18n="export.includePhotosHint">حجم فایل را زیاد می‌کند (هر عکس تا ~۲۰۰KB).</small>
                     </span>
                 </label>
                 <label class="export-option">
                     <input type="checkbox" id="exportIncludeSettings">
                     <span>
-                        <strong>شامل تنظیمات</strong>
-                        <small>تم، زبان، یادآورها و سایر ترجیحات.</small>
+                        <strong data-i18n="export.includeSettings">شامل تنظیمات</strong>
+                        <small data-i18n="export.includeSettingsHint">تم، زبان، یادآورها و سایر ترجیحات.</small>
                     </span>
                 </label>
             </div>
@@ -702,49 +685,46 @@
             <div class="export-meta" id="exportMeta"></div>
 
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="exportConfirm" type="button">📥 دانلود فایل پشتیبان</button>
-                <button class="btn-clear" id="exportCancel" type="button">انصراف</button>
+                <button class="btn-add picker-confirm" id="exportConfirm" type="button" data-i18n="export.downloadButton">📥 دانلود فایل پشتیبان</button>
+                <button class="btn-clear" id="exportCancel" type="button" data-i18n="export.cancel">انصراف</button>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         ⚠️ مودال Import (بازیابی از پشتیبان)
-         ═══════════════════════════════════════════════════════════════════ -->
     <div class="picker-overlay" id="importModal" style="display: none;">
         <div class="picker" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
-            <div class="picker-title" id="importModalTitle">📥 بازیابی از فایل پشتیبان</div>
-            <p class="modal-message">
+            <div class="picker-title" id="importModalTitle" data-i18n="import.title">📥 بازیابی از فایل پشتیبان</div>
+            <p class="modal-message" data-i18n="import.description">
                 یک فایل JSON پشتیبان انتخاب کنید. قبل از بازیابی، نسخه‌ی فایل بررسی می‌شود.
             </p>
 
             <div class="import-file-row">
-                <label class="due-btn photo-upload-btn" for="importFileInput" style="cursor: pointer;">📁 انتخاب فایل JSON</label>
+                <label class="due-btn photo-upload-btn" for="importFileInput" style="cursor: pointer;" data-i18n="import.selectFile">📁 انتخاب فایل JSON</label>
                 <input type="file" id="importFileInput" accept="application/json,.json" hidden>
-                <span class="import-file-name" id="importFileName">فایلی انتخاب نشده</span>
+                <span class="import-file-name" id="importFileName" data-i18n="import.noFileSelected">فایلی انتخاب نشده</span>
             </div>
 
             <div class="import-mode" id="importModeWrap" style="display: none;">
-                <div class="field-label" style="margin-bottom: 6px;">روش بازیابی</div>
+                <div class="field-label" style="margin-bottom: 6px;" data-i18n="import.modeLabel">روش بازیابی</div>
                 <label class="export-option">
                     <input type="radio" name="importMode" value="merge" checked>
                     <span>
-                        <strong>ادغام با داده‌های فعلی</strong>
-                        <small>وظایف جدید اضافه می‌شوند؛ وظایف با شناسه‌ی یکسان جایگزین می‌شوند.</small>
+                        <strong data-i18n="import.modeMerge">ادغام با داده‌های فعلی</strong>
+                        <small data-i18n="import.modeMergeHint">وظایف جدید اضافه می‌شوند؛ وظایف با شناسه‌ی یکسان جایگزین می‌شوند.</small>
                     </span>
                 </label>
                 <label class="export-option">
                     <input type="radio" name="importMode" value="replace">
                     <span>
-                        <strong>جایگزینی کامل</strong>
-                        <small>همه‌ی وظایف فعلی حذف و با محتوای فایل جایگزین می‌شوند. این کار قابل بازگشت نیست.</small>
+                        <strong data-i18n="import.modeReplace">جایگزینی کامل</strong>
+                        <small data-i18n="import.modeReplaceHint">همه‌ی وظایف فعلی حذف و با محتوای فایل جایگزین می‌شوند. این کار قابل بازگشت نیست.</small>
                     </span>
                 </label>
                 <label class="export-option" id="importSettingsWrap">
                     <input type="checkbox" id="importSettingsCheck">
                     <span>
-                        <strong>بازیابی تنظیمات</strong>
-                        <small>تم، زبان و سایر ترجیحات ذخیره‌شده در فایل اعمال می‌شوند.</small>
+                        <strong data-i18n="import.importSettings">بازیابی تنظیمات</strong>
+                        <small data-i18n="import.importSettingsHint">تم، زبان و سایر ترجیحات ذخیره‌شده در فایل اعمال می‌شوند.</small>
                     </span>
                 </label>
             </div>
@@ -752,8 +732,8 @@
             <div class="import-meta" id="importMeta"></div>
 
             <div class="picker-actions">
-                <button class="btn-add picker-confirm" id="importConfirm" type="button" disabled>بازیابی</button>
-                <button class="btn-clear" id="importCancel" type="button">انصراف</button>
+                <button class="btn-add picker-confirm" id="importConfirm" type="button" disabled data-i18n="import.restoreButton">بازیابی</button>
+                <button class="btn-clear" id="importCancel" type="button" data-i18n="import.cancel">انصراف</button>
             </div>
         </div>
     </div>

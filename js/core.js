@@ -56,8 +56,7 @@ export const state = {
         soundPresetOn: false,
         soundTtsOn: false,
         soundTtsVoice: null,
-        theme: 'auto',
-        lang: 'fa'
+        theme: 'auto'
     },
     selectedDay: null,
     calJy: 0,

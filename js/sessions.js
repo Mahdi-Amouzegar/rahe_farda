@@ -3,15 +3,44 @@
 
 import { state, toFa, escapeHtml } from './core.js';
 import { getNow } from './time.js';
+import { formatDate, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Formatting
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * فرمت کوتاه تاریخ + ساعت بر اساس زبان فعلی.
+ *
+ * ⚠️ نام تابع `faShort` برای backward compat داخلی حفظ شده،
+ *    ولی حالا از i18n.formatDate استفاده می‌کند.
+ *
+ * ⚠️ fa: «۱۵ دی، ساعت ۱۴:۳۰» (تقویم جلالی)
+ * ⚠️ en: «January 5, 2:30 PM» (تقویم میلادی)
+ *
+ * @param {string} iso
+ * @returns {string}
+ */
 export function faShort(iso) {
     const d = new Date(iso);
-    return d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' }) + '، ساعت ' +
-        d.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+    if (isNaN(d)) return '';
+
+    const dateStr = formatDate(d, { day: 'numeric', month: 'long' });
+
+    let timeStr = '';
+    try {
+        timeStr = new Intl.DateTimeFormat(
+            getLang() === 'en' ? 'en-US' : 'fa-IR',
+            { hour: '2-digit', minute: '2-digit' }
+        ).format(d);
+    } catch {
+        timeStr = '';
+    }
+
+    if (getLang() === 'en') {
+        return `${dateStr} at ${timeStr}`;
+    }
+    return `${dateStr}، ساعت ${timeStr}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -66,14 +95,15 @@ function weatherButtonHtml(task) {
     const daysAhead = (due - Date.now()) / 86400000;
     if (daysAhead < 0 || daysAhead > 16) return '';
     const key = `${escapeHtml(String(task.id))}|${escapeHtml(next.at)}`;
-    return `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
+    const label = i18nT('taskItem.weather.buttonAria');
+    return `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" aria-label="${label}" title="${label}"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
 }
 
 export function sessionSummaryHtml(task) {
     const sessions = task.sessions || [];
     if (sessions.length === 0) return '';
     if (task.completed) {
-        return `<span class="due-line past-all">📅 ${toFa(sessions.length)} جلسه</span>`;
+        return `<span class="due-line past-all">📅 ${i18nT('sessions.summary.count', { n: toFa(sessions.length) })}</span>`;
     }
     const n = nearestUpcoming(task);
     if (n) {
@@ -81,27 +111,37 @@ export function sessionSummaryHtml(task) {
         const due = new Date(n.at);
         const startOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
         const diffDays = Math.round((startOf(due) - startOf(now)) / 86400000);
-        const extra = diffDays === 0 ? ' (امروز)' : diffDays === 1 ? ' (فردا)' : ` (${toFa(diffDays)} روز مانده)`;
-        const count = sessions.length > 1 ? ` <span class="sess-count">${toFa(sessions.length)} جلسه</span>` : '';
+        let extra = '';
+        if (diffDays === 0) extra = ' ' + i18nT('sessions.summary.today');
+        else if (diffDays === 1) extra = ' ' + i18nT('sessions.summary.tomorrow');
+        else extra = ' ' + i18nT('sessions.summary.daysLeft', { n: toFa(diffDays) });
+        const count = sessions.length > 1
+            ? ` <span class="sess-count">${i18nT('sessions.summary.count', { n: toFa(sessions.length) })}</span>`
+            : '';
         const wBtn = weatherButtonHtml(task);
-        return `<span class="due-line">📅 جلسه بعد: ${faShort(n.at)}${extra}${n.location ? ' 📍' : ''}${wBtn}</span>${count}`;
+        return `<span class="due-line">${i18nT('sessions.summary.nextSession', { date: faShort(n.at) })}${extra}${n.location ? ' 📍' : ''}${wBtn}</span>${count}`;
     }
     const past = [...sessions].sort((a, b) => new Date(b.at) - new Date(a.at))[0];
-    return `<span class="due-line overdue">⚠ سررسید گذشته: ${faShort(past.at)}</span>`;
+    return `<span class="due-line overdue">${i18nT('sessions.summary.overdue', { date: faShort(past.at) })}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Badge / day helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function recurBadge(t, cls) {
-    if (!t.recur || t.recur === 'none') return '';
+export function recurBadge(task, cls) {
+    if (!task.recur || task.recur === 'none') return '';
     let suffix = '';
-    if (t.recur === 'custom' && t.recurN > 1) suffix = ` ${toFa(t.recurN)} روز`;
-    else if (t.recur === 'hourly' && t.recurN >= 1) suffix = ` هر ${toFa(t.recurN)} ساعت`;
-    else if (t.recur === 'weeklyDays') suffix = ' روزهای هفته';
-    else if (t.recur === 'monthlyDays') suffix = ' روزهای ماه';
-    return `<span class="${cls || ''}" title="تکرارشونده${suffix}">🔁</span>`;
+    if (task.recur === 'custom' && task.recurN > 1) {
+        suffix = ' ' + i18nT('recur.everyNDays', { n: toFa(task.recurN) });
+    } else if (task.recur === 'hourly' && task.recurN >= 1) {
+        suffix = ' ' + i18nT('recur.everyNHours', { n: toFa(task.recurN) });
+    } else if (task.recur === 'weeklyDays') {
+        suffix = ' ' + i18nT('recur.weeklyDays');
+    } else if (task.recur === 'monthlyDays') {
+        suffix = ' ' + i18nT('recur.monthlyDays');
+    }
+    return `<span class="${cls || ''}" title="${i18nT('recur.badgeTitle')}${suffix}">🔁</span>`;
 }
 
 export function dayKey(d) {

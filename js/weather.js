@@ -4,6 +4,7 @@
 import { state, toFa } from './core.js';
 import { nearestUpcoming, faShort } from './sessions.js';
 import { findTask } from './store.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -24,35 +25,37 @@ const ICON_CACHE_TTL_MS = 3 * 60 * 60 * 1000; // ۳ ساعت
 const ICON_CACHE_MAX = 100;
 
 // کد وضعیت WMO → آیکن + برچسب فارسی
+// کد وضعیت WMO → آیکن + کلید ترجمه
+// ⚠️ labelKey به i18n کلید می‌دهد. متن نهایی از weather.wmo.* خوانده می‌شود.
 const WMO_MAP = {
-    0:  { icon: '☀️', label: 'صاف' },
-    1:  { icon: '🌤️', label: 'عمدتاً صاف' },
-    2:  { icon: '⛅', label: 'کمی ابری' },
-    3:  { icon: '☁️', label: 'ابری' },
-    45: { icon: '🌫️', label: 'مه' },
-    48: { icon: '🌫️', label: 'مه یخ‌زده' },
-    51: { icon: '🌦️', label: 'نم‌نم باران سبک' },
-    53: { icon: '🌦️', label: 'نم‌نم باران' },
-    55: { icon: '🌦️', label: 'نم‌نم باران شدید' },
-    56: { icon: '🌧️', label: 'باران یخ‌زده سبک' },
-    57: { icon: '🌧️', label: 'باران یخ‌زده' },
-    61: { icon: '🌧️', label: 'باران سبک' },
-    63: { icon: '🌧️', label: 'باران' },
-    65: { icon: '🌧️', label: 'باران شدید' },
-    66: { icon: '🌧️', label: 'باران یخ‌زده سبک' },
-    67: { icon: '🌧️', label: 'باران یخ‌زده شدید' },
-    71: { icon: '❄️', label: 'برف سبک' },
-    73: { icon: '❄️', label: 'برف' },
-    75: { icon: '❄️', label: 'برف شدید' },
-    77: { icon: '❄️', label: 'دانه‌های برف' },
-    80: { icon: '🌧️', label: 'رگبار سبک' },
-    81: { icon: '🌧️', label: 'رگبار' },
-    82: { icon: '🌧️', label: 'رگبار شدید' },
-    85: { icon: '🌨️', label: 'رگبار برف سبک' },
-    86: { icon: '🌨️', label: 'رگبار برف شدید' },
-    95: { icon: '⛈️', label: 'رعد و برق' },
-    96: { icon: '⛈️', label: 'رعد و برق با تگرگ سبک' },
-    99: { icon: '⛈️', label: 'رعد و برق با تگرگ' }
+    0:  { icon: '☀️', labelKey: 'weather.wmo.clear' },
+    1:  { icon: '🌤️', labelKey: 'weather.wmo.mainlyClear' },
+    2:  { icon: '⛅', labelKey: 'weather.wmo.partlyCloudy' },
+    3:  { icon: '☁️', labelKey: 'weather.wmo.overcast' },
+    45: { icon: '🌫️', labelKey: 'weather.wmo.fog' },
+    48: { icon: '🌫️', labelKey: 'weather.wmo.freezingFog' },
+    51: { icon: '🌦️', labelKey: 'weather.wmo.lightDrizzle' },
+    53: { icon: '🌦️', labelKey: 'weather.wmo.drizzle' },
+    55: { icon: '🌦️', labelKey: 'weather.wmo.heavyDrizzle' },
+    56: { icon: '🌧️', labelKey: 'weather.wmo.lightFreezingDrizzle' },
+    57: { icon: '🌧️', labelKey: 'weather.wmo.freezingDrizzle' },
+    61: { icon: '🌧️', labelKey: 'weather.wmo.lightRain' },
+    63: { icon: '🌧️', labelKey: 'weather.wmo.rain' },
+    65: { icon: '🌧️', labelKey: 'weather.wmo.heavyRain' },
+    66: { icon: '🌧️', labelKey: 'weather.wmo.lightFreezingRain' },
+    67: { icon: '🌧️', labelKey: 'weather.wmo.heavyFreezingRain' },
+    71: { icon: '❄️', labelKey: 'weather.wmo.lightSnow' },
+    73: { icon: '❄️', labelKey: 'weather.wmo.snow' },
+    75: { icon: '❄️', labelKey: 'weather.wmo.heavySnow' },
+    77: { icon: '❄️', labelKey: 'weather.wmo.snowGrains' },
+    80: { icon: '🌧️', labelKey: 'weather.wmo.lightShowers' },
+    81: { icon: '🌧️', labelKey: 'weather.wmo.showers' },
+    82: { icon: '🌧️', labelKey: 'weather.wmo.violentShowers' },
+    85: { icon: '🌨️', labelKey: 'weather.wmo.lightSnowShowers' },
+    86: { icon: '🌨️', labelKey: 'weather.wmo.heavySnowShowers' },
+    95: { icon: '⛈️', labelKey: 'weather.wmo.thunderstorm' },
+    96: { icon: '⛈️', labelKey: 'weather.wmo.thunderstormLightHail' },
+    99: { icon: '⛈️', labelKey: 'weather.wmo.thunderstormHeavyHail' }
 };
 
 // کش داده کامل هوا: کلید = `lat,lng,start,end` → مقدار = { data, fetchedAt }
@@ -313,6 +316,7 @@ export function extractDailyByIndex(weatherData, dayIndex) {
     const d = weatherData.daily;
     if (!Array.isArray(d.time) || dayIndex < 0 || dayIndex >= d.time.length) return null;
     const code = d.weather_code?.[dayIndex];
+    const labelKey = WMO_MAP[code]?.labelKey;
     return {
         date: d.time[dayIndex],
         tempMax: d.temperature_2m_max?.[dayIndex],
@@ -322,7 +326,7 @@ export function extractDailyByIndex(weatherData, dayIndex) {
         windSpeedMax: d.wind_speed_10m_max?.[dayIndex],
         weatherCode: code,
         icon: WMO_MAP[code]?.icon || '🌡️',
-        label: WMO_MAP[code]?.label || 'نامشخص'
+        label: labelKey ? i18nT(labelKey) : i18nT('weather.wmo.unknown')
     };
 }
 
@@ -352,6 +356,7 @@ export function extractHourlyAt(weatherData, isoDate) {
 
     const h = weatherData.hourly;
     const code = h.weather_code?.[bestIdx];
+    const labelKey = WMO_MAP[code]?.labelKey;
     return {
         time: h.time[bestIdx],
         temperature: h.temperature_2m?.[bestIdx],
@@ -362,7 +367,7 @@ export function extractHourlyAt(weatherData, isoDate) {
         windSpeed: h.wind_speed_10m?.[bestIdx],
         weatherCode: code,
         icon: WMO_MAP[code]?.icon || '🌡️',
-        label: WMO_MAP[code]?.label || 'نامشخص'
+        label: labelKey ? i18nT(labelKey) : i18nT('weather.wmo.unknown')
     };
 }
 

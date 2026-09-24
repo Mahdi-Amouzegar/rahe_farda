@@ -11,6 +11,7 @@ import {
     findDayIndex,
     computeDateRange
 } from './weather.js';
+import { getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -45,7 +46,7 @@ function faNum(n, unit) {
  */
 function formatPlace(loc) {
     if (!loc) return '';
-    const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+    const lang = getLang() === 'en' ? 'en' : 'fa';
 
     // ۱. نام شهر (cityNames) — خودکار از reverse geocode
     if (loc.cityNames) {
@@ -117,14 +118,14 @@ function toDateStringOf(isoDate) {
 function renderWeatherView() {
     // Guard: اگر داده هواشناسی وجود ندارد
     if (!_currentWeatherData) {
-        setContent('<div class="weather-error">داده‌ای برای نمایش موجود نیست.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorNoData')}</div>`);
         return;
     }
 
     // Guard: اگر daily.time وجود ندارد یا آرایه نیست
     const dailyTime = _currentWeatherData.daily?.time;
     if (!Array.isArray(dailyTime) || dailyTime.length === 0) {
-        setContent('<div class="weather-error">داده‌ی روزانه از سرور دریافت نشد.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorNoDailyData')}</div>`);
         return;
     }
 
@@ -137,7 +138,7 @@ function renderWeatherView() {
     const hourly = extractHourlyAt(_currentWeatherData, _currentSessionDate);
 
     if (!daily) {
-        setContent('<div class="weather-error">داده‌ای برای این روز موجود نیست.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorNoDayData')}</div>`);
         return;
     }
 
@@ -153,7 +154,7 @@ function renderWeatherView() {
     let dayLabel = '';
     try {
         dayLabel = currentDayDate.toLocaleDateString(
-            state.prefs.lang === 'en' ? 'en-US' : 'fa-IR',
+            getLang() === 'en' ? 'en-US' : 'fa-IR',
             { weekday: 'long', day: 'numeric', month: 'long' }
         );
     } catch {
@@ -165,12 +166,12 @@ function renderWeatherView() {
 
     const hourlyHTML = hourly ? `
         <div class="weather-grid">
-            <div class="weather-item"><span>دما (ساعت سررسید)</span><strong>${faTemp(hourly.temperature)}C</strong></div>
-            <div class="weather-item"><span>احساس</span><strong>${faTemp(hourly.apparent)}C</strong></div>
-            <div class="weather-item"><span>رطوبت</span><strong>${faNum(hourly.humidity, '%')}</strong></div>
-            <div class="weather-item"><span>باد</span><strong>${faNum(hourly.windSpeed, 'km/h')}</strong></div>
-            <div class="weather-item"><span>احتمال بارش</span><strong>${faNum(hourly.precipitationProb, '%')}</strong></div>
-            <div class="weather-item"><span>بارش</span><strong>${faNum(hourly.precipitation, 'mm')}</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.tempHour')}</span><strong>${faTemp(hourly.temperature)}C</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.feelsLike')}</span><strong>${faTemp(hourly.apparent)}C</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.humidity')}</span><strong>${faNum(hourly.humidity, '%')}</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.wind')}</span><strong>${faNum(hourly.windSpeed, 'km/h')}</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.precipProb')}</span><strong>${faNum(hourly.precipitationProb, '%')}</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.precip')}</span><strong>${faNum(hourly.precipitation, 'mm')}</strong></div>
         </div>` : '';
 
     setContent(`
@@ -178,28 +179,28 @@ function renderWeatherView() {
             <div class="weather-icon-big" aria-hidden="true">${daily.icon}</div>
             <div class="weather-label">${escapeHtml(daily.label)}</div>
         </div>
-        <div class="weather-place">پیش‌بینی آب و هوا برای ${escapeHtml(placeName)}</div>
-        <div class="weather-task-title">📝 ${escapeHtml(taskText)}</div>
+        <div class="weather-place">${i18nT('weather.place', { place: escapeHtml(placeName) })}</div>
+        <div class="weather-task-title">${i18nT('weather.taskTitle', { task: escapeHtml(taskText) })}</div>
 
         <div class="weather-day-nav">
-            <button type="button" class="weather-nav-btn" data-weather-nav="prev" ${canPrev ? '' : 'disabled'} aria-label="روز قبل">‹</button>
+            <button type="button" class="weather-nav-btn" data-weather-nav="prev" ${canPrev ? '' : 'disabled'} aria-label="${i18nT('weather.dayPrev')}">‹</button>
             <div class="weather-day-label">
                 ${escapeHtml(dayLabel)}
-                ${isTargetDay ? '<span class="weather-day-badge">سررسید</span>' : ''}
+                ${isTargetDay ? `<span class="weather-day-badge">${i18nT('weather.dayBadge')}</span>` : ''}
             </div>
-            <button type="button" class="weather-nav-btn" data-weather-nav="next" ${canNext ? '' : 'disabled'} aria-label="روز بعد">›</button>
+            <button type="button" class="weather-nav-btn" data-weather-nav="next" ${canNext ? '' : 'disabled'} aria-label="${i18nT('weather.dayNext')}">›</button>
         </div>
 
-        <div class="weather-time">📅 سررسید: ${faShort(_currentSessionDate)}</div>
+        <div class="weather-time">${i18nT('weather.dueLine', { date: faShort(_currentSessionDate) })}</div>
 
         ${hourlyHTML}
 
         <div class="weather-daily">
-            <div class="weather-daily-title">📊 خلاصه روز</div>
-            <div class="weather-item"><span>حداکثر دما</span><strong>${faTemp(daily.tempMax)}C</strong></div>
-            <div class="weather-item"><span>حداقل دما</span><strong>${faTemp(daily.tempMin)}C</strong></div>
-            <div class="weather-item"><span>مجموع بارش</span><strong>${faNum(daily.precipitationSum, 'mm')}</strong></div>
-            <div class="weather-item"><span>حداکثر باد</span><strong>${faNum(daily.windSpeedMax, 'km/h')}</strong></div>
+            <div class="weather-daily-title">${i18nT('weather.summaryTitle')}</div>
+            <div class="weather-item"><span>${i18nT('weather.fields.tempMax')}</span><strong>${faTemp(daily.tempMax)}C</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.tempMin')}</span><strong>${faTemp(daily.tempMin)}C</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.precipSum')}</span><strong>${faNum(daily.precipitationSum, 'mm')}</strong></div>
+            <div class="weather-item"><span>${i18nT('weather.fields.windMax')}</span><strong>${faNum(daily.windSpeedMax, 'km/h')}</strong></div>
         </div>
     `);
 }
@@ -228,7 +229,7 @@ export async function showWeatherModal(taskId, sessionId) {
     }
     if (!targetSession) {
         openModal();
-        setContent('<div class="weather-error">سررسید آینده‌ای برای این وظیفه وجود ندارد.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorNoUpcoming')}</div>`);
         return;
     }
 
@@ -236,7 +237,7 @@ export async function showWeatherModal(taskId, sessionId) {
     const loc = targetSession.location || task.location;
     if (!loc) {
         openModal();
-        setContent('<div class="weather-error">مکانی برای این وظیفه ثبت نشده است.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorNoLocation')}</div>`);
         return;
     }
 
@@ -246,29 +247,29 @@ export async function showWeatherModal(taskId, sessionId) {
     const daysAhead = (due - now) / 86400000;
     if (daysAhead < 0) {
         openModal();
-        setContent('<div class="weather-error">این سررسید گذشته است و پیش‌بینی هوا برای آن معنا ندارد.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorPast')}</div>`);
         return;
     }
     if (daysAhead > 16) {
         openModal();
-        setContent('<div class="weather-error">پیش‌بینی هوا فقط تا ۱۶ روز آینده در دسترس است.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorTooFar')}</div>`);
         return;
     }
 
     // نمایش loading
     openModal();
-    setContent('<div class="weather-loading">در حال دریافت پیش‌بینی هوا...</div>');
+    setContent(`<div class="weather-loading">${i18nT('weather.loading')}</div>`);
 
     // دریافت داده
     const data = await fetchWeather(loc, targetSession.at);
     if (!data) {
-        setContent('<div class="weather-error">دریافت پیش‌بینی ناموفق بود. اتصال اینترنت را بررسی کنید.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorFetch')}</div>`);
         return;
     }
 
     // Guard نهایی: اگر data ناقص باشد
     if (!data.daily || !Array.isArray(data.daily.time) || data.daily.time.length === 0) {
-        setContent('<div class="weather-error">داده‌ی معتبری از سرور دریافت نشد.</div>');
+        setContent(`<div class="weather-error">${i18nT('weather.errorInvalid')}</div>`);
         return;
     }
 

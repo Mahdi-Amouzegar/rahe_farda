@@ -1,6 +1,11 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // ui.js -- main list render + filters (ESM) — فاز ۴ گام ۷
 //
+// ⚠️ فاز ۴C (i18n):
+//   - همه‌ی متن‌های hardcoded به i18n منتقل شدند
+//   - PRIORITY_LABELS حذف شد — به‌جای آن tasks.priority.* از i18n
+//   - formatDate از i18n برای تاریخ‌های locale-aware
+//
 // ⚠️ این نسخه:
 //   - render() را به renderFull + renderDiff تقسیم می‌کند
 //   - از render-diff.js برای تشخیص تغییرات استفاده می‌کند
@@ -13,7 +18,6 @@ import {
     toFa,
     escapeHtml,
     MAX_LENGTH,
-    PRIORITY_LABELS,
     faDate,
     trapFocus
 } from './core.js';
@@ -51,6 +55,7 @@ import {
     diffTasks,
     isSafeForDiff
 } from './render-diff.js';
+import { formatDate, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -75,6 +80,13 @@ function hasAnyLocation(t) {
     if (t.location) return true;
     if (Array.isArray(t.sessions) && t.sessions.some(s => s && s.location)) return true;
     return false;
+}
+
+function priorityLabel(priority) {
+    const key = priority === 'high' ? 'tasks.priority.high'
+              : priority === 'low' ? 'tasks.priority.low'
+              : 'tasks.priority.medium';
+    return i18nT(key);
 }
 
 function hydrateWeatherIcons(rootEl) {
@@ -240,14 +252,19 @@ export function renderStats(total, done) {
     });
     const max = Math.max(1, ...counts);
     const rate = total > 0 ? Math.round((done / total) * 100) : 0;
-    box.innerHTML = `<div class="stats-title">📊 ۷ روز گذشته · نرخ تکمیل ${toFa(rate)}٪</div><div class="bars">` +
+    const titleText = i18nT('tasks.insight.statsTitle', { rate: toFa(rate) });
+    box.innerHTML = `<div class="stats-title">${titleText}</div><div class="bars">` +
         days.map((d, i) => {
             let wd = '';
             try {
-                wd = d.toLocaleDateString('fa-IR', { weekday: 'narrow' });
+                wd = d.toLocaleDateString(
+                    getLang() === 'en' ? 'en-US' : 'fa-IR',
+                    { weekday: 'narrow' }
+                );
             } catch { /* نادیده */ }
             const h = Math.max(3, Math.round((counts[i] / max) * 100));
-            return `<div class="bar-col" title="${toFa(counts[i])} انجام‌شده"><div class="bar${counts[i] === 0 ? ' empty' : ''}" style="height: ${h}%;"></div><span>${wd}</span></div>`;
+            const tooltip = i18nT('tasks.insight.barTooltip', { n: toFa(counts[i]) });
+            return `<div class="bar-col" title="${tooltip}"><div class="bar${counts[i] === 0 ? ' empty' : ''}" style="height: ${h}%;"></div><span>${wd}</span></div>`;
         }).join('') + `</div>`;
 }
 
@@ -259,21 +276,21 @@ export function renderTemplateList() {
     const el = document.getElementById('tplList');
     if (!el) return;
     el.innerHTML = `<div class="tpl-list">` + PLAN_TEMPLATES.map(x =>
-        `<button type="button" class="tpl-opt" data-tpl="${x.id}"><b>${escapeHtml(x.title)}</b><span>${toFa(x.children.length)} کار آماده</span></button>`
+        `<button type="button" class="tpl-opt" data-tpl="${x.id}"><b>${escapeHtml(x.title)}</b><span>${i18nT('template.childrenCount', { n: toFa(x.children.length) })}</span></button>`
     ).join('') + `</div>`;
 }
 
 function planDateRange(t) {
     const fmt = iso => {
         try {
-            return new Date(iso).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' });
+            return formatDate(new Date(iso), { day: 'numeric', month: 'long' });
         } catch {
             return '';
         }
     };
-    if (t.startAt && t.endAt) return `از ${fmt(t.startAt)} تا ${fmt(t.endAt)}`;
-    if (t.startAt) return `از ${fmt(t.startAt)}`;
-    if (t.endAt) return `تا ${fmt(t.endAt)}`;
+    if (t.startAt && t.endAt) return `${i18nT('detail.sections.planDates.from')} ${fmt(t.startAt)} ${i18nT('detail.sections.planDates.to')} ${fmt(t.endAt)}`;
+    if (t.startAt) return `${i18nT('detail.sections.planDates.from')} ${fmt(t.startAt)}`;
+    if (t.endAt) return `${i18nT('detail.sections.planDates.to')} ${fmt(t.endAt)}`;
     return '';
 }
 
@@ -283,8 +300,8 @@ export function renderTplKids() {
     el.innerHTML = tplDraft.kids.length ? tplDraft.kids.map((k, i) =>
         `<div class="session-item"><span class="session-num">${toFa(i + 1)}</span>` +
         `<span class="session-date">${escapeHtml(k)}</span>` +
-        `<button class="btn-icon btn-delete" data-tplkid="${i}" aria-label="حذف کار">✕</button></div>`
-    ).join('') : '<div class="session-empty">همه کارها را حذف کردید؛ کار جدید اضافه کنید.</div>';
+        `<button class="btn-icon btn-delete" data-tplkid="${i}" aria-label="${i18nT('template.deleteChild')}">✕</button></div>`
+    ).join('') : `<div class="session-empty">${i18nT('template.emptyKids')}</div>`;
 }
 
 export function getTplDraft() { return tplDraft; }
@@ -323,20 +340,20 @@ export function renderTrash() {
     const el = document.getElementById('trashList');
     if (!el) return;
     if (!state.trash.length) {
-        el.innerHTML = '<div class="session-empty">سطل زباله خالی است.</div>';
+        el.innerHTML = `<div class="session-empty">${i18nT('trash.empty')}</div>`;
         return;
     }
     const sorted = [...state.trash].sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
     el.innerHTML = sorted.map(x => {
         let dstr = '';
         try {
-            dstr = new Date(x.deletedAt).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' });
+            dstr = formatDate(new Date(x.deletedAt), { day: 'numeric', month: 'long' });
         } catch { /* نادیده */ }
         return `<div class="session-item">
             <span class="session-num">${x.kind === 'plan' ? '📁' : '📝'}</span>
             <span class="session-date">${escapeHtml(x.text)} <small>(${dstr})</small></span>
-            <button class="btn-icon btn-edit" data-tact="restore" data-tid="${escapeHtml(String(x.id))}" aria-label="بازگردانی">↩</button>
-            <button class="btn-icon btn-delete" data-tact="purge" data-tid="${escapeHtml(String(x.id))}" aria-label="حذف همیشگی">✕</button>
+            <button class="btn-icon btn-edit" data-tact="restore" data-tid="${escapeHtml(String(x.id))}" aria-label="${i18nT('trash.restore')}">↩</button>
+            <button class="btn-icon btn-delete" data-tact="purge" data-tid="${escapeHtml(String(x.id))}" aria-label="${i18nT('trash.purge')}">✕</button>
         </div>`;
     }).join('');
 }
@@ -400,7 +417,13 @@ export function renderCalendar() {
         const cls = 'picker-day cal-day' + (isToday ? ' today' : '') + (state.selectedDay === k ? ' selected' : '');
         const dots = list.slice(0, 3).map(s => `<span class="dot d-${s.priority || 'low'}"></span>`).join('');
         const more = list.length > 3 ? `<span class="dot-more">${toFa(list.length - 3)}+</span>` : '';
-        html += `<button class="${cls}" data-calday="${k}" aria-label="${toFa(d)} ${JALALI_MONTHS[state.calJm - 1]}${list.length ? '، ' + toFa(list.length) + ' جلسه' : ''}">${toFa(d)}<span class="cal-dots">${dots}${more}</span></button>`;
+        const sessionsPart = list.length ? i18nT('calendar.daySessions', { n: toFa(list.length) }) : '';
+        const ariaLabel = i18nT('calendar.dayAria', {
+            day: toFa(d),
+            month: JALALI_MONTHS[state.calJm - 1],
+            sessions: sessionsPart
+        });
+        html += `<button class="${cls}" data-calday="${k}" aria-label="${ariaLabel}">${toFa(d)}<span class="cal-dots">${dots}${more}</span></button>`;
     }
     document.getElementById('calDays').innerHTML = html;
 }
@@ -434,9 +457,10 @@ export function closeCal() {
 // HTML سازها
 // ═══════════════════════════════════════════════════════════════════════════
 
-function operationMenu(items, label = 'عملیات') {
+function operationMenu(items, label) {
+    const menuLabel = label || i18nT('taskItem.operations.menuLabel');
     return `<div class="operation-menu">
-        <button type="button" class="operation-trigger" data-action="toggle-menu" aria-label="${label}" aria-expanded="false">⋯ <span>عملیات</span></button>
+        <button type="button" class="operation-trigger" data-action="toggle-menu" aria-label="${menuLabel}" aria-expanded="false">⋯ <span>${i18nT('taskItem.operations.menuLabel')}</span></button>
         <div class="operation-list" role="menu" hidden>
             ${items.map(item => `<button type="button" role="menuitem" class="operation-item ${item.className || ''}" data-action="${item.action}" aria-label="${item.label}">${item.icon ? `<span aria-hidden="true">${item.icon}</span>` : ''}<span>${item.label}</span></button>`).join('')}
         </div>
@@ -452,22 +476,23 @@ function childWeatherButton(c) {
     const daysAhead = (due - Date.now()) / 86400000;
     if (daysAhead < 0 || daysAhead > 16) return '';
     const key = `${escapeHtml(String(c.id))}|${escapeHtml(n.at)}`;
-    return `<button type="button" class="weather-icon-btn weather-icon-btn-sm" data-weather-task="${escapeHtml(String(c.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
+    const label = i18nT('taskItem.weather.buttonAria');
+    return `<button type="button" class="weather-icon-btn weather-icon-btn-sm" data-weather-task="${escapeHtml(String(c.id))}" aria-label="${label}" title="${label}"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
 }
 
 function childHtml(c) {
     if (String(c.id) === String(state.editingId)) {
         return `<div class="child-item" data-id="${escapeHtml(String(c.id))}">
             <div class="edit-wrap">
-                <input type="text" class="task-edit-input" value="${escapeHtml(c.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش زیرکار">
-                <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
-                <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف">✕</button>
+                <input type="text" class="task-edit-input" value="${escapeHtml(c.text)}" maxlength="${MAX_LENGTH}" aria-label="${i18nT('taskItem.edit.childAria')}">
+                <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="${i18nT('taskItem.edit.okAria')}">✓</button>
+                <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="${i18nT('common.cancel')}">✕</button>
             </div>
         </div>`;
     }
 
     const n = nearestUpcoming(c);
-    const prioLabel = PRIORITY_LABELS[c.priority] || PRIORITY_LABELS.medium;
+    const prioLabel = priorityLabel(c.priority);
     const hasLoc = Boolean(c.location);
     const hasPhotos = (c.photos || []).length > 0;
     const wBtn = childWeatherButton(c);
@@ -475,33 +500,39 @@ function childHtml(c) {
 
     const hasMeta = n || hasLoc || hasPhotos || recur || wBtn;
 
+    const toggleAria = c.completed
+        ? i18nT('taskItem.checkbox.markUndone')
+        : i18nT('taskItem.checkbox.markDone');
+
+    const menuItems = state.currentFilter === 'archived'
+        ? [
+            { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
+            { action: 'delete', label: i18nT('taskItem.operations.deleteChild'), icon: '✕', className: 'danger' }
+        ]
+        : [
+            { action: 'pick-loc', label: c.location ? i18nT('taskItem.operations.showLoc') : i18nT('taskItem.operations.pickLoc'), icon: '📍' },
+            ...(hasAnyLocation(c) ? [{ action: 'route', label: i18nT('taskItem.operations.route'), icon: '🧭' }] : []),
+            { action: 'detail', label: i18nT('taskItem.operations.detailChild'), icon: '📋' },
+            { action: 'archive', label: i18nT('taskItem.operations.archiveChild'), icon: '📦' },
+            { action: 'delete', label: i18nT('taskItem.operations.deleteChild'), icon: '✕', className: 'danger' }
+        ];
+
     return `<div class="child-item ${c.completed ? 'completed' : ''} ${String(c.id) === String(state.justAddedId) ? 'just-added' : ''}" data-id="${escapeHtml(String(c.id))}">
         <div class="child-main-row">
             <button class="task-checkbox ${c.completed ? 'checked' : ''}" data-action="toggle"
-                aria-label="${c.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
+                aria-label="${toggleAria}"
                 aria-pressed="${c.completed}"></button>
-            <div class="child-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید">${escapeHtml(c.text)}</div>
+            <div class="child-text" data-action="edit" title="${i18nT('taskItem.edit.title')}">${escapeHtml(c.text)}</div>
             <div class="child-actions">
-                ${operationMenu(state.currentFilter === 'archived'
-                    ? [
-                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                        { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
-                    ]
-                    : [
-                        { action: 'pick-loc', label: c.location ? 'نمایش محل روی نقشه' : 'ثبت محل روی نقشه', icon: '📍' },
-                        ...(hasAnyLocation(c) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
-                        { action: 'detail', label: 'جزئیات زیرکار', icon: '📋' },
-                        { action: 'archive', label: 'بایگانی زیرکار', icon: '📦' },
-                        { action: 'delete', label: 'حذف زیرکار', icon: '✕', className: 'danger' }
-                    ], 'عملیات زیرکار')}
+                ${operationMenu(menuItems, i18nT('taskItem.operations.childMenuLabel'))}
             </div>
         </div>
         ${hasMeta ? `<div class="child-meta-row">
             <span class="priority-badge p-${c.priority}">${prioLabel}</span>
             ${recur}
             ${n ? `<span class="child-meta-item">📅 ${faShort(n.at)}</span>` : ''}
-            ${hasLoc ? '<span class="child-meta-item" title="مکان ثبت شده">📍</span>' : ''}
-            ${hasPhotos ? `<span class="child-meta-item" title="${toFa(c.photos.length)} عکس">📷</span>` : ''}
+            ${hasLoc ? `<span class="child-meta-item" title="${i18nT('location.hasLocation')}">📍</span>` : ''}
+            ${hasPhotos ? `<span class="child-meta-item" title="${toFa(c.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${wBtn}
         </div>` : ''}
     </div>`;
@@ -515,49 +546,52 @@ function planHtml(task) {
     const drafts = state.childDrafts[task.id] || [];
     const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
     const hasLoc = hasAnyLocation(task);
+
+    const menuItems = state.currentFilter === 'archived'
+        ? [
+            { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
+            { action: 'delete', label: i18nT('taskItem.operations.deletePlan'), icon: '✕', className: 'danger' }
+        ]
+        : [
+            { action: 'pin', label: task.pinned ? i18nT('taskItem.operations.unpin') : i18nT('taskItem.operations.pin'), icon: '📌' },
+            ...(hasLoc ? [{ action: 'route', label: i18nT('taskItem.operations.route'), icon: '🧭' }] : []),
+            { action: 'detail', label: i18nT('taskItem.operations.detailPlan'), icon: '📋' },
+            { action: 'archive', label: i18nT('taskItem.operations.archivePlan'), icon: '📦' },
+            { action: 'delete', label: i18nT('taskItem.operations.deletePlan'), icon: '✕', className: 'danger' }
+        ];
+
     return `<div class="task-item plan-item prio-${task.priority}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="plan-head">
-            <button class="plan-caret" data-action="expand" aria-label="باز و بسته کردن برنامه">${open ? '▾' : '◂'}</button>
+            <button class="plan-caret" data-action="expand" aria-label="${i18nT('taskItem.plan.expand')}">${open ? '▾' : '◂'}</button>
             <div class="plan-head-main">
                 <div class="task-text">📁 ${escapeHtml(task.text)}</div>
             </div>
             <div class="task-actions">
-                ${operationMenu(state.currentFilter === 'archived'
-                    ? [
-                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                        { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
-                    ]
-                    : [
-                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
-                        ...(hasLoc ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
-                        { action: 'detail', label: 'جزئیات برنامه', icon: '📋' },
-                        { action: 'archive', label: 'بایگانی برنامه', icon: '📦' },
-                        { action: 'delete', label: 'حذف برنامه', icon: '✕', className: 'danger' }
-                    ], 'عملیات برنامه')}
+                ${operationMenu(menuItems, i18nT('taskItem.operations.planMenuLabel'))}
             </div>
         </div>
         <div class="task-meta plan-meta-row">
-            <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>${recurBadge(task)}
-            <span>زیرکار: ${toFa(st.done)} از ${toFa(st.total)}</span>
+            <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>${recurBadge(task)}
+            <span>${i18nT('taskItem.plan.subCount', { done: toFa(st.done), total: toFa(st.total) })}</span>
             ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
-            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
-            ${hasLoc ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
+            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
+            ${hasLoc ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
             <div class="mini-progress"><div class="mini-progress-fill" style="width: ${pct}%;"></div></div>
-            ${st.total > 0 && st.done < st.total ? '<button class="mini-link" data-action="check-all" aria-label="انجام شدن همه زیرکارها">✓ همه انجام شد</button>' : ''}
+            ${st.total > 0 && st.done < st.total ? `<button class="mini-link" data-action="check-all" aria-label="${i18nT('taskItem.operations.checkAll')}">✓ ${i18nT('taskItem.operations.checkAll')}</button>` : ''}
         </div>
         ${(task.sessions && task.sessions.length) ? `<div class="plan-session-row">${sessionSummaryHtml(task)}</div>` : ''}
         ${open ? `<div class="plan-body">
-            ${kids.length ? kids.map(c => childHtml(c)).join('') : '<div class="session-empty">هنوز زیرکاری ثبت نشده است.</div>'}
-            ${drafts.length ? `<div class="due-chips" style="display: flex; margin: 0;">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="حذف">✕</button></span>`).join('')}</div>` : ''}
+            ${kids.length ? kids.map(c => childHtml(c)).join('') : `<div class="session-empty">${i18nT('taskItem.plan.noChildren')}</div>`}
+            ${drafts.length ? `<div class="due-chips" style="display: flex; margin: 0;">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="${i18nT('common.delete')}">✕</button></span>`).join('')}</div>` : ''}
             <div class="child-add">
-                <input type="text" class="child-input" placeholder="زیرکار جدید..." maxlength="${MAX_LENGTH}" aria-label="عنوان زیرکار جدید">
-                <select class="child-prio" aria-label="اولویت زیرکار">
-                    <option value="low">کم</option>
-                    <option value="medium" selected>متوسط</option>
-                    <option value="high">زیاد</option>
+                <input type="text" class="child-input" placeholder="${i18nT('tasks.plan.newChildPlaceholder')}" maxlength="${MAX_LENGTH}" aria-label="${i18nT('tasks.plan.newChildAria')}">
+                <select class="child-prio" aria-label="${i18nT('tasks.details.priorityAria')}">
+                    <option value="low">${i18nT('tasks.priority.low')}</option>
+                    <option value="medium" selected>${i18nT('tasks.priority.medium')}</option>
+                    <option value="high">${i18nT('tasks.priority.high')}</option>
                 </select>
-                <button class="btn-icon btn-detail" data-action="child-date" aria-label="تعیین سررسید زیرکار">📅</button>
-                <button class="btn-add btn-child-add" data-action="child-add">افزودن زیرکار به برنامه</button>
+                <button class="btn-icon btn-detail" data-action="child-date" aria-label="${i18nT('taskItem.plan.childDate')}">📅</button>
+                <button class="btn-add btn-child-add" data-action="child-add">${i18nT('tasks.plan.addChild')}</button>
             </div>
         </div>` : ''}
     </div>`;
@@ -574,45 +608,52 @@ function taskItemHtml(task) {
             <div class="task-main-row">
                 <div class="task-content">
                     <div class="edit-wrap">
-                        <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="ویرایش وظیفه">
-                        <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="تأیید ویرایش">✓</button>
-                        <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="انصراف از ویرایش">✕</button>
+                        <input type="text" class="task-edit-input" value="${escapeHtml(task.text)}" maxlength="${MAX_LENGTH}" aria-label="${i18nT('taskItem.edit.aria')}">
+                        <button class="btn-icon btn-ok" data-action="edit-ok" aria-label="${i18nT('taskItem.edit.okAria')}">✓</button>
+                        <button class="btn-icon btn-cancel" data-action="edit-cancel" aria-label="${i18nT('taskItem.edit.cancelAria')}">✕</button>
                     </div>
                 </div>
             </div>
         </div>`;
     }
+
+    const toggleAria = task.completed
+        ? i18nT('taskItem.checkbox.markUndone')
+        : i18nT('taskItem.checkbox.markDone');
+
+    const menuItems = state.currentFilter === 'archived'
+        ? [
+            { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
+            { action: 'delete', label: i18nT('taskItem.operations.delete'), icon: '✕', className: 'danger' }
+        ]
+        : [
+            { action: 'pin', label: task.pinned ? i18nT('taskItem.operations.unpin') : i18nT('taskItem.operations.pin'), icon: '📌' },
+            ...(hasAnyLocation(task) ? [{ action: 'route', label: i18nT('taskItem.operations.route'), icon: '🧭' }] : []),
+            { action: 'detail', label: i18nT('taskItem.operations.detail'), icon: '📋' },
+            { action: 'edit-btn', label: i18nT('taskItem.operations.edit'), icon: '✎' },
+            { action: 'archive', label: i18nT('taskItem.operations.archive'), icon: '📦' },
+            { action: 'delete', label: i18nT('taskItem.operations.delete'), icon: '✕', className: 'danger' }
+        ];
+
     return `
     <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="task-main-row">
             <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
-                aria-label="${task.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده'}"
+                aria-label="${toggleAria}"
                 aria-pressed="${task.completed}"></button>
             <div class="task-content">
-                <div class="task-text" data-action="edit" title="برای ویرایش دو بار کلیک کنید"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
+                <div class="task-text" data-action="edit" title="${i18nT('taskItem.edit.title')}"><span class="task-type-icon" aria-hidden="true">${taskTypeIcon(task)}</span> ${escapeHtml(task.text)}</div>
             </div>
             <div class="task-actions">
-                ${operationMenu(state.currentFilter === 'archived'
-                    ? [
-                        { action: 'unarchive', label: 'بازگردانی از بایگانی', icon: '↩' },
-                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                    ]
-                    : [
-                        { action: 'pin', label: task.pinned ? 'برداشتن سنجاق' : 'سنجاق به بالا', icon: '📌' },
-                        ...(hasAnyLocation(task) ? [{ action: 'route', label: 'نمایش مسیر', icon: '🧭' }] : []),
-                        { action: 'detail', label: 'جزئیات و اطلاعات بیشتر', icon: '📋' },
-                        { action: 'edit-btn', label: 'ویرایش نام وظیفه', icon: '✎' },
-                        { action: 'archive', label: 'بایگانی وظیفه', icon: '📦' },
-                        { action: 'delete', label: 'حذف وظیفه', icon: '✕', className: 'danger' }
-                    ], 'عملیات وظیفه')}
+                ${operationMenu(menuItems, i18nT('taskItem.operations.menuLabel'))}
             </div>
         </div>
         <div class="task-info-row">
-            <span class="priority-badge p-${task.priority}">${PRIORITY_LABELS[task.priority]}</span>
+            <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>
             ${recurBadge(task)}
             <span class="created-date">${faDate(task.createdAt)}</span>
-            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} عکس">📷</span>` : ''}
-            ${task.location ? '<button class="mini-link" data-action="locate" aria-label="نمایش محل روی نقشه">📍 نقشه</button>' : ''}
+            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
+            ${task.location ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
         </div>
         ${sessionSummaryHtml(task)}
     </div>`;
@@ -623,7 +664,7 @@ function taskItemHtml(task) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function buildTrashMessage(ids) {
-    if (!ids || ids.length === 0) return 'به سطل زباله منتقل شد';
+    if (!ids || ids.length === 0) return i18nT('snackbar.trashGeneric');
     if (ids.length === 1) {
         const found = findTask(ids[0]);
         if (!found) {
@@ -631,16 +672,16 @@ function buildTrashMessage(ids) {
                 ? state.trash.find(x => String(x.id) === String(ids[0]))
                 : null;
             if (inTrash) {
-                const kindLabel = inTrash.kind === 'plan' ? 'برنامه' : (inTrash.kind === 'series' ? 'دوره' : 'کار');
-                return `${kindLabel} «${inTrash.text}» به سطل زباله منتقل شد.`;
+                const kindLabel = i18nT(`kind.${inTrash.kind === 'plan' ? 'plan' : inTrash.kind === 'series' ? 'series' : 'task'}`);
+                return i18nT('snackbar.trashSingle', { kind: kindLabel, text: inTrash.text });
             }
-            return 'به سطل زباله منتقل شد';
+            return i18nT('snackbar.trashGeneric');
         }
         const task = found.task;
-        const kindLabel = task.kind === 'plan' ? 'برنامه' : (task.kind === 'series' ? 'دوره' : 'کار');
-        return `${kindLabel} «${task.text}» به سطل زباله منتقل شد.`;
+        const kindLabel = i18nT(`kind.${task.kind === 'plan' ? 'plan' : task.kind === 'series' ? 'series' : 'task'}`);
+        return i18nT('snackbar.trashSingle', { kind: kindLabel, text: task.text });
     }
-    return `${toFa(ids.length)} مورد به سطل زباله منتقل شد.`;
+    return i18nT('snackbar.trashMultiple', { n: toFa(ids.length) });
 }
 
 export function showUndoFor(ids, label) {
@@ -677,19 +718,19 @@ function renderFull(filtered, total, done) {
     if (filtered.length === 0) {
         let msg;
         if (state.searchQuery) {
-            msg = 'نتیجه‌ای برای جستجو یافت نشد';
+            msg = i18nT('tasks.empty.noResults');
         } else if (state.currentFilter === 'completed') {
-            msg = 'هنوز وظیفه انجام شده‌ای ندارید';
+            msg = i18nT('tasks.empty.noCompleted');
         } else if (state.currentFilter === 'active') {
-            msg = 'همه وظایف انجام شده‌اند!';
+            msg = i18nT('tasks.empty.allDone');
         } else {
-            msg = 'لیست وظایف خالی است';
+            msg = i18nT('tasks.empty.emptyList');
         }
         taskList.innerHTML = `
             <div class="empty-state">
                 <div class="icon">✦</div>
                 <p>${msg}</p>
-                ${state.tasks.length === 0 && !state.searchQuery ? '<p class="empty-hint">برای شروع عنوان را بنویسید و «افزودن» را بزنید — با 📅 تاریخ و با 📍 محل هم می‌توانید اضافه کنید.</p>' : ''}
+                ${state.tasks.length === 0 && !state.searchQuery ? `<p class="empty-hint">${i18nT('tasks.empty.startHint')}</p>` : ''}
             </div>`;
         state.justAddedId = null;
         updateTaskListStatus('');
@@ -702,7 +743,7 @@ function renderFull(filtered, total, done) {
     }).join('');
 
     hydrateWeatherIcons(taskList);
-    updateTaskListStatus(`${filtered.length} مورد نمایش داده می‌شود`);
+    updateTaskListStatus(i18nT('tasks.status.showingCount', { n: toFa(filtered.length) }));
     state.justAddedId = null;
 }
 
@@ -740,7 +781,11 @@ function renderDiff(filtered) {
             if (cb) {
                 cb.classList.toggle('checked', op.patches.completed);
                 cb.setAttribute('aria-pressed', String(op.patches.completed));
-                cb.setAttribute('aria-label', op.patches.completed ? 'برگرداندن به انجام نشده' : 'علامت‌گذاری به عنوان انجام شده');
+                cb.setAttribute('aria-label',
+                    op.patches.completed
+                        ? i18nT('taskItem.checkbox.markUndone')
+                        : i18nT('taskItem.checkbox.markDone')
+                );
             }
         }
         if ('priority' in op.patches) {
@@ -749,7 +794,7 @@ function renderDiff(filtered) {
             const badge = el.querySelector('.priority-badge');
             if (badge) {
                 badge.className = `priority-badge p-${op.patches.priority}`;
-                badge.textContent = PRIORITY_LABELS[op.patches.priority];
+                badge.textContent = priorityLabel(op.patches.priority);
             }
         }
         // فیلدهای پیچیده → diff امن نیست
@@ -801,7 +846,7 @@ export function render() {
         if (state.selectedDay) {
             const [gy, gm, gd] = state.selectedDay.split('-').map(Number);
             chip.style.display = '';
-            chip.innerHTML = `📅 ${new Date(gy, gm - 1, gd).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' })} <b>✕</b>`;
+            chip.innerHTML = `📅 ${formatDate(new Date(gy, gm - 1, gd), { day: 'numeric', month: 'long' })} <b>✕</b>`;
         } else chip.style.display = 'none';
     }
 
@@ -819,12 +864,20 @@ export function render() {
         });
     });
 
-    const FILTER_LABELS = { all: 'همه', active: 'انجام نشده', completed: 'انجام شده', archived: '📦 بایگانی', hasloc: '📍 محل‌دار', hasdue: '📅 سررسیددار' };
+    const FILTER_KEYS = {
+        all: 'tasks.filter.all',
+        active: 'tasks.filter.active',
+        completed: 'tasks.filter.completed',
+        archived: 'tasks.filter.archived',
+        hasloc: 'tasks.filter.hasloc',
+        hasdue: 'tasks.filter.hasdue'
+    };
     const COUNTS = { all: total, active: activeCount, completed: done, archived: archivedCount, hasloc: locCount, hasdue: dueCount };
     document.querySelectorAll('.filter-btn').forEach(b => {
         const f = b.dataset.filter;
         if (!f || !(f in COUNTS)) return;
-        b.textContent = FILTER_LABELS[f] + ` (${toFa(COUNTS[f])})`;
+        const label = i18nT(FILTER_KEYS[f]);
+        b.textContent = `${label} (${toFa(COUNTS[f])})`;
     });
 
     if (progressFill) progressFill.style.width = pct + '%';

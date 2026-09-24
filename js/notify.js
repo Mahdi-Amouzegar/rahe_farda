@@ -14,6 +14,7 @@ import { findTask, saveTasks } from './store.js';
 import { allSessions, faShort, dayKey } from './sessions.js';
 import { getNow } from './time.js';
 import { savePrefs } from './map.js';
+import { getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Notification support
@@ -108,15 +109,15 @@ function playDefaultChime() {
 const SOUND_PRESETS = {
     'gentle-bell': {
         file: 'page-forward-single-chime.ogg',
-        label: '🔔 زنگ ملایم'
+        labelKey: 'sound.preset.gentleBell'
     },
     'soft-chime': {
         file: 'software-interface.ogg',
-        label: '💻 صدای دیجیتال'
+        labelKey: 'sound.preset.softChime'
     },
     'digital-alert': {
         file: 'uplifting-bells.ogg',
-        label: '🎵 ناقوس‌های شاد'
+        labelKey: 'sound.preset.digitalAlert'
     }
 };
 
@@ -139,7 +140,7 @@ function presetFilePath(presetName) {
 export function getSoundPresets() {
     return Object.entries(SOUND_PRESETS).map(([key, val]) => ({
         key,
-        label: val.label,
+        label: i18nT(val.labelKey),
         file: val.file
     }));
 }
@@ -265,15 +266,15 @@ function playTts(text) {
             utter.lang = chosen.lang;
             effectiveLang = chosen.lang;
         } else {
-            utter.lang = state.prefs.lang === 'en' ? 'en-US' : 'fa-IR';
+            utter.lang = getLang() === 'en' ? 'en-US' : 'fa-IR';
         }
 
         // ⚠️ warning در Console (برای دیباگ)
-        const wantsFa = state.prefs.lang !== 'en';
+        const wantsFa = getLang() !== 'en';
         if (wantsFa && !effectiveLang.toLowerCase().startsWith('fa')) {
             console.warn(
-                '[TTS] voice فارسی در سیستم یافت نشد. ' +
-                'از voice انگلیسی استفاده می‌شود: ' + effectiveLang
+                '[TTS] Persian voice not found on system. ' +
+                'Using English voice: ' + effectiveLang
             );
         }
 
@@ -399,7 +400,11 @@ export function checkReminders() {
         if (rm && rm > 0) {
             const leadTarget = v - rm * 60 * 1000;
             if (!s.reminded && now >= leadTarget && now < v) {
-                fireNotification('⏰ یادآور جلسه', `${s.owner} — ${faShort(s.at)}`, 'sess-' + s.id).then(ok => {
+                fireNotification(
+                    i18nT('notifications.reminder.title'),
+                    `${s.owner} — ${faShort(s.at)}`,
+                    'sess-' + s.id
+                ).then(ok => {
                     if (ok) {
                         // ⚠️ TTS عنوان را می‌خواند
                         playChime(s.owner);
@@ -412,7 +417,11 @@ export function checkReminders() {
         // ۲. هشدار ۵ دقیقه قبل (همیشه، مستقل از rm)
         const nearDueTarget = v - NEAR_DUE_MIN * 60 * 1000;
         if (!s.remindedDue && now >= nearDueTarget && now < v && now - nearDueTarget <= REMINDER_GRACE) {
-            fireNotification('🔔 ۵ دقیقه تا جلسه', `${s.owner} — ${faShort(s.at)}`, 'due-' + s.id).then(ok => {
+            fireNotification(
+                i18nT('notifications.reminder.dueSoonTitle'),
+                `${s.owner} — ${faShort(s.at)}`,
+                'due-' + s.id
+            ).then(ok => {
                 if (ok) {
                     playChime(s.owner);
                     markReminded(s.taskId, s.id, 'due');
@@ -436,9 +445,13 @@ export function checkDigest() {
     // نکته: allSessions(false) چون می‌خواهیم همه جلسات امروز (حتی completed) را ببینیم
     const todays = allSessions(false).filter(s => dayKey(new Date(s.at)) === day);
     const body = todays.length
-        ? `امروز ${toFa(todays.length)} جلسه داری: ${todays.slice(0, 3).map(s => s.owner).join('، ')}${todays.length > 3 ? ' و…' : ''}`
-        : 'امروز جلسه‌ای نداری 🎉';
-    fireNotification('📅 برنامه امروز', body, 'digest-' + day).then(ok => {
+        ? i18nT('notifications.digest.hasSessions', {
+            n: toFa(todays.length),
+            list: todays.slice(0, 3).map(s => s.owner).join('، '),
+            more: todays.length > 3 ? i18nT('notifications.digest.more') : ''
+        })
+        : i18nT('notifications.digest.noSessions');
+    fireNotification(i18nT('notifications.digest.title'), body, 'digest-' + day).then(ok => {
         if (ok) {
             playChime();
             state.prefs.lastDigest = day;
@@ -474,5 +487,5 @@ export function startReminderLoop() {
  * @param {string} [titleText]
  */
 export function testAudioReminder(titleText) {
-    playChime(titleText || 'این یک یادآور آزمایشی است');
+    playChime(titleText || i18nT('notifications.testReminder'));
 }

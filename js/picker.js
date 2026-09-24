@@ -10,6 +10,7 @@ import {
     jalaliMonthLength
 } from './jalali.js';
 import { faShort, updateDueChips, hasSessionAt, allSessions } from './sessions.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Internal state
@@ -102,7 +103,7 @@ export function renderPicker() {
 export function confirmPicker() {
     const err = document.getElementById('pickerError');
     if (!state.pickerDay) {
-        err.textContent = 'لطفاً یک روز انتخاب کنید.';
+        err.textContent = i18nT('picker.errorNoDay');
         return;
     }
     const g = jalaliToGregorian(state.pickerJy, state.pickerJm, state.pickerDay);
@@ -110,13 +111,13 @@ export function confirmPicker() {
     const mi = parseInt(document.getElementById('pickerMinute').value, 10);
     const picked = new Date(g.gy, g.gm - 1, g.gd, h, mi, 0, 0);
     if (picked.getTime() <= getNow().getTime()) {
-        err.textContent = 'زمان سررسید باید بعد از زمان جاری باشد.';
+        err.textContent = i18nT('picker.errorPast');
         return;
     }
     const hit = findConflict(picked.getTime());
     if (hit && !conflictArmed) {
         conflictArmed = true;
-        err.textContent = `⚠️ تداخل زمانی: «${hit.owner}» در ${faShort(hit.at)} برنامه‌ریزی شده و کمتر از ۳۰ دقیقه با زمان انتخاب‌شده فاصله دارد. برای ثبت این سررسید، دوباره تأیید کنید.`;
+        err.textContent = i18nT('picker.errorConflict', { owner: hit.owner, date: faShort(hit.at) });
         return;
     }
     const iso = picked.toISOString();
@@ -127,7 +128,7 @@ export function confirmPicker() {
         cb(iso);
     } else {
         if (hasSessionAt(state.addDraftSessions, iso)) {
-            err.textContent = 'این سررسید قبلاً ثبت شده است.';
+            err.textContent = i18nT('picker.errorDuplicate');
             return;
         }
         state.addDraftSessions.push({ id: uid(), at: iso });

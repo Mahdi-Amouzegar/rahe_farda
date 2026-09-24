@@ -1,13 +1,23 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // app.js -- event wiring + boot (ESM entry point) — فاز ۶ گام ۲
 //
+// ⚠️ فاز ۴C (i18n):
+//   - state.prefs.lang حذف شد — i18n منبع یکتای زبان است
+//   - initI18n() بعد از loadPrefs() صدا زده می‌شود
+//   - applyDisplaySettings() فقط تم را مدیریت می‌کند (dir/lang به i18n واگذار شد)
+//   - language toggle از setLang() + applyToDOM() + resetRenderSignature() استفاده می‌کند
+//   - updateFooter() برای به‌روزرسانی dynamic footer (سال + todayLine)
+//   - refreshSoundPresetList() برای به‌روزرسانی لیست آهنگ‌ها در تغییر زبان
+//   - بستن operation-list با کلیک بیرون
+//
 // ⚠️ این نسخه:
 //   - wireEvents() مستقیم برای همه listenerها
 //   - DueChipsManager جایگزین _dueHome
 //   - setMapHelpers (رفع circular import)
 //   - Export/Import
 //   - initNetworkMonitor, initSyncQueue, initHeaderStatus, initPWA
-//   - ⚠️ فاز ۶ گام ۲: initAuth, restoreSession, authModal (Telegram Redirect-based)
+//   - initAuth, restoreSession, authModal (Telegram Redirect-based)
+//   - initI18n (فاز ۴C)
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -164,6 +174,16 @@ import {
     ALLOWED_TTL_DAYS
 } from './auth.js';
 
+// ⚠️ فاز ۴C — چندزبانه
+import {
+    initI18n,
+    applyToDOM,
+    setLang,
+    getLang,
+    t,
+    t as i18nT
+} from './i18n.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DueChipsManager — جایگزین _dueHome
 // ═══════════════════════════════════════════════════════════════════════════
@@ -260,15 +280,6 @@ function closeAuthModal() {
 
 /**
  * رندر محتوای مودال بر اساس وضعیت auth.
- *
- * حالت ۱ (وارد نشده): دو دکمه — [ورود با تلگرام] فعال + [ورود با کد همگام‌سازی] غیرفعال
- * حالت ۲ (وارد شده): اطلاعات کاربر + دکمه‌ی خروج
- */
-/**
- * رندر محتوای مودال بر اساس وضعیت auth.
- *
- * حالت ۱ (وارد نشده): دو دکمه — [ورود با تلگرام] فعال + [ورود با کد همگام‌سازی] غیرفعال
- * حالت ۲ (وارد شده): اطلاعات کاربر + انتخاب TTL + زمان مانده دقیق + دکمه‌ی خروج
  */
 function renderAuthModal() {
     const body = document.getElementById('authModalBody');
@@ -280,22 +291,22 @@ function renderAuthModal() {
         // ─── حالت ۱: وارد نشده ───
         body.innerHTML = `
             <p class="modal-message">
-                برای همگام‌سازی بین دستگاه‌ها، یکی از روش‌های زیر را انتخاب کنید.
-                <br><small class="auth-hint">اطلاعات شما همچنان روی همین دستگاه می‌ماند. همگام‌سازی به‌صورت پیش‌فرض خاموش است.</small>
+                ${i18nT('auth.login.message')}
+                <br><small class="auth-hint">${i18nT('auth.login.hint')}</small>
             </p>
             <div class="auth-options">
                 <button type="button" class="btn-add auth-option-btn" id="authTelegramBtn">
                     <span aria-hidden="true">📱</span>
-                    <span>ورود با حساب تلگرام</span>
+                    <span>${i18nT('auth.login.telegramButton')}</span>
                 </button>
-                <button type="button" class="btn-small auth-option-btn auth-option-btn--disabled" id="authSyncCodeBtn" disabled aria-disabled="true" title="به‌زودی در گام بعدی فعال می‌شود">
+                <button type="button" class="btn-small auth-option-btn auth-option-btn--disabled" id="authSyncCodeBtn" disabled aria-disabled="true" title="${i18nT('auth.login.syncCodeDisabledTitle')}">
                     <span aria-hidden="true">🔑</span>
-                    <span>ورود با کد همگام‌سازی</span>
-                    <small class="auth-option-soon">به‌زودی</small>
+                    <span>${i18nT('auth.login.syncCodeButton')}</span>
+                    <small class="auth-option-soon">${i18nT('auth.login.syncCodeSoon')}</small>
                 </button>
             </div>
             <p class="auth-note">
-                💡 کد همگام‌سازی برای ورود سریع در دستگاه‌های بعدی است و پس از اولین ورود با تلگرام در دسترس قرار می‌گیرد.
+                ${i18nT('auth.login.note')}
             </p>
             <div class="auth-error" id="authError" style="display:none;" role="alert"></div>
         `;
@@ -312,15 +323,14 @@ function renderAuthModal() {
 
     // ─── حالت ۲: وارد شده ───
     const user = auth.user || {};
-    const displayName = user.displayName || 'کاربر';
+    const displayName = user.displayName || i18nT('auth.defaultUserName');
     const username = user.telegramUsername ? `@${user.telegramUsername}` : '—';
     const expiryText = formatExpiry(auth.expiresAt);
     const currentTtl = user.tokenTtlDays || 90;
     const warning = auth.shouldWarnExpiry
-        ? `<div class="auth-warning">⚠️ توکن شما به‌زودی منقضی می‌شود (${expiryText} باقی‌مانده). لطفاً تمدید کنید.</div>`
+        ? `<div class="auth-warning">${i18nT('auth.warning.expiringSoon', { remaining: expiryText })}</div>`
         : '';
 
-    // ساخت dropdown TTL
     const ttlOptionsHtml = ALLOWED_TTL_DAYS.map(d => {
         const selected = (d === currentTtl) ? ' selected' : '';
         return `<option value="${d}"${selected}>${ttlLabel(d)}</option>`;
@@ -328,44 +338,43 @@ function renderAuthModal() {
 
     body.innerHTML = `
         <div class="auth-user-info">
-            <div class="auth-user-row"><span>نام:</span> <strong>${escapeHtml(displayName)}</strong></div>
-            <div class="auth-user-row"><span>نام کاربری:</span> <strong dir="ltr">${escapeHtml(username)}</strong></div>
+            <div class="auth-user-row"><span>${i18nT('auth.loggedIn.nameLabel')}</span> <strong>${escapeHtml(displayName)}</strong></div>
+            <div class="auth-user-row"><span>${i18nT('auth.loggedIn.usernameLabel')}</span> <strong dir="ltr">${escapeHtml(username)}</strong></div>
         </div>
 
         <div class="auth-ttl-block">
-            <label class="auth-ttl-label" for="authTtlSelect">مدت اعتبار توکن:</label>
+            <label class="auth-ttl-label" for="authTtlSelect">${i18nT('auth.loggedIn.ttlLabel')}</label>
             <div class="auth-ttl-row">
-                <select id="authTtlSelect" class="sort-select" aria-label="انتخاب مدت اعتبار">
+                <select id="authTtlSelect" class="sort-select" aria-label="${i18nT('auth.loggedIn.ttlLabel')}">
                     ${ttlOptionsHtml}
                 </select>
-                <button type="button" class="btn-small" id="authApplyTtlBtn">اعمال</button>
+                <button type="button" class="btn-small" id="authApplyTtlBtn">${i18nT('auth.loggedIn.ttlApplyButton')}</button>
             </div>
             <div class="auth-remaining">
-                ⏳ زمان باقی‌مانده: <strong>${escapeHtml(expiryText)}</strong>
+                ${i18nT('auth.loggedIn.remainingLabel')} <strong>${escapeHtml(expiryText)}</strong>
             </div>
         </div>
 
         <div class="auth-user-info">
-            <div class="auth-user-row"><span>کد همگام‌سازی:</span> <strong>${user.hasSyncCode ? '✓ فعال' : '— در گام بعدی قابل ساخت'}</strong></div>
+            <div class="auth-user-row"><span>${i18nT('auth.loggedIn.syncCodeLabel')}</span> <strong>${user.hasSyncCode ? i18nT('auth.loggedIn.syncCodeActive') : i18nT('auth.loggedIn.syncCodeUnavailable')}</strong></div>
         </div>
 
         ${warning}
 
         <div class="auth-actions">
-            <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">خروج از حساب</button>
-                        <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="راهنمای ورود با حساب تلگرام دیگر">🔗 ورود با حساب تلگرام دیگر</button>
+            <button class="btn-clear auth-logout-btn" id="authLogoutBtn" type="button">${i18nT('auth.loggedIn.logoutButton')}</button>
+            <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="${i18nT('auth.disconnect.title')}">${i18nT('auth.loggedIn.disconnectButton')}</button>
         </div>
     `;
 
-    // ─── دکمه‌ی خروج با confirm modal سفارشی ───
     const logoutBtn = document.getElementById('authLogoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             const ok = await showConfirmModal({
-                title: 'خروج از حساب',
-                message: 'از حساب خارج می‌شوید؟ داده‌های محلی شما حفظ می‌شود.',
-                confirmText: 'خروج',
-                cancelText: 'انصراف',
+                title: i18nT('auth.logout.confirmTitle'),
+                message: i18nT('auth.logout.confirmMessage'),
+                confirmText: i18nT('auth.logout.confirmOk'),
+                cancelText: i18nT('auth.logout.confirmCancel'),
                 danger: true
             });
             if (!ok) return;
@@ -375,7 +384,6 @@ function renderAuthModal() {
         });
     }
 
-    // ─── دکمه‌ی اعمال TTL ───
     const applyTtlBtn = document.getElementById('authApplyTtlBtn');
     const ttlSelect = document.getElementById('authTtlSelect');
     if (applyTtlBtn && ttlSelect) {
@@ -383,7 +391,6 @@ function renderAuthModal() {
             const newTtl = parseInt(ttlSelect.value, 10);
             if (!Number.isFinite(newTtl)) return;
             if (newTtl === currentTtl) {
-                // نیازی به تغییر نیست
                 return;
             }
             applyTtlBtn.disabled = true;
@@ -394,37 +401,34 @@ function renderAuthModal() {
                     renderAuthModal();
                     updateAccountStatusText();
                 } else {
-                    alert(result.error || 'خطا در تمدید توکن');
+                    alert(result.error || i18nT('errors.refreshFailed'));
                     applyTtlBtn.disabled = false;
-                    applyTtlBtn.textContent = 'اعمال';
+                    applyTtlBtn.textContent = i18nT('auth.loggedIn.ttlApplyButton');
                 }
             } catch (err) {
-                alert('خطا در تمدید توکن');
+                alert(i18nT('errors.refreshFailed'));
                 applyTtlBtn.disabled = false;
-                applyTtlBtn.textContent = 'اعمال';
+                applyTtlBtn.textContent = i18nT('auth.loggedIn.ttlApplyButton');
             }
         });
     }
-    // ─── دکمه‌ی «راهنمای ورود با حساب دیگر» ───
-    // ⚠️ طبق D-009: Telegram Login (Legacy Redirect-based) پارامتر رسمی
-    //    برای قطع session از سمت ما ندارد. پس فقط راهنمای متنی نشان می‌دهیم.
-    //    کاربر باید در اپ تلگرام session را Terminate کند.
+
     const disconnectBtn = document.getElementById('authDisconnectBtn');
     if (disconnectBtn) {
         disconnectBtn.addEventListener('click', async () => {
             await showInfoModal({
-                title: '🔗 ورود با حساب تلگرام دیگر',
+                title: i18nT('auth.disconnect.title'),
                 paragraphs: [
-                    'برای ورود با حساب تلگرام دیگر، لطفاً این مراحل را انجام دهید:',
-                    '<strong>۱.</strong> در اپ تلگرام به <strong>Settings → Privacy and Security</strong> بروید.',
-                    '<strong>۲.</strong> بخش <strong>«Logged in with Telegram»</strong> (یا Active Sessions) را باز کنید.',
-                    '<strong>۳.</strong> session مربوط به <strong>rahe_farda_bot</strong> یا <strong>mahdi-amouzegar.github.io</strong> را پیدا کنید.',
-                    '<strong>۴.</strong> روی <strong>Terminate Session</strong> بزنید.',
-                    '<strong>۵.</strong> به راه فردا برگردید و «خروج از حساب» را بزنید.',
-                    '<strong>۶.</strong> سپس روی «ورود با حساب تلگرام» بزنید — این بار شماره‌ی جدید را می‌پرسد.',
-                    '<small style="color:var(--text-muted);">توجه: اگر فقط «خروج از حساب» بزنید، session تلگرام باقی می‌ماند و بار بعد بدون پرسیدن شماره وارد می‌شوید.</small>'
+                    i18nT('auth.disconnect.instructions'),
+                    i18nT('auth.disconnect.step1'),
+                    i18nT('auth.disconnect.step2'),
+                    i18nT('auth.disconnect.step3'),
+                    i18nT('auth.disconnect.step4'),
+                    i18nT('auth.disconnect.step5'),
+                    i18nT('auth.disconnect.step6'),
+                    `<small style="color:var(--text-muted);">${i18nT('auth.disconnect.note')}</small>`
                 ],
-                buttonText: 'فهمیدم'
+                buttonText: i18nT('auth.disconnect.buttonText')
             });
         });
     }
@@ -439,17 +443,45 @@ function updateAccountStatusText() {
 
     const auth = getAuthState();
     if (!auth.loggedIn) {
-        el.textContent = 'وارد نشده‌اید';
+        el.textContent = t('auth.status.loggedOut');
         el.classList.remove('is-logged-in');
         el.classList.add('is-logged-out');
         return;
     }
 
     const user = auth.user || {};
-    const name = user.displayName || 'کاربر';
-    el.textContent = `وارد شده‌اید — ${name}`;
+    const name = user.displayName || t('auth.defaultUserName');
+    el.textContent = t('auth.status.loggedInAs', { name });
     el.classList.remove('is-logged-out');
     el.classList.add('is-logged-in');
+}
+
+/**
+ * ⚠️ فاز ۴C: به‌روزرسانی متن‌های داینامیک footer و todayLine بر اساس زبان فعلی.
+ */
+function updateFooter() {
+    const footerEl = document.getElementById('footerCopyright');
+    if (footerEl) {
+        let year = '';
+        try {
+            year = new Date().toLocaleDateString(
+                getLang() === 'en' ? 'en-US' : 'fa-IR',
+                { year: 'numeric' }
+            );
+        } catch { /* silent */ }
+        footerEl.textContent = t('app.footer.copyright', { year });
+    }
+
+    const todayEl = document.getElementById('todayLine');
+    if (todayEl) {
+        try {
+            const dateStr = new Date().toLocaleDateString(
+                getLang() === 'en' ? 'en-US' : 'fa-IR',
+                { weekday: 'long', day: 'numeric', month: 'long' }
+            );
+            todayEl.textContent = t('header.today', { date: dateStr });
+        } catch { /* silent */ }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -479,21 +511,16 @@ function wireEvents() {
 
     events.on(EV.MODAL_CONFIRM, showConfirmModal);
 
-    // ⚠️ فاز ۵: هندلر shortcut از pwa.js
     events.on('pwa:shortcut-action', ({ action }) => {
         if (action === 'new-task') setKind('task');
         else if (action === 'new-plan') setKind('plan');
         else if (action === 'new-series') setKind('series');
     });
 
-    // ⚠️ فاز ۵: کلیک روی نشانگر وضعیت
     events.on('header-status:clicked', () => {
         // فعلاً: هیچ‌کاری — در فاز ۶ می‌تواند modal باز کند
     });
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // ⚠️ فاز ۶ گام ۲: listenerهای auth
-    // ═══════════════════════════════════════════════════════════════════════
     events.on('auth:login', () => {
         updateAccountStatusText();
     });
@@ -520,10 +547,10 @@ export function setKind(kind) {
     state.prefs.pendingKind = kind;
     savePrefs();
     input.placeholder = kind === 'plan'
-        ? 'نام برنامه (مثلاً سفر به تهران)...'
+        ? t('tasks.planPlaceholder')
         : kind === 'series'
-            ? 'نام دوره (مثلاً جلسات فیزیوتراپی)...'
-            : 'کار جدید را بنویسید...';
+            ? t('tasks.seriesPlaceholder')
+            : t('tasks.newPlaceholder');
     document.querySelectorAll('.kind3-btn').forEach(x => x.classList.toggle('active', x.dataset.kind === kind));
     const isPlan = kind === 'plan';
     const isSeries = kind === 'series';
@@ -556,7 +583,13 @@ export function setKind(kind) {
     if (isPlan) renderPlanDatesForm();
 
     const addB = document.getElementById('addBtn');
-    if (addB) addB.textContent = isPlan ? 'افزودن برنامه' : isSeries ? 'افزودن دوره' : 'افزودن کار';
+    if (addB) {
+        addB.textContent = isPlan
+            ? t('tasks.addButton.plan')
+            : isSeries
+                ? t('tasks.addButton.series')
+                : t('tasks.addButton.task');
+    }
     updateDueRow();
     syncDisclosure();
 }
@@ -565,12 +598,22 @@ function renderPlanDatesForm() {
     const startBtn = document.getElementById('planStartBtn');
     const endBtn = document.getElementById('planEndBtn');
     const line = document.getElementById('planDatesLine');
-    if (startBtn) startBtn.textContent = state.planDraftStart ? `📅 شروع: ${fmtDateFa(state.planDraftStart)}` : '📅 تاریخ شروع';
-    if (endBtn) endBtn.textContent = state.planDraftEnd ? `📅 پایان: ${fmtDateFa(state.planDraftEnd)}` : '📅 تاریخ پایان';
+    if (startBtn) {
+        startBtn.textContent = state.planDraftStart
+            ? t('detail.planDates.startWithDate', { date: fmtDateFa(state.planDraftStart) })
+            : t('detail.sections.planDates.startButton');
+    }
+    if (endBtn) {
+        endBtn.textContent = state.planDraftEnd
+            ? t('detail.planDates.endWithDate', { date: fmtDateFa(state.planDraftEnd) })
+            : t('detail.sections.planDates.endButton');
+    }
     if (line) {
         const parts = [];
-        if (state.planDraftStart) parts.push('از ' + fmtDateFa(state.planDraftStart));
-        if (state.planDraftEnd) parts.push('تا ' + fmtDateFa(state.planDraftEnd));
+        const fromLabel = t('detail.sections.planDates.from');
+        const toLabel = t('detail.sections.planDates.to');
+        if (state.planDraftStart) parts.push(`${fromLabel} ${fmtDateFa(state.planDraftStart)}`);
+        if (state.planDraftEnd) parts.push(`${toLabel} ${fmtDateFa(state.planDraftEnd)}`);
         line.textContent = parts.join(' ');
         line.style.display = parts.length ? '' : 'none';
     }
@@ -620,7 +663,7 @@ document.getElementById('locBtn').addEventListener('click', () => {
     ensureMapVisible();
     switchToTab('map');
     document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
-    mapHint('روی نقشه کلیک کنید تا محل وظیفه جدید انتخاب شود');
+    mapHint(t('map.hint.clickForNew'));
 });
 document.getElementById('locChip').addEventListener('click', e => {
     if (!e.target.closest('[data-locclear]')) return;
@@ -738,7 +781,7 @@ if (planDatesClearForm) {
 function renderPlanKids() {
     const box = document.getElementById('planKidChips');
     if (!box) return;
-    box.innerHTML = state.planDraftKids.map((k, i) => `<span class="due-chip">📝 ${escapeHtml(k)}<button type="button" data-plankid="${i}" aria-label="حذف">✕</button></span>`).join('');
+    box.innerHTML = state.planDraftKids.map((k, i) => `<span class="due-chip">📝 ${escapeHtml(k)}<button type="button" data-plankid="${i}" aria-label="${t('common.delete')}">✕</button></span>`).join('');
     box.style.display = state.planDraftKids.length ? 'flex' : 'none';
 }
 
@@ -846,8 +889,8 @@ function renderTplDates() {
         }
     };
     const parts = [];
-    if (draft.startAt) parts.push('از ' + fmt(draft.startAt));
-    if (draft.endAt) parts.push('تا ' + fmt(draft.endAt));
+    if (draft.startAt) parts.push(t('detail.sections.planDates.from') + ' ' + fmt(draft.startAt));
+    if (draft.endAt) parts.push(t('detail.sections.planDates.to') + ' ' + fmt(draft.endAt));
     el.textContent = parts.length ? '📅 ' + parts.join(' ') : '';
 }
 document.getElementById('tplStartBtn').addEventListener('click', () => {
@@ -887,7 +930,6 @@ function toggleSettings(force) {
         settingsTrapCleanup?.();
         settingsTrapCleanup = trapFocus(settingsModal);
         setTimeout(() => settingsCloseBtn?.focus(), 60);
-        // ⚠️ فاز ۶ گام ۲: آپدیت وضعیت حساب هنگام باز شدن
         updateAccountStatusText();
     } else {
         settingsTrapCleanup?.();
@@ -903,10 +945,9 @@ settingsModal?.addEventListener('click', event => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ فاز ۶ گام ۲: حساب من — دکمه و مودال
+// حساب من — دکمه و مودال
 // ═══════════════════════════════════════════════════════════════════════════
 document.getElementById('authOpenBtn')?.addEventListener('click', () => {
-    // بستن تنظیمات و باز کردن مودال auth
     toggleSettings(false);
     setTimeout(() => openAuthModal(), 100);
 });
@@ -917,15 +958,15 @@ document.getElementById('authModal')?.addEventListener('click', e => {
 
 document.getElementById('heroDescToggle').addEventListener('click', async () => {
     await showInfoModal({
-        title: 'راه فردا',
+        title: t('hero.infoTitle'),
         paragraphs: [
-            'وظایف و قرارهای روزانه را با یادآور، نقشه و تقویم شمسی مدیریت کن — <strong>بدون حساب کاربری</strong>، حتی آفلاین.',
-            '<strong>📝 کار:</strong> یک وظیفه ساده با تاریخ یا محل.',
-            '<strong>📂 برنامه:</strong> مجموعه‌ای از زیرکارها (مثلاً سفر، خانه‌تکانی).',
-            '<strong>📅 دوره:</strong> یک وظیفه تکرارشونده (روزانه، هفتگی، ماهانه یا سفارشی).',
-            'برای شروع، عنوان را در فیلد بالا بنویس و دکمه <strong>افزودن کار</strong> را بزن.'
+            t('hero.infoIntro'),
+            t('hero.infoTask'),
+            t('hero.infoPlan'),
+            t('hero.infoSeries'),
+            t('hero.infoStart')
         ],
-        buttonText: 'شروع می‌کنم'
+        buttonText: t('hero.buttonText')
     });
     if (window.matchMedia('(min-width: 901px)').matches) {
         const ti = document.getElementById('taskInput');
@@ -934,19 +975,14 @@ document.getElementById('heroDescToggle').addEventListener('click', async () => 
 });
 
 document.getElementById('privacyBtn').addEventListener('click', async () => {
+    const paragraphs = [];
+    for (let i = 0; i < 8; i++) {
+        paragraphs.push(t(`privacy.paragraphs.${i}`));
+    }
     await showInfoModal({
-        title: '🔒 حریم خصوصی شما',
-        paragraphs: [
-            '<strong>همه اطلاعات شما</strong> (وظایف، تاریخ‌ها، محل‌ها و تصاویر) فقط در همین دستگاه و مرورگر خودتان ذخیره می‌شود و به هیچ سروری ارسال نمی‌شود.',
-            '<strong>نقشه</strong> فقط تصویر اینترنتی است و چیزی از شما آپلود نمی‌کند. سرویس‌های نقشه (OpenStreetMap، Esri) فقط tile تصویری دریافت می‌کنند، نه اطلاعات وظایف شما.',
-            '<strong>همگام‌سازی زمان</strong> با سرورهای عمومی (timeapi.io، worldclockapi.com) فقط برای اصلاح ساعت دستگاه است و هیچ اطلاعاتی ارسال نمی‌کند.',
-            '<strong>پیش‌بینی هوا</strong> از Open-Meteo دریافت می‌شود و فقط مختصات مکان و تاریخ درخواست را می‌فرستد. هیچ اطلاعاتی از وظایف شما ارسال نمی‌شود.',
-            '<strong>نام مکان</strong> با Nominatim (OpenStreetMap) دریافت می‌شود؛ فقط مختصات ارسال می‌شود و نام شهر برگردانده می‌شود.',
-            '<strong>ورود با تلگرام</strong> فقط برای همگام‌سازی اختیاری است. اگر وارد نشوید، هیچ اطلاعاتی به سرور ارسال نمی‌شود.',
-            '<strong>پشتیبان‌گیری:</strong> از دکمه‌ی «📤 پشتیبان‌گیری» در تنظیمات می‌توانید یک فایل JSON بسازید.',
-            'برای پاک کردن کامل داده‌ها، از سطل زباله استفاده کنید یا داده‌های سایت را از تنظیمات مرورگر حذف کنید.'
-        ],
-        buttonText: 'فهمیدم'
+        title: t('privacy.title'),
+        paragraphs,
+        buttonText: t('privacy.buttonText')
     });
     if (window.matchMedia('(min-width: 901px)').matches) {
         const ti = document.getElementById('taskInput');
@@ -991,9 +1027,9 @@ function updateExportMeta() {
         : 0;
     const estimated = baseSize + photosSize;
     meta.innerHTML = `
-        <div class="export-meta-row"><span>وظایف:</span> <strong>${toFa(taskCount)}</strong></div>
-        <div class="export-meta-row"><span>سطل زباله:</span> <strong>${toFa(trashCount)}</strong></div>
-        <div class="export-meta-row"><span>حجم تخمینی:</span> <strong>${formatBytes(estimated)}</strong></div>
+        <div class="export-meta-row"><span>${t('export.metaTasks')}</span> <strong>${toFa(taskCount)}</strong></div>
+        <div class="export-meta-row"><span>${t('export.metaTrash')}</span> <strong>${toFa(trashCount)}</strong></div>
+        <div class="export-meta-row"><span>${t('export.metaSize')}</span> <strong>${formatBytes(estimated)}</strong></div>
     `;
 }
 
@@ -1014,20 +1050,20 @@ document.getElementById('exportConfirm')?.addEventListener('click', async () => 
         const ok = downloadJSON(backup, filename);
         if (ok) {
             closeExportModal();
-            events.emit(EV.UI_SNACKBAR, [], `✓ فایل پشتیبان ساخته شد (${filename})`);
+            events.emit(EV.UI_SNACKBAR, [], t('export.success', { filename }));
         } else {
-            alert('خطا در ساخت فایل پشتیبان');
+            alert(t('export.error'));
         }
     } catch (err) {
         console.error('export failed:', err);
-        alert('خطا در ساخت فایل پشتیبان');
+        alert(t('export.error'));
     }
 });
 
 function openImportModal() {
     if (!importModal) return;
     _importFileData = null;
-    document.getElementById('importFileName').textContent = 'فایلی انتخاب نشده';
+    document.getElementById('importFileName').textContent = t('import.noFileSelected');
     document.getElementById('importModeWrap').style.display = 'none';
     document.getElementById('importMeta').innerHTML = '';
     document.getElementById('importConfirm').disabled = true;
@@ -1065,25 +1101,30 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
         _importFileData = data;
 
         if (!data || !data.data || !Array.isArray(data.data.tasks)) {
-            if (metaEl) metaEl.innerHTML = '<div class="import-error">ساختار فایل نامعتبر است.</div>';
+            if (metaEl) metaEl.innerHTML = `<div class="import-error">${t('import.invalidStructure')}</div>`;
             document.getElementById('importConfirm').disabled = true;
             return;
         }
 
-        const schemaVersion = data.schemaVersion || 'نامشخص';
+        const schemaVersion = data.schemaVersion || t('import.unknown');
         const taskCount = data.data.tasks.length;
         const trashCount = Array.isArray(data.data.trash) ? data.data.trash.length : 0;
-        const exportedAt = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'نامشخص';
+        const exportedAt = data.exportedAt
+            ? new Date(data.exportedAt).toLocaleDateString(
+                getLang() === 'en' ? 'en-US' : 'fa-IR',
+                { day: 'numeric', month: 'long', year: 'numeric' }
+            )
+            : t('import.unknown');
         const hasSettings = Boolean(data.settings);
         const hasPhotos = (data.options && data.options.includePhotos);
 
         if (metaEl) {
             metaEl.innerHTML = `
-                <div class="import-meta-row"><span>نسخه:</span> <strong>${escapeHtml(schemaVersion)}</strong></div>
-                <div class="import-meta-row"><span>تاریخ ساخت:</span> <strong>${escapeHtml(exportedAt)}</strong></div>
-                <div class="import-meta-row"><span>وظایف:</span> <strong>${toFa(taskCount)}</strong></div>
-                <div class="import-meta-row"><span>سطل زباله:</span> <strong>${toFa(trashCount)}</strong></div>
-                ${hasPhotos ? '<div class="import-meta-warn">⚠️ این فایل شامل تصاویر است.</div>' : ''}
+                <div class="import-meta-row"><span>${t('import.metaVersion')}</span> <strong>${escapeHtml(schemaVersion)}</strong></div>
+                <div class="import-meta-row"><span>${t('import.metaExportedAt')}</span> <strong>${escapeHtml(exportedAt)}</strong></div>
+                <div class="import-meta-row"><span>${t('import.metaTasks')}</span> <strong>${toFa(taskCount)}</strong></div>
+                <div class="import-meta-row"><span>${t('import.metaTrash')}</span> <strong>${toFa(trashCount)}</strong></div>
+                ${hasPhotos ? `<div class="import-meta-warn">${t('import.hasPhotosWarning')}</div>` : ''}
             `;
         }
 
@@ -1097,9 +1138,9 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
         document.getElementById('importConfirm').disabled = false;
     } catch (err) {
         console.error('read file failed:', err);
-        let msg = 'خطا در خواندن فایل';
-        if (err.message === 'invalid-json') msg = 'فایل JSON نامعتبر است';
-        else if (err.message === 'file-too-large') msg = 'حجم فایل بیش از حد مجاز است (۵۰MB)';
+        let msg = t('import.errorRead');
+        if (err.message === 'invalid-json') msg = t('import.errorInvalidJson');
+        else if (err.message === 'file-too-large') msg = t('import.errorTooLarge');
         if (metaEl) metaEl.innerHTML = `<div class="import-error">${escapeHtml(msg)}</div>`;
         document.getElementById('importConfirm').disabled = true;
     }
@@ -1112,10 +1153,10 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
 
     if (mode === 'replace') {
         const ok = await showConfirmModal({
-            title: 'جایگزینی کامل',
-            message: 'همه‌ی وظایف فعلی حذف و با محتوای فایل جایگزین می‌شوند. این کار قابل بازگشت نیست. ادامه می‌دهید؟',
-            confirmText: 'بله، جایگزین کن',
-            cancelText: 'انصراف',
+            title: t('import.replaceConfirmTitle'),
+            message: t('import.replaceConfirmMessage'),
+            confirmText: t('import.replaceConfirmOk'),
+            cancelText: t('import.replaceConfirmCancel'),
             danger: true
         });
         if (!ok) return;
@@ -1134,16 +1175,16 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
                 applyMapVisibility();
                 applyProMode();
             }
-            const parts = [`✓ ${toFa(result.imported)} وظیفه بازیابی شد`];
-            if (result.skipped > 0) parts.push(`${toFa(result.skipped)} مورد رد شد`);
+            const parts = [t('import.success', { n: toFa(result.imported) })];
+            if (result.skipped > 0) parts.push(t('import.successSkipped', { n: toFa(result.skipped) }));
             if (result.warning) parts.push(result.warning);
             events.emit(EV.UI_SNACKBAR, [], parts.join(' — '));
         } else {
-            alert(result.error || 'خطا در بازیابی');
+            alert(result.error || t('import.errorImport'));
         }
     } catch (err) {
         console.error('import failed:', err);
-        alert('خطا در بازیابی');
+        alert(t('import.errorImport'));
     }
 });
 
@@ -1192,17 +1233,20 @@ function applyTheme(theme) {
 function updateThemeBtn() {
     const btn = document.getElementById('themeBtn');
     if (!btn) return;
-    const icons = { auto: '🖥', dark: '🌙', light: '☀️' };
-    const titles = { auto: 'حالت نمایش: خودکار', dark: 'حالت نمایش: تاریک', light: 'حالت نمایش: روشن' };
-    btn.textContent = `${icons[state.prefs.theme] || icons.auto} ${state.prefs.theme === 'dark' ? 'تاریک' : state.prefs.theme === 'light' ? 'روشن' : 'خودکار'}`;
-    btn.title = titles[state.prefs.theme] || titles.auto;
+    const themeKey = state.prefs.theme === 'dark' ? 'dark'
+                   : state.prefs.theme === 'light' ? 'light'
+                   : 'auto';
+    btn.textContent = t(`theme.${themeKey}`);
+    const titleKey = themeKey.charAt(0).toUpperCase() + themeKey.slice(1);
+    btn.title = t(`theme.label${titleKey}`);
 }
 
 function updateLangBtn() {
     const btn = document.getElementById('langBtn');
     if (!btn) return;
-    btn.textContent = state.prefs.lang === 'en' ? '🌐 EN' : '🌐 FA';
-    btn.title = state.prefs.lang === 'en' ? 'Switch to Persian' : 'تغییر زبان به انگلیسی';
+    const current = getLang();
+    btn.textContent = current === 'en' ? '🌐 EN' : '🌐 FA';
+    btn.title = current === 'en' ? t('language.switchToFa') : t('language.switchToEn');
 }
 
 function updateWelcomeOpts() {
@@ -1214,19 +1258,19 @@ function updateWelcomeOpts() {
     }
     const langGroup = document.getElementById('welcomeLangGroup');
     if (langGroup) {
+        const current = getLang();
         langGroup.querySelectorAll('[data-lang]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.lang === state.prefs.lang);
+            btn.classList.toggle('active', btn.dataset.lang === current);
         });
     }
 }
 
+/**
+ * ⚠️ فاز ۴C: فقط تم را اعمال می‌کند.
+ *    dir/lang/data-lang به i18n واگذار شد.
+ */
 function applyDisplaySettings() {
     applyTheme(state.prefs.theme);
-    const dir = state.prefs.lang === 'en' ? 'ltr' : 'rtl';
-    document.documentElement.setAttribute('data-lang', state.prefs.lang);
-    document.documentElement.setAttribute('lang', state.prefs.lang);
-    document.documentElement.setAttribute('dir', dir);
-    document.querySelector('.app-shell')?.setAttribute('dir', dir);
     updateThemeBtn();
     updateLangBtn();
     updateWelcomeOpts();
@@ -1244,10 +1288,19 @@ if (themeBtnEl) {
 
 const langBtnEl = document.getElementById('langBtn');
 if (langBtnEl) {
-    langBtnEl.addEventListener('click', () => {
-        state.prefs.lang = state.prefs.lang === 'en' ? 'fa' : 'en';
-        savePrefs();
+    langBtnEl.addEventListener('click', async () => {
+        const next = getLang() === 'en' ? 'fa' : 'en';
+        await setLang(next);
+        applyToDOM();
         applyDisplaySettings();
+        resetRenderSignature();
+        render();
+        updateAccountStatusText();
+        refreshSoundPresetList();
+        updateFooter();
+        // ⚠️ بستن weather modal (راه‌حل موقت — ترجمه‌ی کامل در فایل بعدی)
+        const wm = document.getElementById('weatherModal');
+        if (wm && wm.style.display === 'flex') wm.style.display = 'none';
     });
 }
 
@@ -1264,12 +1317,19 @@ if (_welcomeThemeGroup) {
 
 const _welcomeLangGroup = document.getElementById('welcomeLangGroup');
 if (_welcomeLangGroup) {
-    _welcomeLangGroup.addEventListener('click', e => {
+    _welcomeLangGroup.addEventListener('click', async e => {
         const btn = e.target.closest('[data-lang]');
         if (!btn) return;
-        state.prefs.lang = btn.dataset.lang;
-        savePrefs();
+        await setLang(btn.dataset.lang);
+        applyToDOM();
         applyDisplaySettings();
+        resetRenderSignature();
+        render();
+        updateAccountStatusText();
+        refreshSoundPresetList();
+        updateFooter();
+        const wm = document.getElementById('weatherModal');
+        if (wm && wm.style.display === 'flex') wm.style.display = 'none';
     });
 }
 
@@ -1369,6 +1429,15 @@ function initSettings() {
     initSystemPermissions();
 }
 
+function refreshSoundPresetList() {
+    const presetSel = document.getElementById('setSoundPreset');
+    if (!presetSel) return;
+    const presets = getSoundPresets();
+    const current = state.prefs.soundPreset;
+    presetSel.innerHTML = `<option value="">${escapeHtml(t('sound.preset.none'))}</option>` +
+        presets.map(p => `<option value="${escapeHtml(p.key)}"${p.key === current ? ' selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
+}
+
 function initSoundSettings() {
     const master = document.getElementById('setSoundOn');
     const modesWrap = document.getElementById('soundModesWrap');
@@ -1416,10 +1485,7 @@ function initSoundSettings() {
     const presetCb = document.getElementById('setSoundPresetOn');
     const presetSel = document.getElementById('setSoundPreset');
     if (presetSel) {
-        const presets = getSoundPresets();
-        const current = state.prefs.soundPreset;
-        presetSel.innerHTML = '<option value="">— هیچ‌کدام —</option>' +
-            presets.map(p => `<option value="${escapeHtml(p.key)}"${p.key === current ? ' selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
+        refreshSoundPresetList();
         presetSel.addEventListener('change', () => {
             state.prefs.soundPreset = presetSel.value || null;
             savePrefs();
@@ -1436,7 +1502,7 @@ function initSoundSettings() {
     if (presetTest) {
         presetTest.addEventListener('click', () => {
             if (!state.prefs.soundPreset) {
-                alert('اول یک ریتم از لیست انتخاب کنید.');
+                alert(t('sound.preset.selectFirst'));
                 return;
             }
             const prev = state.prefs.soundDefault;
@@ -1462,9 +1528,9 @@ function initSoundSettings() {
 
     function populateTtsVoices(sel) {
         if (!sel) return;
-        const voices = getVoicesForLang(state.prefs.lang);
+        const voices = getVoicesForLang(getLang());
         const current = state.prefs.soundTtsVoice;
-        sel.innerHTML = '<option value="">— پیش‌فرض مرورگر —</option>' +
+        sel.innerHTML = `<option value="">${escapeHtml(t('sound.tts.defaultVoice'))}</option>` +
             voices.map(v => {
                 const label = `${escapeHtml(v.name)} (${escapeHtml(v.lang)})`;
                 const selected = v.name === current ? ' selected' : '';
@@ -1479,13 +1545,9 @@ function initSoundSettings() {
         if (!label) return;
         if (!ttsSupportedNow) return;
         if (!hasPersianTtsVoice()) {
-            label.innerHTML =
-                '⚠️ voice فارسی در سیستم یافت نشد. ' +
-                'متن با voice انگلیسی خوانده می‌شود. ' +
-                '<a href="https://support.microsoft.com/en-us/windows/how-to-download-voices-for-text-to-speech-44883593-a2f2-9a6d-a1b6-2f7f8dc8ff2b" ' +
-                'target="_blank" rel="noopener">راهنمای نصب</a>';
+            label.innerHTML = t('sound.tts.noPersianVoice');
         } else {
-            label.textContent = 'با speechSynthesis مرورگر';
+            label.textContent = t('sound.tts.hint');
         }
     }
     if (!ttsSupportedNow) {
@@ -1494,7 +1556,7 @@ function initSoundSettings() {
             const modeEl = ttsCb.closest('.sound-mode');
             if (modeEl) {
                 const small = modeEl.querySelector('small');
-                if (small) small.textContent = 'مرورگر شما از TTS پشتیبانی نمی‌کند.';
+                if (small) small.textContent = t('sound.tts.unsupported');
             }
         }
         if (ttsVoiceSel) ttsVoiceSel.disabled = true;
@@ -1510,7 +1572,7 @@ function initSoundSettings() {
             }
             if (ttsCb.checked) {
                 if (!state.prefs.soundTtsVoice) {
-                    const voices = getVoicesForLang(state.prefs.lang);
+                    const voices = getVoicesForLang(getLang());
                     if (voices.length) {
                         state.prefs.soundTtsVoice = voices[0].name;
                         savePrefs();
@@ -1552,7 +1614,7 @@ function initSoundSettings() {
         ttsTest.disabled = !ttsSupportedNow;
         ttsTest.addEventListener('click', () => {
             if (!ttsSupportedNow) {
-                alert('مرورگر شما از TTS پشتیبانی نمی‌کند.');
+                alert(t('sound.tts.unsupported'));
                 return;
             }
             const prev = state.prefs.soundDefault;
@@ -1563,7 +1625,7 @@ function initSoundSettings() {
             state.prefs.soundDefault = false;
             state.prefs.soundPresetOn = false;
             state.prefs.soundTtsOn = true;
-            testAudioReminder('این یک آزمایش خواندن عنوان است');
+            testAudioReminder(t('sound.tts.testText'));
             state.prefs.soundDefault = prev;
             state.prefs.soundPresetOn = prevPresetOn;
             state.prefs.soundTtsOn = prevTtsOn;
@@ -1585,28 +1647,58 @@ function setPermissionStatus(id, text) {
 
 async function inspectSystemPermissions() {
     const notification = typeof Notification === 'undefined' ? null : Notification.permission;
-    setPermissionStatus('permissionNotifStatus', notification === 'granted' ? 'فعال است' : notification === 'denied' ? 'مسدود شده' : notification === 'default' ? 'فعال نیست' : 'پشتیبانی نمی‌شود');
+    const statusGranted = t('settings.sections.permissions.statusGranted');
+    const statusDenied = t('settings.sections.permissions.statusDenied');
+    const statusNotGranted = t('settings.sections.permissions.statusNotGranted');
+    const statusUnsupported = t('settings.sections.permissions.statusUnsupported');
+    const statusTestPrompt = t('settings.sections.permissions.statusTestPrompt');
+
+    setPermissionStatus('permissionNotifStatus',
+        notification === 'granted' ? statusGranted
+        : notification === 'denied' ? statusDenied
+        : notification === 'default' ? statusNotGranted
+        : statusUnsupported
+    );
     const location = await queryPermission('geolocation');
-    setPermissionStatus('permissionLocationStatus', location ? (location.state === 'granted' ? 'فعال است' : location.state === 'denied' ? 'مسدود شده' : 'فعال نیست') : 'برای بررسی تست کنید');
+    setPermissionStatus('permissionLocationStatus',
+        location ? (location.state === 'granted' ? statusGranted : location.state === 'denied' ? statusDenied : statusNotGranted) : statusTestPrompt
+    );
     const microphone = await queryPermission('microphone');
-    setPermissionStatus('permissionMicStatus', microphone ? (microphone.state === 'granted' ? 'فعال است' : microphone.state === 'denied' ? 'مسدود شده' : 'فعال نیست') : 'برای بررسی تست کنید');
+    setPermissionStatus('permissionMicStatus',
+        microphone ? (microphone.state === 'granted' ? statusGranted : microphone.state === 'denied' ? statusDenied : statusNotGranted) : statusTestPrompt
+    );
 }
 
 async function requestLocationPermission() {
-    if (!navigator.geolocation) return setPermissionStatus('permissionLocationStatus', 'پشتیبانی نمی‌شود');
-    navigator.geolocation.getCurrentPosition(() => setPermissionStatus('permissionLocationStatus', 'فعال است'), error => setPermissionStatus('permissionLocationStatus', error.code === 1 ? 'مسدود شده' : 'فعال نیست'), { timeout: 8000, maximumAge: 0 });
+    if (!navigator.geolocation) return setPermissionStatus('permissionLocationStatus', t('settings.sections.permissions.statusUnsupported'));
+    const statusGranted = t('settings.sections.permissions.statusGranted');
+    const statusDenied = t('settings.sections.permissions.statusDenied');
+    const statusNotGranted = t('settings.sections.permissions.statusNotGranted');
+    navigator.geolocation.getCurrentPosition(
+        () => setPermissionStatus('permissionLocationStatus', statusGranted),
+        error => setPermissionStatus('permissionLocationStatus', error.code === 1 ? statusDenied : statusNotGranted),
+        { timeout: 8000, maximumAge: 0 }
+    );
 }
 
 async function requestMicrophonePermission() {
-    if (!navigator.mediaDevices?.getUserMedia) return setPermissionStatus('permissionMicStatus', 'پشتیبانی نمی‌شود');
-    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach(track => track.stop()); setPermissionStatus('permissionMicStatus', 'فعال است'); }
-    catch (error) { setPermissionStatus('permissionMicStatus', error.name === 'NotAllowedError' ? 'مسدود شده' : 'فعال نیست'); }
+    if (!navigator.mediaDevices?.getUserMedia) return setPermissionStatus('permissionMicStatus', t('settings.sections.permissions.statusUnsupported'));
+    const statusGranted = t('settings.sections.permissions.statusGranted');
+    const statusDenied = t('settings.sections.permissions.statusDenied');
+    const statusNotGranted = t('settings.sections.permissions.statusNotGranted');
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        setPermissionStatus('permissionMicStatus', statusGranted);
+    } catch (error) {
+        setPermissionStatus('permissionMicStatus', error.name === 'NotAllowedError' ? statusDenied : statusNotGranted);
+    }
 }
 
 function initSystemPermissions() {
     inspectSystemPermissions();
     document.getElementById('permissionNotifBtn')?.addEventListener('click', async () => { await ensureNotifPerm(); inspectSystemPermissions(); });
-    document.getElementById('permissionNotifTestBtn')?.addEventListener('click', async () => { if (await ensureNotifPerm()) fireNotification('اعلان آزمایشی', 'مجوز اعلان فعال است.'); inspectSystemPermissions(); });
+    document.getElementById('permissionNotifTestBtn')?.addEventListener('click', async () => { if (await ensureNotifPerm()) fireNotification(t('notifications.testNotification.title'), t('notifications.testNotification.body')); inspectSystemPermissions(); });
     document.getElementById('permissionLocationBtn')?.addEventListener('click', requestLocationPermission);
     document.getElementById('permissionLocationTestBtn')?.addEventListener('click', requestLocationPermission);
     document.getElementById('permissionMicBtn')?.addEventListener('click', requestMicrophonePermission);
@@ -1694,10 +1786,10 @@ document.getElementById('trashBack').addEventListener('click', closeTrash);
 document.getElementById('trashEmpty').addEventListener('click', async () => {
     if (!state.trash.length) return;
     const ok = await showConfirmModal({
-        title: 'خالی کردن سطل زباله',
-        message: 'همه موارد سطل زباله برای همیشه حذف شوند؟ این عمل قابل بازگشت نیست.',
-        confirmText: 'خالی کن',
-        cancelText: 'انصراف',
+        title: t('trash.emptyConfirmTitle'),
+        message: t('trash.emptyConfirmMessage'),
+        confirmText: t('trash.emptyConfirmOk'),
+        cancelText: t('trash.emptyConfirmCancel'),
         danger: true
     });
     if (!ok) return;
@@ -1712,10 +1804,10 @@ document.getElementById('trashList').addEventListener('click', async e => {
     if (b.dataset.tact === 'restore') restoreTrash(b.dataset.tid);
     else if (b.dataset.tact === 'purge') {
         const ok = await showConfirmModal({
-            title: 'حذف همیشگی',
-            message: 'این مورد برای همیشه حذف شود؟ این عمل قابل بازگشت نیست.',
-            confirmText: 'حذف کن',
-            cancelText: 'انصراف',
+            title: t('trash.purgeConfirmTitle'),
+            message: t('trash.purgeConfirmMessage'),
+            confirmText: t('trash.purgeConfirmOk'),
+            cancelText: t('trash.purgeConfirmCancel'),
             danger: true
         });
         if (!ok) return;
@@ -1740,7 +1832,6 @@ document.addEventListener('keydown', e => {
     if (exportModal && exportModal.style.display === 'flex') { closeExportModal(); return; }
     if (importModal && importModal.style.display === 'flex') { closeImportModal(); return; }
 
-    // ⚠️ فاز ۶: بستن مودال auth با Escape
     const authModal = document.getElementById('authModal');
     if (authModal && authModal.style.display === 'flex') { closeAuthModal(); return; }
 
@@ -1838,7 +1929,7 @@ taskList.addEventListener('click', e => {
         const t = found.task;
         const hasLoc = t.location || (t.sessions || []).some(s => s.location);
         if (!hasLoc) {
-            mapHint('مکانی برای این مورد ثبت نشده است');
+            mapHint(t('map.hint.noLocationForTask'));
             return;
         }
         ensureMapVisible();
@@ -1873,12 +1964,12 @@ taskList.addEventListener('click', e => {
         if (!found) return;
         ensureMapVisible();
         if (found.task.location) flyToTask(id);
-        else if (!getMapReady()) mapHint('نقشه در دسترس نیست (آفلاین؟)');
+        else if (!getMapReady()) mapHint(t('map.hint.mapNotAvailable'));
         else {
             state.relocateTaskId = id;
             switchToTab('map');
             document.getElementById('panelMap').scrollIntoView({ behavior: 'smooth' });
-            mapHint('روی نقشه کلیک کنید تا محل ثبت شود');
+            mapHint(t('map.hint.clickForRelocate'));
         }
     }
     else if (action === 'check-all') {
@@ -1983,7 +2074,7 @@ document.getElementById('archiveDone').addEventListener('click', archiveDone);
         const rec = new SR();
         let finalText = '';
         const base = target.value || '';
-        rec.lang = state.prefs.lang === 'en' ? 'en-US' : 'fa-IR';
+        rec.lang = getLang() === 'en' ? 'en-US' : 'fa-IR';
         rec.interimResults = true;
         rec.continuous = false;
         rec.maxAlternatives = 1;
@@ -2097,8 +2188,8 @@ function maybeSuggestDue(value, targetId) {
     if (state.addDraftSessions.some(s => Math.abs(new Date(s.at).getTime() - new Date(iso).getTime()) < 60000)) return;
 
     smartTargetId = targetId;
-    const sourceLabel = targetId === 'descInput' ? 'توضیح' : 'عنوان';
-    document.getElementById('smartChipText').textContent = `📅 پیشنهاد از ${sourceLabel}: ${faShort(iso)}`;
+    const sourceKey = targetId === 'descInput' ? 'tasks.smartSuggest.fromDesc' : 'tasks.smartSuggest.fromTitle';
+    document.getElementById('smartChipText').textContent = t(sourceKey, { date: faShort(iso) });
     document.getElementById('smartChip').style.display = 'flex';
 
     document.getElementById('smartAccept').onclick = () => {
@@ -2139,13 +2230,6 @@ function attachSmartSuggest(el, targetId) {
     }
 })();
 
-try {
-    document.getElementById('todayLine').textContent =
-        'امروز: ' + new Date().toLocaleDateString('fa-IR', { weekday: 'long', day: 'numeric', month: 'long' });
-    document.getElementById('copyYear').textContent =
-        new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
-} catch { /* نادیده */ }
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2156,6 +2240,16 @@ loadPrefs();
 setMapHelpers({ getMap, getMapReady, getPickMarker, setPickMarker });
 
 wireEvents();
+
+// ⚠️ بستن operation-list وقتی بیرون از آن کلیک می‌شود
+document.addEventListener('click', e => {
+    if (e.target.closest('.operation-trigger')) return;
+    document.querySelectorAll('.operation-list:not([hidden])').forEach(openList => {
+        openList.hidden = true;
+        const trigger = openList.parentElement?.querySelector('.operation-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+});
 
 (function initDueChips() {
     dueChipsManager.init();
@@ -2171,8 +2265,6 @@ initPWA();
 
 // ⚠️ فاز ۶ گام ۲: راه‌اندازی auth
 initAuth();
-
-// ⚠️ Phase 4: loadPendingChanges حذف شد (چون initSyncQueue خودش IDB را بارگذاری می‌کند)
 
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
@@ -2190,9 +2282,7 @@ if (window.matchMedia('(min-width: 901px)').matches && !state.prefs.tourSeen) {
         if (ti) ti.focus({ preventScroll: true });
     }, 100);
 }
-initSettings();
 applyMapVisibility();
-applyDisplaySettings();
 applyProMode();
 
 // ⚠️ فاز ۶ گام ۲: آپدیت وضعیت حساب در UI
@@ -2201,7 +2291,16 @@ updateAccountStatusText();
 attachSmartSuggest(input, 'taskInput');
 attachSmartSuggest(document.getElementById('descInput'), 'descInput');
 
-loadTasks().then(async () => {
+// ⚠️ فاز ۴C: initI18n قبل از هر render
+initI18n().then(async () => {
+    applyToDOM();
+    applyDisplaySettings();
+    updateAccountStatusText();
+    updateFooter();
+    initSettings();
+
+    // ⚠️ بعد از i18n، taskها را لود کن
+    await loadTasks();
     await loadTrash();
     if (state.prefs.proMode) state.tasks.forEach(t => { if (t.kind === 'plan') state.expandedPlans.add(String(t.id)); });
     updateDueChips();
@@ -2214,7 +2313,7 @@ loadTasks().then(async () => {
     startReminderLoop();
     bindWeatherModal();
 
-    // ⚠️ فاز ۶ گام ۲: پردازش callback تلگرام (اگر از oauth.telegram.org برگشتیم)
+    // ⚠️ پردازش callback تلگرام
     try {
         const handled = await handleTelegramRedirect();
         if (handled.handled) {
@@ -2228,7 +2327,7 @@ loadTasks().then(async () => {
         console.warn('[auth] handleTelegramRedirect failed:', err);
     }
 
-    // ⚠️ فاز ۶ گام ۲: بازیابی session (اگر توکن قبلی داریم)
+    // ⚠️ بازیابی session
     try {
         const restored = await restoreSession();
         if (restored.restored) {
@@ -2238,10 +2337,20 @@ loadTasks().then(async () => {
         console.warn('[auth] restoreSession failed:', err);
     }
 
-    // ⚠️ فاز ۵: به‌روزرسانی badge بعد از load
     updateBadge({ immediate: true });
     updateHeaderStatus({ immediate: true });
     updateAccountStatusText();
+}).catch(err => {
+    console.error('[app] initI18n failed:', err);
+    applyDisplaySettings();
+    initSettings();
+    // ⚠️ در صورت خطا، حداقل taskها را لود کن
+    loadTasks().then(() => {
+        loadTrash().then(() => {
+            render();
+            renderTrash();
+        });
+    });
 });
 
 if (import.meta.env.DEV) {

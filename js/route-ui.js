@@ -14,6 +14,7 @@ import {
     getYouMarker,
     setYouMarker
 } from './map.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -233,15 +234,15 @@ async function showRouteTo(taskId) {
     switchToTab('map');
     const ready = await waitForMapReady();
     if (!ready) {
-        mapHint('نقشه هنوز آماده نشده است؛ دوباره تلاش کنید');
+        mapHint(i18nT('map.hint.mapNotReady'));
         return;
     }
 
     clearMapRoute(); // همیشه پاکسازی کامل قبل از مسیر جدید
-    mapHint('در حال دریافت موقعیت فعلی و محاسبه مسیر برای خودرو، دوچرخه و پیاده...');
+    mapHint(i18nT('map.hint.calculatingRoute'));
     const origin = await getFreshOrigin();
     if (!origin) {
-        mapHint('دسترسی به موقعیت فعلی ممکن نیست؛ مجوز موقعیت مکانی را بررسی کنید');
+        mapHint(i18nT('map.hint.locationUnavailable'));
         return;
     }
 
@@ -272,12 +273,12 @@ async function showRouteTo(taskId) {
         const btn = document.getElementById('routeClearBtn');
         if (btn) btn.style.display = '';
         clearTimer = setTimeout(() => clearMapRoute(), AUTO_CLEAR_MS);
-        mapHint('یک شیوه را انتخاب کنید تا مسیر همان شیوه روی نقشه نمایش داده شود.', 5000);
+        mapHint(i18nT('map.hint.routeSelectMode'), 5000);
     } catch (err) {
         if (err && err.name === 'AbortError') {
-            if (getMapReady()) mapHint('محاسبه مسیر متوقف شد');
+            if (getMapReady()) mapHint(i18nT('map.hint.routeStopped'));
         } else if (getMapReady()) {
-            mapHint('مسیریابی ناموفق بود (اینترنت؟)');
+            mapHint(i18nT('map.hint.routeFailed'));
         }
     } finally {
         clearTimeout(timeout);

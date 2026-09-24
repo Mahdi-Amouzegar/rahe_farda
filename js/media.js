@@ -24,6 +24,8 @@
 //   - قابل استفاده در همه‌ی مرورگرهای مدرن
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { t as i18nT } from './i18n.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ثابت‌ها
 // ═══════════════════════════════════════════════════════════════════════════
@@ -127,17 +129,17 @@ function getExtension(filename) {
 export function validateImageFile(file) {
     // ─── نوع ورودی ───
     if (!file || !(file instanceof File)) {
-        return { ok: false, reason: 'فایل نامعتبر است' };
+        return { ok: false, reason: i18nT('media.errors.invalidFile') };
     }
 
     // ─── حجم ───
     if (file.size === 0) {
-        return { ok: false, reason: 'فایل خالی است' };
+        return { ok: false, reason: i18nT('media.errors.emptyFile') };
     }
     if (file.size > MAX_INPUT_SIZE_BYTES) {
         return {
             ok: false,
-            reason: `حجم فایل بیش از حد مجاز است (حداکثر ${formatBytes(MAX_INPUT_SIZE_BYTES)})`,
+            reason: i18nT('media.errors.tooLarge', { max: formatBytes(MAX_INPUT_SIZE_BYTES) }),
         };
     }
 
@@ -147,7 +149,7 @@ export function validateImageFile(file) {
         // اگر MIME خالی بود، بر اساس extension چک کن
         const ext = getExtension(file.name);
         if (!ALLOWED_EXTENSIONS.includes(ext)) {
-            return { ok: false, reason: 'فرمت فایل پشتیبانی نمی‌شود' };
+            return { ok: false, reason: i18nT('media.errors.unsupportedFormat') };
         }
         return { ok: true };
     }
@@ -155,7 +157,7 @@ export function validateImageFile(file) {
     if (!ALLOWED_MIME_TYPES.includes(mime)) {
         return {
             ok: false,
-            reason: `فرمت فایل پشتیبانی نمی‌شود (${mime})`,
+            reason: i18nT('media.errors.unsupportedFormatWithMime', { mime }),
         };
     }
 
@@ -164,7 +166,7 @@ export function validateImageFile(file) {
     if (ext && !ALLOWED_EXTENSIONS.includes(ext)) {
         return {
             ok: false,
-            reason: `پسوند فایل پشتیبانی نمی‌شود (${ext})`,
+            reason: i18nT('media.errors.unsupportedExtension', { ext }),
         };
     }
 

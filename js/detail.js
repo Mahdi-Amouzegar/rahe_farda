@@ -1,6 +1,11 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // detail.js -- detail page (ESM) — فاز ۴ گام ۴
 //
+// ⚠️ فاز ۴C (i18n):
+//   - همه‌ی متن‌های hardcoded به i18n منتقل شدند
+//   - formatDate از i18n برای تاریخ‌های locale-aware
+//   - WEEK_ORDER به کلیدهای recur.dayOfWeek.X تبدیل شد
+//
 // ⚠️ این نسخه:
 //   - _callbacks و registerDetailCallbacks با EventEmitter جایگزین شد
 //   - رفتار صفحه جزئیات (ویرایش، جلسات، عکس، timer، smart suggest) بدون تغییر است
@@ -31,6 +36,7 @@ import {
 } from './map.js';
 import { openPicker } from './picker.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+import { formatDate, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Backward-compat: registerDetailCallbacks (پل موقت)
@@ -89,7 +95,7 @@ export function getDetailTask() {
 function flashSaved(msg) {
     const hint = document.getElementById('saveHint');
     if (!hint) return;
-    hint.textContent = msg || '✓ ذخیره شد';
+    hint.textContent = msg || i18nT('detail.saveHint');
     hint.classList.add('show');
     clearTimeout(saveHintTimer);
     saveHintTimer = setTimeout(() => hint.classList.remove('show'), 1500);
@@ -100,7 +106,7 @@ function formatDateShort(iso) {
     try {
         const d = new Date(iso);
         if (isNaN(d)) return '';
-        return d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' });
+        return formatDate(d, { day: 'numeric', month: 'long', year: 'numeric' });
     } catch {
         return '';
     }
@@ -204,9 +210,11 @@ function maybeSuggestDueInDetail(value, targetId) {
     if (hasSessionAt(task.sessions, iso)) return;
 
     detailSmartTargetId = targetId;
-    const sourceLabel = targetId === 'fDesc' ? 'توضیح' : 'عنوان';
+    const sourceKey = targetId === 'fDesc'
+        ? 'detail.smartSuggest.fromDesc'
+        : 'detail.smartSuggest.fromTitle';
     const textEl = document.getElementById('detailSmartChipText');
-    if (textEl) textEl.textContent = `📅 پیشنهاد از ${sourceLabel}: ${faShort(iso)}`;
+    if (textEl) textEl.textContent = i18nT(sourceKey, { date: faShort(iso) });
     const chip = document.getElementById('detailSmartChip');
     if (chip) chip.style.display = 'flex';
 
@@ -225,7 +233,7 @@ function maybeSuggestDueInDetail(value, targetId) {
             const focusTarget = document.getElementById(detailSmartTargetId || 'fTitle');
             hideDetailSmart();
             if (focusTarget) focusTarget.focus();
-            flashSaved('سررسید اضافه شد');
+            flashSaved(i18nT('detail.smartSuggest.added'));
         };
     }
     if (dismissBtn) {
@@ -265,14 +273,24 @@ function renderPlanDates() {
     const endBtn = document.getElementById('detailPlanEndBtn');
     const clearBtn = document.getElementById('detailPlanDatesClear');
 
-    if (startBtn) startBtn.textContent = task.startAt ? `📅 شروع: ${formatDateShort(task.startAt)}` : '📅 تاریخ شروع';
-    if (endBtn) endBtn.textContent = task.endAt ? `📅 پایان: ${formatDateShort(task.endAt)}` : '📅 تاریخ پایان';
+    if (startBtn) {
+        startBtn.textContent = task.startAt
+            ? i18nT('detail.planDates.startWithDate', { date: formatDateShort(task.startAt) })
+            : i18nT('detail.sections.planDates.startButton');
+    }
+    if (endBtn) {
+        endBtn.textContent = task.endAt
+            ? i18nT('detail.planDates.endWithDate', { date: formatDateShort(task.endAt) })
+            : i18nT('detail.sections.planDates.endButton');
+    }
 
     if (line) {
         const parts = [];
-        if (task.startAt && task.endAt) parts.push(`از ${formatDateShort(task.startAt)} تا ${formatDateShort(task.endAt)}`);
-        else if (task.startAt) parts.push(`از ${formatDateShort(task.startAt)}`);
-        else if (task.endAt) parts.push(`تا ${formatDateShort(task.endAt)}`);
+        const fromLabel = i18nT('detail.sections.planDates.from');
+        const toLabel = i18nT('detail.sections.planDates.to');
+        if (task.startAt && task.endAt) parts.push(`${fromLabel} ${formatDateShort(task.startAt)} ${toLabel} ${formatDateShort(task.endAt)}`);
+        else if (task.startAt) parts.push(`${fromLabel} ${formatDateShort(task.startAt)}`);
+        else if (task.endAt) parts.push(`${toLabel} ${formatDateShort(task.endAt)}`);
         line.textContent = parts.length ? parts.join(' ') : '';
         line.style.display = parts.length ? '' : 'none';
     }
@@ -367,8 +385,8 @@ function enterLocationPickMode(taskId, mode) {
             document.body.style.overflow = '';
         }
 
-        mapHint('روی نقشه کلیک کنید تا محل جدید ثبت شود');
-        call('showMobilePickBanner', 'روی نقشه ضربه بزنید تا محل جدید ثبت شود. برای انصراف، دکمه لغو را بزنید.');
+        mapHint(i18nT('map.hint.clickForRelocate'));
+        call('showMobilePickBanner', i18nT('location.pickBanner'));
     } else if (mode === 'show') {
         flyToTask(taskId);
     } else if (mode === 'route') {
@@ -422,31 +440,36 @@ export function renderDetailSessions() {
     const el = document.getElementById('sessList');
     if (!el) return;
     if (list.length === 0) {
-        el.innerHTML = '<div class="session-empty">هنوز جلسه‌ای ثبت نشده است.</div>';
+        el.innerHTML = `<div class="session-empty">${i18nT('detail.sessions.empty')}</div>`;
         return;
     }
     const now = getNow().getTime();
     el.innerHTML = list.map((s, i) => {
         const past = new Date(s.at).getTime() < now;
         const sessionLoc = s.location || task.location;
+        const weatherLabel = i18nT('taskItem.weather.buttonAria');
         const weatherBtn = !past && sessionLoc
-            ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" data-weather-session="${escapeHtml(String(s.id))}" aria-label="پیش‌بینی هوا" title="پیش‌بینی هوا">🌡️</button>`
+            ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" data-weather-session="${escapeHtml(String(s.id))}" aria-label="${weatherLabel}" title="${weatherLabel}">🌡️</button>`
             : '';
+        const pastLabel = past ? ` ${i18nT('detail.session.past')}` : '';
+        const remindAria = i18nT('detail.session.remindAria');
+        const locAria = i18nT('detail.session.locationAria');
+        const delAria = i18nT('detail.session.removeAria', { n: toFa(i + 1) });
         return `<div class="session-item ${past ? 'past' : ''}">
             <span class="session-num">${toFa(i + 1)}</span>
-            <span class="session-date">📅 ${faShort(s.at)}${past ? ' (گذشته)' : ''} ${weatherBtn}</span>
-            <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="یادآور این جلسه">
-                <option value=""${s.remindMin == null ? ' selected' : ''}>⏰ پیش‌فرض</option>
-                <option value="5"${s.remindMin === 5 ? ' selected' : ''}>۵ دقیقه</option>
-                <option value="15"${s.remindMin === 15 ? ' selected' : ''}>۱۵ دقیقه</option>
-                <option value="30"${s.remindMin === 30 ? ' selected' : ''}>۳۰ دقیقه</option>
-                <option value="60"${s.remindMin === 60 ? ' selected' : ''}>۱ ساعت</option>
-                <option value="180"${s.remindMin === 180 ? ' selected' : ''}>۳ ساعت</option>
-                <option value="1440"${s.remindMin === 1440 ? ' selected' : ''}>۱ روز</option>
-                <option value="0"${s.remindMin === 0 ? ' selected' : ''}>خاموش</option>
+            <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
+            <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}">
+                <option value=""${s.remindMin == null ? ' selected' : ''}>${i18nT('detail.session.remindDefault')}</option>
+                <option value="5"${s.remindMin === 5 ? ' selected' : ''}>${i18nT('detail.session.remind5')}</option>
+                <option value="15"${s.remindMin === 15 ? ' selected' : ''}>${i18nT('detail.session.remind15')}</option>
+                <option value="30"${s.remindMin === 30 ? ' selected' : ''}>${i18nT('detail.session.remind30')}</option>
+                <option value="60"${s.remindMin === 60 ? ' selected' : ''}>${i18nT('detail.session.remind60')}</option>
+                <option value="180"${s.remindMin === 180 ? ' selected' : ''}>${i18nT('detail.session.remind180')}</option>
+                <option value="1440"${s.remindMin === 1440 ? ' selected' : ''}>${i18nT('detail.session.remind1440')}</option>
+                <option value="0"${s.remindMin === 0 ? ' selected' : ''}>${i18nT('detail.session.remindOff')}</option>
             </select>
-            <button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="ثبت محل جلسه">📍</button>
-            <button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="حذف جلسه ${toFa(i + 1)}">✕</button>
+            <button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>
+            <button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>
         </div>`;
     }).join('');
 }
@@ -469,12 +492,10 @@ async function renderDetailPhotos() {
     if (!grid) return;
 
     if (list.length === 0) {
-        grid.innerHTML = '<div class="session-empty">عکسی ثبت نشده است.</div>';
+        grid.innerHTML = `<div class="session-empty">${i18nT('detail.photo.empty')}</div>`;
         return;
     }
 
-    // ─── گرفتن وضعیت upload برای هر عکس ───
-    // ⚠️ اگر state.sync.enabled نباشد، همه‌ی uploadها صرف‌نظر می‌شوند.
     const statuses = await Promise.all(
         list.map(async p => {
             if (!state.sync.enabled) return null;
@@ -486,20 +507,23 @@ async function renderDetailPhotos() {
         })
     );
 
+    const altText = i18nT('detail.photo.alt');
+    const delAria = i18nT('detail.photo.deleteAria');
+    const sizeLabelPrefix = i18nT('detail.photo.sizePrefix');
+
     grid.innerHTML = list.map((p, idx) => {
         const upload = statuses[idx];
         const sizeLabel = p.sizeBytes ? formatBytes(p.sizeBytes) : '';
-        const title = sizeLabel ? `حجم: ${sizeLabel}` : '';
+        const title = sizeLabel ? `${sizeLabelPrefix}: ${sizeLabel}` : '';
 
-        // ─── وضعیت آپلود ───
         const uploadState = upload ? upload.status : null;
         const uploadBadge = renderUploadBadge(uploadState);
 
         return `
         <div class="photo-thumb photo-thumb--${uploadState || 'local'}">
-            <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="تصویر وظیفه" loading="lazy" title="${escapeHtml(title)}">
+            <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="${altText}" loading="lazy" title="${escapeHtml(title)}">
             ${uploadBadge}
-            <button data-photo-del="${escapeHtml(String(p.id))}" aria-label="حذف عکس">✕</button>
+            <button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>
         </div>`;
     }).join('');
 }
@@ -514,14 +538,22 @@ function renderUploadBadge(status) {
     if (!status) return '';
 
     switch (status) {
-        case 'pending':
-            return '<span class="photo-upload-badge photo-upload-badge--pending" title="در انتظار آپلود" aria-label="در انتظار آپلود">⏳</span>';
-        case 'uploading':
-            return '<span class="photo-upload-badge photo-upload-badge--uploading" title="در حال آپلود" aria-label="در حال آپلود">⬆</span>';
-        case 'uploaded':
-            return '<span class="photo-upload-badge photo-upload-badge--uploaded" title="آپلود شده" aria-label="آپلود شده">✓</span>';
-        case 'failed':
-            return '<span class="photo-upload-badge photo-upload-badge--failed" title="آپلود ناموفق" aria-label="آپلود ناموفق">⚠</span>';
+        case 'pending': {
+            const label = i18nT('detail.photo.badge.pending');
+            return `<span class="photo-upload-badge photo-upload-badge--pending" title="${label}" aria-label="${label}">⏳</span>`;
+        }
+        case 'uploading': {
+            const label = i18nT('detail.photo.badge.uploading');
+            return `<span class="photo-upload-badge photo-upload-badge--uploading" title="${label}" aria-label="${label}">⬆</span>`;
+        }
+        case 'uploaded': {
+            const label = i18nT('detail.photo.badge.uploaded');
+            return `<span class="photo-upload-badge photo-upload-badge--uploaded" title="${label}" aria-label="${label}">✓</span>`;
+        }
+        case 'failed': {
+            const label = i18nT('detail.photo.badge.failed');
+            return `<span class="photo-upload-badge photo-upload-badge--failed" title="${label}" aria-label="${label}">⚠</span>`;
+        }
         default:
             return '';
     }
@@ -544,9 +576,9 @@ function faDuration(sec) {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    if (h > 0) return `${toFa(h)} ساعت و ${toFa(m)} دقیقه`;
-    if (m > 0) return `${toFa(m)} دقیقه`;
-    return `${toFa(s)} ثانیه`;
+    if (h > 0) return i18nT('detail.timer.duration.hoursMinutes', { h: toFa(h), m: toFa(m) });
+    if (m > 0) return i18nT('detail.timer.duration.minutes', { m: toFa(m) });
+    return i18nT('detail.timer.duration.seconds', { s: toFa(s) });
 }
 
 function renderTimer() {
@@ -555,7 +587,9 @@ function renderTimer() {
     const labelEl = document.getElementById('timerLabel');
     if (labelEl) labelEl.textContent = faDuration(currentSpent(task));
     const toggleEl = document.getElementById('timerToggle');
-    if (toggleEl) toggleEl.textContent = task.timerStartedAt ? '⏸ توقف' : '▶ شروع';
+    if (toggleEl) toggleEl.textContent = task.timerStartedAt
+        ? i18nT('detail.timer.paused')
+        : i18nT('detail.timer.started');
 }
 
 function toggleTimer() {
@@ -576,7 +610,15 @@ function toggleTimer() {
 // Recur
 // ═══════════════════════════════════════════════════════════════════════════
 
-const WEEK_ORDER = [['شنبه', 6], ['یکشنبه', 0], ['دوشنبه', 1], ['سه‌شنبه', 2], ['چهارشنبه', 3], ['پنجشنبه', 4], ['جمعه', 5]];
+const WEEK_ORDER = [
+    ['recur.dayOfWeek.sat', 6],
+    ['recur.dayOfWeek.sun', 0],
+    ['recur.dayOfWeek.mon', 1],
+    ['recur.dayOfWeek.tue', 2],
+    ['recur.dayOfWeek.wed', 3],
+    ['recur.dayOfWeek.thu', 4],
+    ['recur.dayOfWeek.fri', 5],
+];
 
 function renderRecurRows() {
     const task = getDetailTask();
@@ -590,13 +632,21 @@ function renderRecurRows() {
     if (monthRow) monthRow.style.display = r === 'monthlyDays' ? '' : 'none';
 
     const nLabel = document.querySelector('#fRecurNRow .field-label');
-    if (nLabel) nLabel.textContent = r === 'hourly' ? 'هر چند ساعت؟' : 'هر چند روز؟';
+    if (nLabel) {
+        nLabel.textContent = r === 'hourly'
+            ? i18nT('tasks.series.everyNHours')
+            : i18nT('detail.sections.recurrence.everyNDays');
+    }
 
     const nInp = document.getElementById('fRecurN');
     if (nInp) nInp.max = r === 'hourly' ? 168 : 365;
 
     const wc = document.getElementById('fRecurWeekChips');
-    if (wc) wc.innerHTML = WEEK_ORDER.map(([name, v]) => `<button type="button" class="day-chip${(task.recurDays || []).includes(v) ? ' on' : ''}" data-wday="${v}">${name}</button>`).join('');
+    if (wc) {
+        wc.innerHTML = WEEK_ORDER.map(([key, v]) =>
+            `<button type="button" class="day-chip${(task.recurDays || []).includes(v) ? ' on' : ''}" data-wday="${v}">${i18nT(key)}</button>`
+        ).join('');
+    }
 
     const mc = document.getElementById('fRecurMonthChips');
     if (mc) {
@@ -627,7 +677,7 @@ const debouncedSaveTitle = debounce(() => {
     const task = getDetailTask();
     if (!task) return;
     task.text = document.getElementById('fTitle').value.trim().replace(/\s+/g, ' ').slice(0, MAX_LENGTH);
-    document.getElementById('detailTitle').textContent = task.text || 'بدون عنوان';
+    document.getElementById('detailTitle').textContent = task.text || i18nT('tasks.new');
     saveTasks();
     call('render');
     flashSaved();
@@ -666,17 +716,6 @@ const debouncedSaveUrl = debounce(() => {
     flashSaved();
 }, 300);
 
-/**
- * تبدیل Blob به dataUrl.
- *
- * ⚠️ چرا dataUrl و نه Blob مستقیم؟
- *   - در Stage D، ما هنوز upload به ParsPack نداریم
- *   - dataUrl را در IndexedDB ذخیره می‌کنیم (سازگار با `sanitizeTask` فعلی)
- *   - در Stage E، این تابع با ذخیره‌ی Blob در IDB جایگزین می‌شود
- *
- * @param {Blob} blob
- * @returns {Promise<string>}
- */
 function blobToDataUrl(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -684,10 +723,10 @@ function blobToDataUrl(blob) {
             if (typeof reader.result === 'string') {
                 resolve(reader.result);
             } else {
-                reject(new Error('خطا در تبدیل Blob به dataUrl'));
+                reject(new Error(i18nT('detail.photo.blobError')));
             }
         };
-        reader.onerror = () => reject(new Error('خطا در خواندن Blob'));
+        reader.onerror = () => reject(new Error(i18nT('detail.photo.blobReadError')));
         reader.readAsDataURL(blob);
     });
 }
@@ -700,7 +739,7 @@ export function bindDetailInputs() {
     document.getElementById('fTitle').addEventListener('input', e => {
         const v = e.target.value.trim().replace(/\s+/g, ' ');
         if (!v) {
-            flashSaved('عنوان نمی‌تواند خالی باشد');
+            flashSaved(i18nT('detail.saveError'));
             return;
         }
         debouncedSaveTitle();
@@ -712,7 +751,7 @@ export function bindDetailInputs() {
         const v = e.target.value.trim();
         const err = document.getElementById('fPhoneError');
         if (v && !/^[0-9+\-\s()]{5,20}$/.test(v)) {
-            err.textContent = 'شماره تلفن معتبر نیست';
+            err.textContent = i18nT('detail.phone.invalid');
             return;
         }
         err.textContent = '';
@@ -734,7 +773,7 @@ export function bindDetailInputs() {
             const task = getDetailTask();
             if (!task) return;
             if (hasSessionAt(task.sessions, iso)) {
-                flashSaved('این سررسید قبلاً ثبت شده است.');
+                flashSaved(i18nT('picker.errorDuplicate'));
                 return;
             }
             task.sessions.push({ id: uid(), at: iso });
@@ -757,8 +796,8 @@ export function bindDetailInputs() {
                 if (pageEl) pageEl.style.display = 'none';
                 document.body.style.overflow = '';
             }
-            mapHint('روی نقشه کلیک کنید تا محل جلسه ثبت شود');
-            call('showMobilePickBanner', 'روی نقشه ضربه بزنید تا محل جلسه ثبت شود. برای انصراف، دکمه لغو را بزنید.');
+            mapHint(i18nT('map.hint.clickForSession'));
+            call('showMobilePickBanner', i18nT('location.pickBannerSession'));
             return;
         }
         const btn = e.target.closest('[data-sess]');
@@ -769,7 +808,7 @@ export function bindDetailInputs() {
         saveTasks();
         renderDetailSessions();
         call('render');
-        flashSaved('جلسه حذف شد');
+        flashSaved(i18nT('detail.session.removed'));
     });
     document.getElementById('sessList').addEventListener('change', e => {
         const sel = e.target.closest('[data-sess-rem]');
@@ -803,7 +842,7 @@ export function bindDetailInputs() {
         call('refreshSavedLocationUI');
         call('render');
         refreshMarkers();
-        flashSaved('محل حذف شد');
+        flashSaved(i18nT('detail.location.removed'));
     });
     document.getElementById('fPriority').addEventListener('change', e => {
         const task = getDetailTask();
@@ -838,7 +877,7 @@ export function bindDetailInputs() {
                 ta.remove();
             } catch { /* نادیده */ }
         }
-        flashSaved(ok ? 'پیوند کپی شد ✓' : 'کپی نشد');
+        flashSaved(ok ? i18nT('detail.url.copied') : i18nT('detail.url.copyFailed'));
     });
     document.getElementById('fPin').addEventListener('change', e => {
         const task = getDetailTask();
@@ -866,7 +905,7 @@ export function bindDetailInputs() {
             task.sessions.sort((a, b) => new Date(a.at) - new Date(b.at));
             task.sessions = [task.sessions[0]];
             renderDetailSessions();
-            warn = 'فقط نزدیک‌ترین سررسید نگه داشته شد؛ بقیه حذف شدند';
+            warn = i18nT('detail.warn.sessionsCollapsed');
         }
         if (task.recur === 'hourly' && !(task.recurN >= 1 && task.recurN <= 168)) task.recurN = 8;
         if (task.recur === 'custom') {
@@ -875,11 +914,11 @@ export function bindDetailInputs() {
             else {
                 task.recur = 'none';
                 e.target.value = 'none';
-                warn = 'عدد روزهای تکرار (۱ تا ۳۶۵) را وارد کنید';
+                warn = i18nT('detail.warn.invalidRecurN');
             }
         }
         if ((task.recur === 'weeklyDays' || task.recur === 'monthlyDays') && !(task.recurDays || []).length) {
-            warn += (warn ? ' — ' : '') + 'حداقل یک روز انتخاب کنید';
+            warn += (warn ? ' — ' : '') + i18nT('detail.warn.noRecurDay');
         }
         saveTasks();
         call('render');
@@ -897,7 +936,7 @@ export function bindDetailInputs() {
             call('render');
             flashSaved();
         } else {
-            flashSaved(`عدد بین ۱ تا ${toFa(maxN)}`);
+            flashSaved(i18nT('detail.warn.rangeError', { max: toFa(maxN) }));
         }
     });
     document.getElementById('detailLocRoute').addEventListener('click', () => {
@@ -918,7 +957,7 @@ export function bindDetailInputs() {
                 saveTasks();
                 renderPlanDates();
                 call('render');
-                flashSaved('تاریخ شروع ثبت شد');
+                flashSaved(i18nT('detail.planDates.startSet'));
             });
         });
     }
@@ -932,7 +971,7 @@ export function bindDetailInputs() {
                 saveTasks();
                 renderPlanDates();
                 call('render');
-                flashSaved('تاریخ پایان ثبت شد');
+                flashSaved(i18nT('detail.planDates.endSet'));
             });
         });
     }
@@ -946,7 +985,7 @@ export function bindDetailInputs() {
             saveTasks();
             renderPlanDates();
             call('render');
-            flashSaved('تاریخ‌ها حذف شدند');
+            flashSaved(i18nT('detail.planDates.cleared'));
         });
     }
 
@@ -957,33 +996,28 @@ export function bindDetailInputs() {
 
         task.photos = task.photos || [];
 
-        // ─── چک سقف ───
         const remaining = MAX_PHOTOS_PER_TASK - task.photos.length;
         if (remaining <= 0) {
             photoInput.value = '';
-            flashSaved(`سقف ${toFa(MAX_PHOTOS_PER_TASK)} عکس`);
+            flashSaved(i18nT('detail.photo.limitReached', { n: toFa(MAX_PHOTOS_PER_TASK) }));
             return;
         }
 
-        // ─── انتخاب فایل‌ها ───
         const files = [...photoInput.files].slice(0, remaining);
         photoInput.value = '';
 
         if (!files.length) {
-            flashSaved('فایلی انتخاب نشد');
+            flashSaved(i18nT('detail.photo.noFile'));
             return;
         }
 
-        // ─── پردازش هر فایل ───
         let successCount = 0;
         let failureCount = 0;
         const errors = [];
 
-        // ⚠️ نمایش loading
-        flashSaved('در حال پردازش عکس‌ها...');
+        flashSaved(i18nT('detail.photo.processing'));
 
         for (const file of files) {
-            // ─── اعتبارسنجی سبک ───
             const validation = validateImageFile(file);
             if (!validation.ok) {
                 failureCount++;
@@ -991,22 +1025,14 @@ export function bindDetailInputs() {
                 continue;
             }
 
-            // ─── پردازش (WebP + downscale در صورت لزوم) ───
             try {
                 const result = await processImageFile(file);
-
-                // ⚠️ در Stage D، هنوز mediaId نداریم.
-                //    عکس را با dataUrl موقت نگه می‌داریم.
-                //    در Stage E، این با mediaId جایگزین می‌شود.
-
-                // ─── تبدیل Blob به dataUrl موقت ───
                 const dataUrl = await blobToDataUrl(result.blob);
 
                 task.photos.push({
                     id: uid(),
                     dataUrl,
                     addedAt: new Date().toISOString(),
-                    // ⚠️ فیلدهای جدید برای Stage E
                     contentType: result.contentType,
                     sizeBytes: result.sizeBytes,
                     width: result.width,
@@ -1016,24 +1042,22 @@ export function bindDetailInputs() {
                 successCount++;
             } catch (err) {
                 failureCount++;
-                errors.push(err instanceof Error ? err.message : 'خطای پردازش');
+                errors.push(err instanceof Error ? err.message : i18nT('detail.photo.processingError'));
             }
         }
 
-        // ─── ذخیره و رندر ───
         if (successCount > 0) {
             saveTasks();
             await renderDetailPhotos();
             call('render');
         }
 
-        // ─── پیام نهایی ───
         if (failureCount === 0) {
-            flashSaved(`${toFa(successCount)} عکس اضافه شد`);
+            flashSaved(i18nT('detail.photo.added', { n: toFa(successCount) }));
         } else if (successCount === 0) {
-            flashSaved(`هیچ عکسی اضافه نشد: ${errors[0] || 'خطای نامشخص'}`);
+            flashSaved(i18nT('detail.photo.noneAdded', { reason: errors[0] || i18nT('detail.photo.unknownError') }));
         } else {
-            flashSaved(`${toFa(successCount)} عکس اضافه شد، ${toFa(failureCount)} رد شد`);
+            flashSaved(i18nT('detail.photo.addedSome', { n: toFa(successCount), m: toFa(failureCount) }));
         }
     });
     document.getElementById('photoGrid').addEventListener('click', async e => {
@@ -1043,21 +1067,19 @@ export function bindDetailInputs() {
             if (!task) return;
             const photoId = del.dataset.photoDel;
 
-            // ⚠️ Stage E: اگر این عکس در صف آپلود است، لغو کن
             try {
                 await cancelUpload(photoId);
             } catch {
-                // silent — اگر upload نبود، مشکلی نیست
+                // silent
             }
 
             task.photos = (task.photos || []).filter(p => String(p.id) !== String(photoId));
-            // ⚠️ Stage E: حذف از mediaIds هم
             task.mediaIds = (task.mediaIds || []).filter(id => String(id) !== String(photoId));
 
             saveTasks();
             await renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
             call('render');
-            flashSaved('عکس حذف شد');
+            flashSaved(i18nT('detail.photo.deleted'));
             return;
         }
         const img = e.target.closest('[data-photo-view]');
@@ -1074,10 +1096,10 @@ export function bindDetailInputs() {
         const task = getDetailTask();
         if (!task) return;
         const ok = await showConfirmModal({
-            title: 'حذف وظیفه',
-            message: `«${task.text}» به سطل زباله منتقل شود؟`,
-            confirmText: 'بله، منتقل کن',
-            cancelText: 'انصراف',
+            title: i18nT('detail.deleteConfirmTitle'),
+            message: i18nT('detail.deleteConfirmMessage', { text: task.text }),
+            confirmText: i18nT('detail.deleteConfirmOk'),
+            cancelText: i18nT('detail.deleteConfirmCancel'),
             danger: true
         });
         if (!ok) return;
@@ -1090,11 +1112,8 @@ export function bindDetailInputs() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ Stage E: event listeners برای وضعیت آپلود Media
+// Stage E: event listeners برای وضعیت آپلود Media
 // ═══════════════════════════════════════════════════════════════════════════
-//
-// وقتی یک عکس آپلود می‌شود یا شکست می‌خورد، detail.js باید
-// renderDetailPhotos را دوباره صدا بزند (اگر detail باز است).
 
 events.on('media:upload-complete', ({ taskId }) => {
     if (String(state.currentDetailId) === String(taskId)) {
@@ -1113,6 +1132,3 @@ events.on('media:upload-enqueued', ({ taskId }) => {
         renderDetailPhotos().catch(() => {});
     }
 });
-// ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ گام ۱۵: SHIM‌ها حذف شدند
-// ═══════════════════════════════════════════════════════════════════════════

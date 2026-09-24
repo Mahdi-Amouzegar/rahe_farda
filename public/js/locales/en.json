@@ -1,0 +1,1186 @@
+{
+  "app": {
+    "title": "Rahe Farda",
+    "tagline": "Your tasks, your time, your path.",
+    "description": "Manage your daily tasks and appointments with reminders, maps, and the Persian calendar — no account needed, works offline.",
+    "footer": {
+      "madeWith": "Made with ❤ by",
+      "author": "Mahdi Amouzegar",
+      "donateSoon": "☕ Donate (coming soon)",
+      "copyright": "© {year} — All rights reserved · 🔒 Your data stays only on this device"
+    }
+  },
+
+  "header": {
+    "today": "Today: {date}",
+    "settings": "Settings",
+    "status": {
+      "online": "Online",
+      "offline": "Offline — this device only",
+      "offlineWithQueue": "Offline — {n} changes pending",
+      "pending": "{n} changes pending sync",
+      "syncing": "Syncing…",
+      "unknown": "Checking…",
+      "ariaOnline": "Online",
+      "ariaOffline": "Offline, {n} changes pending sync",
+      "ariaPending": "{n} changes pending"
+    },
+    "timeSource": {
+      "connecting": "Connecting…",
+      "connectingIndex": "Connecting ({i}/{n}) — {source}…",
+      "online": "✓ Online time ({source}) — synced with internet server",
+      "offline": "⚠ Offline — using device clock",
+      "aria": "Time status"
+    }
+  },
+
+  "tabs": {
+    "tasks": "📋 Tasks",
+    "map": "🗺 Map",
+    "ariaSelect": "Select view"
+  },
+
+  "auth": {
+    "defaultUserName": "User",
+    "modalTitle": "👤 My Account",
+    "modalClose": "Close",
+    "openButton": "👤 My Account",
+    "openAriaLabel": "Open account modal",
+    "login": {
+      "message": "To sync across devices, choose one of the methods below.",
+      "hint": "Your data stays on this device. Sync is disabled by default.",
+      "telegramButton": "Sign in with Telegram",
+      "syncCodeButton": "Sign in with sync code",
+      "syncCodeSoon": "Soon",
+      "syncCodeDisabledTitle": "Will be enabled in the next step",
+      "note": "💡 The sync code lets you sign in quickly on additional devices after your first Telegram login."
+    },
+    "loggedIn": {
+      "nameLabel": "Name:",
+      "usernameLabel": "Username:",
+      "syncCodeLabel": "Sync code:",
+      "syncCodeActive": "✓ Active",
+      "syncCodeUnavailable": "— Available in the next step",
+      "ttlLabel": "Token validity:",
+      "ttlApplyButton": "Apply",
+      "remainingLabel": "⏳ Time remaining:",
+      "logoutButton": "Sign out",
+      "disconnectButton": "🔗 Sign in with another Telegram account"
+    },
+    "logout": {
+      "confirmTitle": "Sign out",
+      "confirmMessage": "Sign out of your account? Your local data will be kept.",
+      "confirmOk": "Sign out",
+      "confirmCancel": "Cancel"
+    },
+    "disconnect": {
+      "title": "🔗 Sign in with another Telegram account",
+      "instructions": "To sign in with another Telegram account, please follow these steps:",
+      "step1": "<strong>1.</strong> In the Telegram app, go to <strong>Settings → Privacy and Security</strong>.",
+      "step2": "<strong>2.</strong> Open <strong>\"Logged in with Telegram\"</strong> (or Active Sessions).",
+      "step3": "<strong>3.</strong> Find the session for <strong>rahe_farda_bot</strong> or <strong>mahdi-amouzegar.github.io</strong>.",
+      "step4": "<strong>4.</strong> Tap <strong>Terminate Session</strong>.",
+      "step5": "<strong>5.</strong> Return to Rahe Farda and tap \"Sign out\".",
+      "step6": "<strong>6.</strong> Then tap \"Sign in with Telegram\" — this time it will ask for a new number.",
+      "note": "Note: if you only tap \"Sign out\", the Telegram session remains and next time you'll be signed in without a number prompt.",
+      "buttonText": "Got it"
+    },
+    "status": {
+      "loggedOut": "Not signed in",
+      "loggedInAs": "Signed in — {name}"
+    },
+    "warning": {
+      "expiringSoon": "⚠️ Your token will expire soon ({remaining} left). Please renew it."
+    },
+    "ttl": {
+      "month1": "1 month",
+      "month3": "3 months",
+      "month6": "6 months",
+      "year1": "1 year",
+      "days": "{n} days"
+    },
+    "expiry": {
+      "expired": "Expired",
+      "lessThanHour": "Less than {n} hours",
+      "days": "{n} days",
+      "monthsAndDays": "{months} months and {days} days",
+      "months": "{n} months",
+      "yearsAndMonths": "{years} years and {months} months",
+      "years": "{n} years"
+    }
+  },
+
+  "settings": {
+    "title": "Settings",
+    "kicker": "Personalization",
+    "description": "Manage the behavior, appearance, and notifications of Rahe Farda.",
+    "close": "Close settings",
+    "sections": {
+      "appearance": {
+        "title": "Appearance & language",
+        "theme": "Display mode",
+        "language": "Interface language"
+      },
+      "app": {
+        "title": "App & privacy",
+        "deviceUsage": "Device usage",
+        "install": "⬇ Install app",
+        "installStatus": "Installation from browser is available",
+        "dataPrivacy": "Data & privacy",
+        "privacy": "🔒 Privacy",
+        "backup": "Backup",
+        "backupButton": "📤 Backup",
+        "backupButtonTitle": "Save a backup of your data",
+        "restoreButton": "📥 Restore from backup",
+        "restoreButtonTitle": "Restore from backup file"
+      },
+      "account": {
+        "title": "Account & sync",
+        "statusLabel": "Account status",
+        "openButton": "👤 My Account",
+        "note": "To sync across devices, first sign in with Telegram. Your data stays on this device."
+      },
+      "reminders": {
+        "title": "Reminders & notifications",
+        "remindOn": "Session reminders",
+        "remindBefore": "How many minutes before?",
+        "digestOn": "Morning digest",
+        "minutes15": "15 minutes",
+        "minutes30": "30 minutes",
+        "hour1": "1 hour",
+        "hour3": "3 hours",
+        "day1": "1 day"
+      },
+      "permissions": {
+        "title": "System permissions",
+        "description": "Check and test browser permissions separately.",
+        "notifications": "Notifications",
+        "location": "Location",
+        "microphone": "Microphone",
+        "statusUnknown": "Checking…",
+        "statusGranted": "Enabled",
+        "statusDenied": "Blocked",
+        "statusNotGranted": "Not enabled",
+        "statusUnsupported": "Not supported",
+        "statusTestPrompt": "Test to check",
+        "enable": "Enable",
+        "test": "Test"
+      },
+      "advanced": {
+        "title": "Professional experience",
+        "proMode": "Professional mode (advanced options always available)",
+        "proModeNote": "This option doesn't delete data or features."
+      }
+    }
+  },
+
+  "theme": {
+    "auto": "🖥 Auto",
+    "light": "☀️ Light",
+    "dark": "🌙 Dark",
+    "labelAuto": "Display mode: auto",
+    "labelLight": "Display mode: light",
+    "labelDark": "Display mode: dark"
+  },
+
+  "language": {
+    "fa": "🌐 FA",
+    "en": "🌐 EN",
+    "switchTo": "Switch language",
+    "switchToEn": "Switch to English",
+    "switchToFa": "تغییر زبان به فارسی"
+  },
+
+  "tasks": {
+    "add": "Add",
+    "new": "New task",
+    "newPlaceholder": "Write your new task…",
+    "planPlaceholder": "Plan name (e.g. Trip to Tehran)…",
+    "seriesPlaceholder": "Series name (e.g. Physio sessions)…",
+    "kind": {
+      "task": "📝 A task",
+      "plan": "📂 A plan",
+      "series": "📅 A series",
+      "aria": "Type of new item"
+    },
+    "priority": {
+      "low": "Low priority",
+      "medium": "Medium priority",
+      "high": "High priority"
+    },
+    "addButton": {
+      "task": "Add task",
+      "plan": "Add plan",
+      "series": "Add series"
+    },
+    "search": {
+      "title": "Search tasks",
+      "placeholder": "Search tasks…",
+      "aria": "Search tasks",
+      "iconAria": "Search"
+    },
+    "filter": {
+      "aria": "Task filter",
+      "all": "All",
+      "active": "Active",
+      "completed": "Completed",
+      "archived": "📦 Archived",
+      "hasloc": "📍 With location",
+      "hasdue": "📅 With due date"
+    },
+    "sort": {
+      "label": "Sort by:",
+      "newest": "Newest",
+      "due": "Nearest due",
+      "oldest": "Oldest",
+      "alpha": "Alphabetical",
+      "manual": "Manual (drag)",
+      "title": "Tip: in \"Manual\" mode you can drag cards to reorder"
+    },
+    "buttons": {
+      "calendar": "📅 Calendar",
+      "trash": "🗑 Trash"
+    },
+    "progress": {
+      "label": "Task completion progress",
+      "aria": "Progress percentage"
+    },
+    "stats": {
+      "total": "Total:",
+      "done": "Done:",
+      "remaining": "Remaining:"
+    },
+    "status": {
+      "showingCount": "Showing {n} items"
+    },
+    "done": {
+      "clearCompleted": "Clear completed",
+      "archiveDone": "📦 Archive completed",
+      "clearConfirmTitle": "Clear completed",
+      "clearConfirmMessage": "Move {n} completed tasks to trash?",
+      "clearConfirmOk": "Yes, move them",
+      "clearConfirmCancel": "Cancel"
+    },
+    "insight": {
+      "title": "Progress report",
+      "statsTitle": "📊 Last 7 days · {rate}% completion rate",
+      "barTooltip": "{n} completed"
+    },
+    "empty": {
+      "noResults": "No results for your search",
+      "noCompleted": "You haven't completed any tasks yet",
+      "allDone": "All tasks are done!",
+      "emptyList": "Task list is empty",
+      "startHint": "To begin, type a title and tap \"Add\" — you can also use 📅 date and 📍 location."
+    },
+    "due": {
+      "setButton": "📅 Set due date (optional)",
+      "setAria": "Set a due date for the new task",
+      "pickLocation": "📍 Pick location on map",
+      "pickLocationAria": "Pick location on map"
+    },
+    "smartSuggest": {
+      "fromTitle": "📅 Suggested from title: {date}",
+      "fromDesc": "📅 Suggested from description: {date}",
+      "accept": "✓ Add",
+      "dismiss": "✕",
+      "dismissAria": "Dismiss"
+    },
+    "details": {
+      "summary": "＋ More details",
+      "priority": "Priority",
+      "priorityAria": "Priority level",
+      "description": "Description",
+      "descriptionPlaceholder": "Short description…",
+      "descriptionAria": "Description",
+      "micAria": "Voice input for description"
+    },
+    "plan": {
+      "newChildPlaceholder": "New task…",
+      "newChildAria": "New child task title",
+      "addChild": "Add",
+      "micChildAria": "Voice input for child task",
+      "fromTemplate": "📁 Build plan from a template"
+    },
+    "series": {
+      "recurTitle": "Series recurrence",
+      "hourly": "Hourly",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "hourlyN": "Every N hours…",
+      "weeklyDays": "Days of week…",
+      "monthlyDays": "Days of month…",
+      "dates": "Due date",
+      "everyNHours": "Every how many hours?",
+      "addDate": "＋ Add due date"
+    },
+    "drag": {
+      "sortHint": "To reorder, drag cards in \"Manual\" mode"
+    }
+  },
+
+  "taskItem": {
+    "operations": {
+      "menuLabel": "Operations",
+      "childMenuLabel": "Child operations",
+      "planMenuLabel": "Plan operations",
+      "unarchive": "Restore from archive",
+      "delete": "Delete task",
+      "deleteChild": "Delete child task",
+      "deletePlan": "Delete plan",
+      "pickLoc": "Set location on map",
+      "showLoc": "Show location on map",
+      "route": "Show route",
+      "detail": "Details and more info",
+      "detailChild": "Child task details",
+      "detailPlan": "Plan details",
+      "edit": "Edit task name",
+      "archive": "Archive task",
+      "archiveChild": "Archive child task",
+      "archivePlan": "Archive plan",
+      "pin": "Pin to top",
+      "unpin": "Unpin",
+      "checkAll": "Mark all children as done"
+    },
+    "checkbox": {
+      "markDone": "Mark as completed",
+      "markUndone": "Mark as not completed"
+    },
+    "edit": {
+      "title": "Double-click to edit",
+      "aria": "Edit task",
+      "okAria": "Confirm edit",
+      "cancelAria": "Cancel edit",
+      "childAria": "Edit child task"
+    },
+    "plan": {
+      "expand": "Expand/collapse plan",
+      "subCount": "Children: {done} of {total}",
+      "noChildren": "No child tasks yet.",
+      "childDate": "Set child due date"
+    },
+    "weather": {
+      "buttonAria": "Weather forecast",
+      "buttonTitle": "Weather forecast"
+    },
+    "map": {
+      "showButton": "📍 Map",
+      "showAria": "Show location on map"
+    }
+  },
+
+  "detail": {
+    "title": "Task details",
+    "back": "Back to list",
+    "delete": "Delete this task",
+    "deleteConfirmTitle": "Delete task",
+    "deleteConfirmMessage": "\"{text}\" will be moved to trash?",
+    "deleteConfirmOk": "Yes, move it",
+    "deleteConfirmCancel": "Cancel",
+    "sections": {
+      "basic": {
+        "kicker": "Basic",
+        "title": "Basic info",
+        "status": "Editable"
+      },
+      "planDates": {
+        "from": "From",
+        "to": "To",
+        "kicker": "Range",
+        "title": "Start and end dates",
+        "status": "Plan only",
+        "startButton": "📅 Start date",
+        "endButton": "📅 End date",
+        "clearAria": "Clear dates"
+      },
+      "sessions": {
+        "kicker": "Schedule",
+        "title": "Sessions and dates",
+        "status": "Active",
+        "addButton": "＋ Add session",
+        "countAria": "Number of sessions",
+        "empty": "No sessions recorded yet.",
+        "removed": "Session deleted"
+      },
+      "location": {
+        "hasLocation": "Location saved",
+        "kicker": "Location",
+        "title": "Location on map",
+        "status": "Location-based",
+        "show": "Show on map",
+        "route": "🧭 Distance and route",
+        "change": "Change location",
+        "add": "＋ Set location",
+        "remove": "Remove location",
+        "removeAria": "Remove location"
+      },
+      "recurrence": {
+        "kicker": "Timing",
+        "title": "Recurrence and timing",
+        "status": "Advanced",
+        "none": "No recurrence",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "custom": "Every N days…",
+        "hourly": "Every N hours…",
+        "weeklyDays": "Days of week…",
+        "monthlyDays": "Days of month…",
+        "whichDays": "Which days?",
+        "whichMonthDays": "Which days of the month?",
+        "everyNDays": "Every how many days?"
+      },
+      "contact": {
+        "kicker": "Contact",
+        "title": "Contact and resources",
+        "status": "Advanced",
+        "phone": "Contact phone",
+        "phonePlaceholder": "+1 555...",
+        "callButton": "📞 Call",
+        "address": "Postal address",
+        "addressPlaceholder": "Office or location address…",
+        "url": "Website address",
+        "urlPlaceholder": "https://...",
+        "urlOpen": "Open link ↗",
+        "urlCopy": "📋 Copy link"
+      },
+      "timer": {
+        "kicker": "Focus",
+        "title": "Time spent",
+        "status": "Optional",
+        "start": "▶ Start",
+        "stop": "⏸ Stop",
+        "initial": "0 minutes"
+      },
+      "photos": {
+        "kicker": "Attachments",
+        "title": "Photos and documents",
+        "status": "Optional",
+        "countAria": "Number of photos",
+        "empty": "No photos recorded.",
+        "addFromGallery": "📁 Add from gallery",
+        "takePhoto": "📷 Take a photo",
+        "deleteAria": "Delete photo",
+        "viewAlt": "Task image"
+      }
+    },
+    "fields": {
+      "title": "Title",
+      "priority": "Priority level",
+      "pin": "📌 Pin to top of list",
+      "description": "More details",
+      "descriptionPlaceholder": "e.g. doctor name, reason for visit…"
+    },
+    "saveHint": "✓ Saved",
+    "saveError": "Title cannot be empty",
+    "session": {
+      "addButton": "＋ Add session",
+      "removeAria": "Delete session {n}",
+      "remindAria": "Reminder for this session",
+      "remindDefault": "⏰ Default",
+      "remind5": "5 minutes",
+      "remind15": "15 minutes",
+      "remind30": "30 minutes",
+      "remind60": "1 hour",
+      "remind180": "3 hours",
+      "remind1440": "1 day",
+      "remindOff": "Off",
+      "locationAria": "Set session location",
+      "past": "(past)"
+    },
+    "photo": {
+      "uploadPending": "Pending upload",
+      "uploading": "Uploading",
+      "uploaded": "Uploaded",
+      "uploadFailed": "Upload failed",
+      "processing": "Processing photos…",
+      "added": "{n} photos added",
+      "addedSome": "{n} photos added, {m} rejected",
+      "noneAdded": "No photos added: {reason}",
+      "unknownError": "Unknown error",
+      "limitReached": "Limit of {n} photos",
+      "noFile": "No file selected",
+      "deleted": "Photo deleted",
+      "processingError": "Processing error",
+      "empty": "No photos recorded.",
+      "alt": "Task image",
+      "deleteAria": "Delete photo",
+      "sizePrefix": "Size",
+      "badge": {
+        "pending": "Pending upload",
+        "uploading": "Uploading",
+        "uploaded": "Uploaded",
+        "failed": "Upload failed"
+      },
+      "blobError": "Failed to convert Blob to dataUrl",
+      "blobReadError": "Failed to read Blob"
+    },
+    "timer": {
+      "started": "▶ Start",
+      "paused": "⏸ Stop",
+      "duration": {
+        "hoursMinutes": "{h} hours and {m} minutes",
+        "minutes": "{m} minutes",
+        "seconds": "{s} seconds"
+      }
+    },
+    "smartSuggest": {
+      "fromTitle": "📅 Suggested from title: {date}",
+      "fromDesc": "📅 Suggested from description: {date}",
+      "added": "Due date added"
+    },
+    "planDates": {
+      "startWithDate": "📅 Start: {date}",
+      "endWithDate": "📅 End: {date}",
+      "startSet": "Start date saved",
+      "endSet": "End date saved",
+      "cleared": "Dates cleared"
+    },
+    "location": {
+      "removed": "Location removed"
+    },
+    "url": {
+      "copied": "Link copied ✓",
+      "copyFailed": "Copy failed"
+    },
+    "phone": {
+      "invalid": "Invalid phone number"
+    },
+    "warn": {
+      "sessionsCollapsed": "Only the nearest due date was kept; the rest were removed",
+      "invalidRecurN": "Enter the number of days between 1 and 365",
+      "noRecurDay": "Pick at least one day",
+      "rangeError": "Number must be between 1 and {max}"
+    }
+  },
+
+  "map": {
+    "title": "🗺 Task locations map",
+    "panelAria": "Map",
+    "myLocation": "📍 My location",
+    "liveTracking": "📡 Live tracking",
+    "liveTrackingStop": "⏹ Stop tracking",
+    "liveTrackingStart": "Live tracking enabled — location updates every 2.5s",
+    "liveTrackingStopped": "Live tracking stopped",
+    "liveTrackingDenied": "Location access denied",
+    "liveTrackingUnavailable": "Geolocation unavailable",
+    "fullscreen": "Fullscreen map",
+    "exitFullscreen": "✕ Close fullscreen map",
+    "clearRoute": "✕ Route",
+    "search": {
+      "placeholder": "Search place, address, city…",
+      "aria": "Search place",
+      "micAria": "Voice input for search",
+      "clearAria": "Clear search",
+      "loading": "Searching…",
+      "empty": "No place found",
+      "errorBlocked": "Search service access is restricted",
+      "errorRateLimit": "Too many requests; please wait a bit",
+      "errorGeneric": "Search failed (internet?)"
+    },
+    "hint": {
+      "clickForNew": "Click on the map to pick the location for the new task",
+      "clickForRelocate": "Click on the map to set the new location",
+      "clickForSession": "Click on the map to set the session location",
+      "locationSelected": "📍 Location picked — write the task title",
+      "newLocationSaved": "New location saved ✓",
+      "sessionLocationSaved": "Session location saved ✓",
+      "savedLocationSelected": "Saved location selected ✓",
+      "mapNotReady": "Map is not ready yet; try again",
+      "mapNotAvailable": "Map is not available (offline?)",
+      "locationUnavailable": "Location access denied",
+      "noLocationForTask": "No location recorded for this item",
+      "calculatingRoute": "Fetching current location and calculating routes for car, bike, and foot…",
+      "routeStopped": "Route calculation stopped",
+      "routeFailed": "Routing failed (internet?)",
+      "routeSelectMode": "Pick a mode to display that route on the map."
+    },
+    "noInternet": "An internet connection is required to display the map.<br>The app works fully without the map.",
+    "note": "Click anywhere on the map to select the location for the new task and open the entry form. Use the layers button (top-left of the map) to switch between normal, dark, or satellite view.",
+    "tiles": {
+      "normal": "Normal map",
+      "dark": "Dark map",
+      "satellite": "Satellite"
+    },
+    "mapToggle": {
+      "on": "🗺 Map: on",
+      "off": "🗺 Map: off",
+      "aria": "Show or hide map",
+      "title": "Show or hide map"
+    },
+    "popup": {
+      "yourLocation": "Your location",
+      "showDetails": "Show details",
+      "route": "🧭 Route",
+      "saveName": "📌 Save name",
+      "noDate": "No due date",
+      "allPast": "All sessions past"
+    }
+  },
+
+  "route": {
+    "summaryTitle": "🧭 Route to \"{task}\"",
+    "summaryTitleGeneric": "🧭 Route",
+    "close": "Close",
+    "profile": {
+      "car": "Car",
+      "bike": "Bike",
+      "foot": "Walk"
+    },
+    "notCalculated": "Not calculated"
+  },
+
+  "location": {
+    "pickBanner": "Tap on the map to set the new location. Tap cancel to dismiss.",
+    "pickBannerSession": "Tap on the map to set the session location. Tap cancel to dismiss.",
+    "pickBannerRelocate": "Tap on the map to update the location \"{name}\"",
+    "cancel": "Cancel",
+    "saveName": "📌 Save name",
+    "changeName": "✏️ Change name",
+    "saveDetailName": "📌 Save location name",
+    "changeDetailName": "✏️ Change name",
+    "noLocation": "No location recorded.",
+    "savedLocations": "📌 Saved locations",
+    "savedCount": "({count}/{max})",
+    "emptyList": "No location saved yet.",
+    "manageAria": "Manage saved locations",
+    "rename": "Rename",
+    "move": "Move on map",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete location",
+    "deleteConfirmMessage": "Delete location \"{name}\"? Existing tasks will keep their name and address.",
+    "deleteConfirmOk": "Delete",
+    "deleteConfirmCancel": "Cancel",
+    "saved": "Location \"{name}\" saved ✓",
+    "updated": "Location \"{name}\" updated ✓",
+    "limitReached": "Saved locations limit ({max}) reached. Delete one first.",
+    "addNew": "＋ Add new location from map",
+    "clickForNew": "Click on the map to pick a new location",
+    "clickForNewMobile": "Tap on the map to pick a new location",
+    "namePrompt": {
+      "title": "📌 Name this location",
+      "titleEdit": "✏️ Rename location",
+      "hint": "Choose a short name for this location so it appears in your saved locations list.",
+      "label": "Name",
+      "placeholder": "e.g. Home, Doctor's office, Work…",
+      "emptyError": "Name cannot be empty.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "conflict": {
+      "title": "⚠️ Duplicate name",
+      "message": "The name \"{name}\" is already saved for another location ({coords}). Existing tasks with this name will keep it.",
+      "replace": "Replace the previous location name",
+      "pickAnother": "Pick another name",
+      "cancel": "Cancel"
+    }
+  },
+
+  "weather": {
+    "modalTitle": "🌤️ Weather forecast",
+    "loading": "Fetching weather forecast…",
+    "errorNoData": "No data to display.",
+    "errorNoDailyData": "Daily data was not received from the server.",
+    "errorNoDayData": "No data for this day.",
+    "errorNoUpcoming": "There is no upcoming due date for this task.",
+    "errorNoLocation": "No location recorded for this task.",
+    "errorPast": "This due date is in the past and weather forecast is meaningless for it.",
+    "errorTooFar": "Weather forecast is only available up to 16 days ahead.",
+    "errorFetch": "Failed to fetch the forecast. Check your internet connection.",
+    "errorInvalid": "Invalid data received from the server.",
+    "wmo": {
+      "clear": "Clear",
+      "mainlyClear": "Mainly clear",
+      "partlyCloudy": "Partly cloudy",
+      "overcast": "Overcast",
+      "fog": "Fog",
+      "freezingFog": "Freezing fog",
+      "lightDrizzle": "Light drizzle",
+      "drizzle": "Drizzle",
+      "heavyDrizzle": "Heavy drizzle",
+      "lightFreezingDrizzle": "Light freezing drizzle",
+      "freezingDrizzle": "Freezing drizzle",
+      "lightRain": "Light rain",
+      "rain": "Rain",
+      "heavyRain": "Heavy rain",
+      "lightFreezingRain": "Light freezing rain",
+      "heavyFreezingRain": "Heavy freezing rain",
+      "lightSnow": "Light snow",
+      "snow": "Snow",
+      "heavySnow": "Heavy snow",
+      "snowGrains": "Snow grains",
+      "lightShowers": "Light showers",
+      "showers": "Showers",
+      "violentShowers": "Violent showers",
+      "lightSnowShowers": "Light snow showers",
+      "heavySnowShowers": "Heavy snow showers",
+      "thunderstorm": "Thunderstorm",
+      "thunderstormLightHail": "Thunderstorm with light hail",
+      "thunderstormHeavyHail": "Thunderstorm with heavy hail",
+      "unknown": "Unknown"
+    },
+    "place": "Weather forecast for {place}",
+    "taskTitle": "📝 {task}",
+    "dueLine": "📅 Due: {date}",
+    "dayBadge": "Due",
+    "dayPrev": "Previous day",
+    "dayNext": "Next day",
+    "summaryTitle": "📊 Day summary",
+    "fields": {
+      "tempHour": "Temperature (at due time)",
+      "feelsLike": "Feels like",
+      "humidity": "Humidity",
+      "wind": "Wind",
+      "precipProb": "Precipitation chance",
+      "precip": "Precipitation",
+      "tempMax": "Max temperature",
+      "tempMin": "Min temperature",
+      "precipSum": "Total precipitation",
+      "windMax": "Max wind"
+    },
+    "attribution": "Weather data by"
+  },
+
+  "sessions": {
+    "summary": {
+      "count": "{n} sessions",
+      "nextSession": "📅 Next session: {date}",
+      "today": "(today)",
+      "tomorrow": "(tomorrow)",
+      "daysLeft": "({n} days left)",
+      "overdue": "⚠ Overdue: {date}"
+    }
+  },
+  "recur": {
+    "weeklyDays": "Days of week",
+    "monthlyDays": "Days of month",
+    "everyNDays": "Every {n} days",
+    "everyNHours": "Every {n} hours",
+    "badgeTitle": "Recurring",
+    "dayOfWeek": {
+      "sat": "Saturday",
+      "sun": "Sunday",
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday"
+    }
+  },
+
+  "picker": {
+    "title": "Pick due date",
+    "todayEvening": "Today evening",
+    "tomorrowMorning": "Tomorrow 9 AM",
+    "nextWeek": "Next week",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minute",
+    "hourAria": "Due hour",
+    "minuteAria": "Due minute",
+    "confirm": "Confirm",
+    "remove": "Remove due date",
+    "cancel": "Cancel",
+    "errorNoDay": "Please pick a day.",
+    "errorPast": "The due time must be after the current time.",
+    "errorConflict": "⚠️ Time conflict: \"{owner}\" is scheduled at {date}, less than 30 minutes from the chosen time. To register this due date, confirm again.",
+    "errorDuplicate": "This due date is already registered."
+  },
+
+  "calendar": {
+    "title": "📅 Sessions calendar",
+    "aria": "Sessions calendar",
+    "close": "Close",
+    "dayAria": "{day} {month}{sessions}",
+    "daySessions": ", {n} sessions"
+  },
+
+  "trash": {
+    "title": "🗑 Trash",
+    "aria": "Trash",
+    "back": "Back to list",
+    "empty": "Trash is empty.",
+    "emptyAll": "Empty trash",
+    "emptyConfirmTitle": "Empty trash",
+    "emptyConfirmMessage": "Delete all items in trash permanently? This action cannot be undone.",
+    "emptyConfirmOk": "Empty",
+    "emptyConfirmCancel": "Cancel",
+    "restore": "Restore",
+    "purge": "Delete permanently",
+    "purgeConfirmTitle": "Delete permanently",
+    "purgeConfirmMessage": "Delete this item permanently? This action cannot be undone.",
+    "purgeConfirmOk": "Delete",
+    "purgeConfirmCancel": "Cancel"
+  },
+
+  "snackbar": {
+    "trashSingle": "{kind} \"{text}\" moved to trash.",
+    "trashMultiple": "{n} items moved to trash.",
+    "trashGeneric": "Moved to trash",
+    "undo": "Undo"
+  },
+
+  "kind": {
+    "task": "Task",
+    "plan": "Plan",
+    "series": "Series"
+  },
+
+  "template": {
+    "deleteChild": "Delete task",
+    "emptyKids": "You've deleted all tasks; add a new one.",
+    "modalTitle": "📁 Build plan from a template",
+    "addChild": "Add child task",
+    "back": "→ Back",
+    "create": "Create plan",
+    "close": "Close",
+    "nameLabel": "Plan name",
+    "startDate": "📅 Start date",
+    "endDate": "📅 End date",
+    "newChildPlaceholder": "New task…",
+    "childAria": "Add task to template",
+    "childrenCount": "{n} prebuilt tasks"
+  },
+
+  "templates": {
+    "travel": {
+      "title": "✈️ Travel",
+      "children": [
+        "Check departure date and time",
+        "Check ID documents",
+        "Check tickets and accommodation booking",
+        "Check phone charger and cables",
+        "Charge power bank",
+        "Prepare essential medicines",
+        "Prepare clothes suited to the destination and weather",
+        "Prepare toiletries",
+        "Check cash and bank cards",
+        "Check personal essentials",
+        "Fully charge phone",
+        "Check the house before leaving"
+      ]
+    },
+    "roadTrip": {
+      "title": "🚗 Road trip",
+      "children": [
+        "Check engine oil",
+        "Check water and car fluids",
+        "Check tire pressure and health",
+        "Check spare tire",
+        "Check brakes",
+        "Check lights and turn signals",
+        "Check wipers and washer fluid",
+        "Check battery",
+        "Check car documents",
+        "Prepare a toolbox",
+        "Prepare emergency kit",
+        "Charge phone and power bank"
+      ]
+    },
+    "moving": {
+      "title": "🏠 Moving",
+      "children": [
+        "Set the moving date",
+        "Arrange a vehicle or movers",
+        "Get boxes and packing supplies",
+        "Gather unused items",
+        "Pack the rooms",
+        "Pack the kitchen items",
+        "Pack fragile items",
+        "Prepare documents and valuables",
+        "Check the new home's condition",
+        "Arrange water, power, gas, and internet",
+        "Move the items",
+        "Check the old home after clearing"
+      ]
+    },
+    "cleaning": {
+      "title": "🧹 House cleaning",
+      "children": [
+        "Tidy up extra items",
+        "Throw away unusable items",
+        "Clean the kitchen",
+        "Clean the fridge",
+        "Clean the stove and oven",
+        "Clean the bathrooms",
+        "Dust the rooms",
+        "Clean the windows",
+        "Sweep and mop the floors",
+        "Organize the closets",
+        "Wash bed sheets and curtains",
+        "Gather and tidy final items"
+      ]
+    },
+    "shopping": {
+      "title": "🛒 Monthly shopping",
+      "children": [
+        "Check grocery stock",
+        "Check cleaning supplies",
+        "Check toiletries",
+        "Check household consumables",
+        "Prepare the shopping list",
+        "Check the budget",
+        "Buy essential items",
+        "Review purchased items",
+        "Organize the purchases at home"
+      ]
+    },
+    "doctor": {
+      "title": "🩺 Doctor visit",
+      "children": [
+        "Choose a doctor",
+        "Book an appointment",
+        "Record date and time of visit",
+        "Record the office address",
+        "Prepare required documents",
+        "Prepare list of current medications",
+        "Note questions and important points",
+        "Bring lab results and related medical records",
+        "Set a reminder for the visit",
+        "Record advice and follow-up actions"
+      ]
+    },
+    "exam": {
+      "title": "📚 Exam preparation",
+      "children": [
+        "Confirm exam date",
+        "Gather resources",
+        "Identify chapters to study",
+        "Plan the study schedule",
+        "Study the main topics",
+        "Review notes",
+        "Solve exercises",
+        "Solve sample questions",
+        "Review mistakes",
+        "Final review",
+        "Prepare exam-day items"
+      ]
+    },
+    "party": {
+      "title": "🎉 Host a party",
+      "children": [
+        "Set date and time",
+        "Prepare guest list",
+        "Notify guests",
+        "Decide the food menu",
+        "Prepare shopping list",
+        "Buy required ingredients",
+        "Prepare the home",
+        "Prepare the food",
+        "Set up the serving",
+        "Tidy up after the party"
+      ]
+    }
+  },
+
+  "welcome": {
+    "title": "👋 Welcome",
+    "text": "This is your task assistant — fully offline and private.<br>• Type a title and press Enter<br>• Add 📅 date or 📍 location<br>• Use \"+ Add\" to create a task, plan, or series",
+    "storageGuidance": "Your data is stored on this device and browser only. If your browser is set to auto-clear site data, your tasks and plans may be lost.",
+    "themeLabel": "Display mode:",
+    "languageLabel": "Language:",
+    "start": "Start"
+  },
+
+  "hero": {
+    "infoTitle": "Rahe Farda",
+    "infoIntro": "Manage your daily tasks and appointments with reminders, maps, and the Persian calendar — <strong>no account needed</strong>, works offline.",
+    "infoTask": "<strong>📝 Task:</strong> a simple item with a date or location.",
+    "infoPlan": "<strong>📂 Plan:</strong> a set of child tasks (e.g. travel, house cleaning).",
+    "infoSeries": "<strong>📅 Series:</strong> a recurring task (daily, weekly, monthly, or custom).",
+    "infoStart": "To start, type a title in the field above and tap <strong>Add task</strong>.",
+    "buttonText": "Let's go"
+  },
+
+  "privacy": {
+    "title": "🔒 Your privacy",
+    "paragraphs": {
+      "0": "<strong>All your data</strong> (tasks, dates, locations, and photos) is stored only on this device and browser, and is never sent to any server.",
+      "1": "<strong>The map</strong> is just an online image and uploads nothing about you. Map services (OpenStreetMap, Esri) only receive image tiles, not your task data.",
+      "2": "<strong>Time sync</strong> with public servers (timeapi.io, worldclockapi.com) is only for correcting the device clock and sends no information.",
+      "3": "<strong>Weather forecast</strong> is fetched from Open-Meteo and only sends the location coordinates and date. No task data is sent.",
+      "4": "<strong>Place name</strong> is fetched from Nominatim (OpenStreetMap); only coordinates are sent, and a city name is returned.",
+      "5": "<strong>Telegram login</strong> is only for optional sync. If you don't sign in, no data is sent to the server.",
+      "6": "<strong>Backup:</strong> the \"📤 Backup\" button in settings lets you create a JSON file.",
+      "7": "To fully erase your data, use the trash, or clear the site data from your browser settings."
+    },
+    "buttonText": "Got it"
+  },
+
+  "export": {
+    "title": "📤 Backup your data",
+    "description": "A JSON file will be created with all tasks, plans, series, and trash. You can keep it somewhere safe or transfer it to another device.",
+    "includePhotos": "Include photos",
+    "includePhotosHint": "Increases file size (each photo ~200KB).",
+    "includeSettings": "Include settings",
+    "includeSettingsHint": "Theme, language, reminders, and other preferences.",
+    "metaTasks": "Tasks:",
+    "metaTrash": "Trash:",
+    "metaSize": "Estimated size:",
+    "downloadButton": "📥 Download backup file",
+    "cancel": "Cancel",
+    "success": "✓ Backup file created ({filename})",
+    "error": "Failed to create backup file"
+  },
+
+  "import": {
+    "unknown": "Unknown",
+    "title": "📥 Restore from backup file",
+    "description": "Pick a JSON backup file. The file's version will be checked before restoring.",
+    "selectFile": "📁 Choose JSON file",
+    "noFileSelected": "No file selected",
+    "modeLabel": "Restore mode",
+    "modeMerge": "Merge with current data",
+    "modeMergeHint": "New tasks are added; tasks with identical IDs are replaced.",
+    "modeReplace": "Full replace",
+    "modeReplaceHint": "All current tasks are deleted and replaced with the file's content. This cannot be undone.",
+    "importSettings": "Restore settings",
+    "importSettingsHint": "Theme, language, and other preferences stored in the file will be applied.",
+    "restoreButton": "Restore",
+    "cancel": "Cancel",
+    "metaVersion": "Version:",
+    "metaExportedAt": "Created at:",
+    "metaTasks": "Tasks:",
+    "metaTrash": "Trash:",
+    "hasPhotosWarning": "⚠️ This file contains photos.",
+    "invalidStructure": "Invalid file structure.",
+    "errorRead": "Failed to read the file",
+    "errorInvalidJson": "Invalid JSON file",
+    "errorTooLarge": "File exceeds the allowed size (50MB)",
+    "replaceConfirmTitle": "Full replace",
+    "replaceConfirmMessage": "All current tasks will be deleted and replaced with the file's content. This cannot be undone. Continue?",
+    "replaceConfirmOk": "Yes, replace",
+    "replaceConfirmCancel": "Cancel",
+    "success": "✓ {n} tasks restored",
+    "successSkipped": "{n} items skipped",
+    "errorImport": "Restore failed"
+  },
+
+  "sound": {
+    "master": "Reminder sound (master switch)",
+    "masterHint": "If off, no sound will play.",
+    "default": {
+      "title": "🔔 Default chime",
+      "hint": "Two soft tones via Web Audio API"
+    },
+    "preset": {
+      "selectFirst": "Please select a chime from the list first.",
+      "title": "🎵 Preset chime",
+      "hint": "An audio file from the list below",
+      "select": "Choose chime:",
+      "none": "— None —",
+      "gentleBell": "🔔 Gentle bell",
+      "softChime": "💻 Digital chime",
+      "digitalAlert": "🎵 Happy bells"
+    },
+    "tts": {
+      "selectFirst": "Please select a chime from the list first.",
+      "testText": "This is a title reading test",
+      "title": "🗣 Read title (TTS)",
+      "hint": "Using the browser's speechSynthesis",
+      "unsupported": "Your browser doesn't support TTS.",
+      "noPersianVoice": "⚠️ No Persian voice found on your system. Text will be read with an English voice. <a href=\"https://support.microsoft.com/en-us/windows/how-to-download-voices-for-text-to-speech-44883593-a2f2-9a6d-a1b6-2f7f8dc8ff2b\" target=\"_blank\" rel=\"noopener\">Installation guide</a>",
+      "selectVoice": "Choose voice:",
+      "defaultVoice": "— Browser default —"
+    },
+    "test": "▶ Test"
+  },
+
+  "notifications": {
+    "notifStatus": {
+      "unsupported": "Your browser doesn't support notifications.",
+      "granted": "✓ Notifications are enabled.",
+      "denied": "Notifications are blocked; enable them from browser settings.",
+      "default": "To receive reminders, tap the enable button."
+    },
+    "reminder": {
+      "title": "⏰ Session reminder",
+      "dueSoonTitle": "🔔 5 minutes to session"
+    },
+    "digest": {
+      "title": "📅 Today's schedule",
+      "hasSessions": "You have {n} sessions today: {list}{more}",
+      "more": " and more",
+      "noSessions": "No sessions today 🎉"
+    },
+    "testNotification": {
+      "title": "Test notification",
+      "body": "Notification permission is enabled."
+    },
+    "testReminder": "This is a test reminder"
+  },
+
+  "bottomActions": {
+    "newTask": "New task",
+    "newPlan": "New plan",
+    "newSeries": "New series",
+    "settings": "Settings",
+    "ariaQuickAccess": "Quick access"
+  },
+
+  "modals": {
+    "confirm": {
+      "defaultTitle": "Confirm",
+      "defaultOk": "Confirm",
+      "defaultCancel": "Cancel"
+    },
+    "info": {
+      "defaultTitle": "Information",
+      "defaultButton": "Got it"
+    }
+  },
+  "media": {
+    "errors": {
+      "invalidFile": "Invalid file",
+      "emptyFile": "File is empty",
+      "tooLarge": "File exceeds the allowed size (max {max})",
+      "unsupportedFormat": "File format not supported",
+      "unsupportedFormatWithMime": "File format not supported ({mime})",
+      "unsupportedExtension": "File extension not supported ({ext})"
+    }
+  },
+  "errors": {
+    "network": "Couldn't connect to the server",
+    "unauthorized": "You must sign in for this operation",
+    "invalidToken": "Token is invalid or expired",
+    "invalidSignature": "Invalid Telegram signature",
+    "invalidSyncCode": "Sync code is invalid or expired",
+    "forbidden": "Access denied",
+    "notFound": "Not found",
+    "rateLimited": "Too many requests; please wait a bit",
+    "serverError": "Internal server error",
+    "serverErrorWithStatus": "Server error ({status})",
+    "serviceUnavailable": "Service temporarily unavailable",
+    "refreshInProgress": "Refresh already in progress",
+    "sessionNotFound": "Session not found",
+    "tokenExpired": "Token expired — please sign in again",
+    "refreshFailed": "Failed to refresh token",
+    "loginFailed": "Login failed",
+    "payloadInvalid": "Invalid payload",
+    "signatureMissing": "Telegram signature not found"
+  },
+
+  "warnings": {
+    "storageError": "Local storage error. Browser storage may be full.",
+    "nameRequired": "Username is required",
+    "titleRequired": "Title cannot be empty"
+  },
+
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "ok": "OK",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "done": "Done",
+    "loading": "Loading…",
+    "error": "Error",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back"
+  }
+}

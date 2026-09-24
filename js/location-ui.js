@@ -19,6 +19,8 @@ import {
 } from './map.js';
 import { openDetail } from './detail.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+import { t as i18nT } from './i18n.js';
+import { getLang } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants & local state
@@ -157,7 +159,7 @@ function label(loc) {
     const saved = savedFor(loc);
     if (saved) {
         if (saved.names) {
-            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            const lang = getLang() === 'en' ? 'en' : 'fa';
             const preferred = saved.names[lang] || saved.names.fa || saved.names.en;
             if (preferred) return preferred;
         }
@@ -176,7 +178,7 @@ function displayFor(loc) {
     if (saved) {
         let name = saved.name;
         if (saved.names) {
-            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            const lang = getLang() === 'en' ? 'en' : 'fa';
             name = saved.names[lang] || saved.names.fa || saved.names.en || saved.name;
         }
         return { icon: '📌', name, cls: 'location-display-name', isSaved: true };
@@ -205,7 +207,9 @@ function askLocationName(defaultValue) {
         overlay.classList.add('picker-overlay--stacked');
         input.value = defaultValue || '';
         err.textContent = '';
-        title.textContent = defaultValue ? '✏️ تغییر نام مکان' : '📌 نام این مکان';
+        title.textContent = defaultValue
+            ? i18nT('location.namePrompt.titleEdit')
+            : i18nT('location.namePrompt.title');
         overlay.style.display = 'flex';
 
         let trapCleanup = null;
@@ -239,7 +243,7 @@ function askLocationName(defaultValue) {
                 input.classList.remove('input-error');
                 void input.offsetWidth;
                 input.classList.add('input-error');
-                err.textContent = 'نام نمی‌تواند خالی باشد.';
+                err.textContent = i18nT('location.namePrompt.emptyError');
                 input.focus();
                 return;
             }
@@ -281,8 +285,7 @@ function askConflictResolution(name, conflict) {
             return;
         }
         if (text) {
-            text.textContent = `نام «${name}» قبلاً برای مکان دیگری (${coords(conflict)}) ذخیره شده است. ` +
-                `وظایف قبلی که این نام را دارند، نام خود را حفظ می‌کنند.`;
+            text.textContent = i18nT('location.conflict.message', { name, coords: coords(conflict) });
         }
         overlay.classList.add('picker-overlay--stacked');
         overlay.style.display = 'flex';
@@ -339,7 +342,9 @@ function renderAdd() {
     if (text.innerHTML !== html) text.innerHTML = html;
     let actions = chip.querySelector('.loc-chip-actions');
     if (!actions) { actions = document.createElement('span'); actions.className = 'loc-chip-actions'; chip.appendChild(actions); }
-    const labelText = d.isSaved ? '✏️ تغییر نام' : '📌 ذخیره نام';
+    const labelText = d.isSaved
+        ? i18nT('location.changeName')
+        : i18nT('location.saveName');
     const ah = `<button type="button" class="loc-chip-save" data-save-pending-location>${labelText}</button>`;
     if (actions.innerHTML !== ah) actions.innerHTML = ah;
 }
@@ -362,14 +367,14 @@ function renderDetail() {
     if (staleSave) staleSave.remove();
 
     if (!task.location) {
-        const html = `<span class="location-display"><span>📍</span><span>محلی ثبت نشده است.</span></span>`;
+        const html = `<span class="location-display"><span>📍</span><span>${i18nT('location.noLocation')}</span></span>`;
         if (line.innerHTML !== html) line.innerHTML = html;
 
         if (showBtn) showBtn.style.display = 'none';
         if (routeBtn) routeBtn.style.display = 'none';
         if (removeBtn) removeBtn.style.display = 'none';
         if (changeBtn) {
-            changeBtn.textContent = '＋ ثبت محل';
+            changeBtn.textContent = i18nT('detail.sections.location.add');
             changeBtn.style.display = '';
         }
         return;
@@ -384,7 +389,7 @@ function renderDetail() {
     if (routeBtn) routeBtn.style.display = '';
     if (removeBtn) removeBtn.style.display = '';
     if (changeBtn) {
-        changeBtn.textContent = 'تغییر محل';
+        changeBtn.textContent = i18nT('detail.sections.location.change');
         changeBtn.style.display = '';
     }
 
@@ -392,8 +397,10 @@ function renderDetail() {
     save.type = 'button';
     save.className = 'location-save-btn';
     save.dataset.saveDetailLocation = '';
-    save.textContent = d.isSaved ? '✏️ تغییر نام' : '📌 ذخیره نام مکان';
-    save.setAttribute('aria-label', 'ذخیره یا تغییر نام این مکان');
+    save.textContent = d.isSaved
+        ? i18nT('location.changeDetailName')
+        : i18nT('location.saveDetailName');
+    save.setAttribute('aria-label', i18nT('location.saveDetailName'));
     line.appendChild(save);
 }
 
@@ -428,7 +435,7 @@ function renderList() {
     const sorted = [...locations].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
     const html = sorted.length
         ? sorted.map(x => `<button type="button" class="saved-location-chip" data-saved-location="${escapeHtml(String(x.id))}" title="${escapeHtml(coords(x))}">${escapeHtml(x.name)}</button>`).join('')
-        : '<span class="saved-locations-empty">هنوز مکانی ذخیره نشده است.</span>';
+        : `<span class="saved-locations-empty">${i18nT('location.emptyList')}</span>`;
     if (list.innerHTML !== html) list.innerHTML = html;
 }
 
@@ -439,7 +446,7 @@ function renderManageList() {
     if (modalCount) modalCount.textContent = locations.length ? `(${toFa(locations.length)}/${toFa(MAX_SAVED_LOCATIONS)})` : '';
     const sorted = [...locations].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
     if (!sorted.length) {
-        body.innerHTML = '<div class="session-empty">هنوز مکانی ذخیره نشده است.</div>';
+        body.innerHTML = `<div class="session-empty">${i18nT('location.emptyList')}</div>`;
         return;
     }
     body.innerHTML = `<div class="saved-locations-body">${sorted.map(x => `
@@ -584,7 +591,7 @@ async function saveLocationWithName(loc, name) {
 
     const existing = savedFor(n);
     if (!existing && locations.length >= MAX_SAVED_LOCATIONS) {
-        mapHint(`سقف ${toFa(MAX_SAVED_LOCATIONS)} مکان ذخیره‌شده پر شده است. یکی را حذف کنید.`, 5000);
+        mapHint(i18nT('location.limitReached', { max: toFa(MAX_SAVED_LOCATIONS) }), 5000);
         return null;
     }
 
@@ -612,7 +619,7 @@ async function saveLocationWithName(loc, name) {
         applyNameToTasksAt(n, cleanName, item.names, item.cityNames);
         sync();
         refreshMarkers();
-        mapHint(`مکان «${cleanName}» ذخیره شد ✓`);
+        mapHint(i18nT('location.saved', { name: cleanName }));
         return { ok: true, item };
     } catch (error) {
         console.error('Saved location error:', error);
@@ -654,8 +661,8 @@ function startRelocateLocation(id) {
     pendingRelocateId = String(id);
     ensureMapVisible();
     switchToTab('map');
-    mapHint(`روی نقشه کلیک کنید تا مکان جدید «${item.name}» ثبت شود`);
-    showMobileBanner(`روی نقشه ضربه بزنید تا مکان «${item.name}» به‌روزرسانی شود`);
+    mapHint(i18nT('location.clickForNew'));
+    showMobileBanner(i18nT('location.pickBannerRelocate', { name: item.name }));
 }
 
 function bindMapRelocate() {
@@ -679,7 +686,7 @@ function bindMapRelocate() {
             if (getMapReady()) {
                 map.flyTo([loc.lat, loc.lng], Math.max(map.getZoom(), 15), { duration: 0.9 });
             }
-            mapHint(`مکان «${item.name}» به‌روزرسانی شد ✓`);
+            mapHint(i18nT('location.updated', { name: item.name }));
 
             (async () => {
                 try {
@@ -750,7 +757,7 @@ function selectLocation(item) {
             call('render');
             refreshMarkers();
             if (ret) openDetail(ret);
-            mapHint('محل ذخیره‌شده انتخاب شد ✓');
+            mapHint(i18nT('map.hint.savedLocationSelected'));
         }
         return;
     }
@@ -769,7 +776,7 @@ function selectLocation(item) {
             refreshMarkers();
             if (ret) openDetail(ret);
             else switchToTab('tasks');
-            mapHint('محل ذخیره‌شده انتخاب شد ✓');
+            mapHint(i18nT('map.hint.savedLocationSelected'));
         }
         return;
     }
@@ -778,7 +785,7 @@ function selectLocation(item) {
     showPickMarker();
     sync();
     switchToTab('tasks');
-    mapHint('محل ذخیره‌شده انتخاب شد — عنوان را بنویسید');
+    mapHint(i18nT('map.hint.savedLocationSelected'));mapHint('محل ذخیره‌شده انتخاب شد — عنوان را بنویسید');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -954,14 +961,14 @@ function bind() {
 
 function startNewLocationFromMap() {
     if (locations.length >= MAX_SAVED_LOCATIONS) {
-        mapHint(`سقف ${toFa(MAX_SAVED_LOCATIONS)} مکان ذخیره‌شده پر شده است. یکی را حذف کنید.`, 5000);
+        mapHint(i18nT('location.limitReached', { max: toFa(MAX_SAVED_LOCATIONS) }), 5000);
         return;
     }
     pendingNewLocationFromMap = true;
     ensureMapVisible();
     switchToTab('map');
-    mapHint('روی نقشه کلیک کنید تا مکان جدید انتخاب شود');
-    showMobileBanner('روی نقشه ضربه بزنید تا مکان جدید انتخاب شود');
+    mapHint(i18nT('location.clickForNew'));
+    showMobileBanner(i18nT('location.clickForNewMobile'));
 }
 
 function bindNewLocationFromMap() {

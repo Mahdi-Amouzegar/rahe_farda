@@ -17,6 +17,7 @@
 
 import { state, toFa } from './core.js';
 import { events, EV } from './events.js';
+import { t as i18nT } from './i18n.js';
 
 const EL_ID = 'headerStatusIndicator';
 const UPDATE_DEBOUNCE_MS = 100;
@@ -53,15 +54,15 @@ function _computeStatus() {
             return {
                 state: 'offline',
                 icon: ICONS.offline,
-                tooltip: `آفلاین — ${toFa(queueSize)} تغییر در انتظار`,
-                ariaLabel: `آفلاین، ${toFa(queueSize)} تغییر در انتظار همگام‌سازی`
+                tooltip: i18nT('header.status.offlineWithQueue', { n: toFa(queueSize) }),
+                ariaLabel: i18nT('header.status.ariaOffline', { n: toFa(queueSize) })
             };
         }
         return {
             state: 'offline',
             icon: ICONS.offline,
-            tooltip: 'آفلاین — فقط روی همین دستگاه',
-            ariaLabel: 'آفلاین'
+            tooltip: i18nT('header.status.offline'),
+            ariaLabel: i18nT('header.status.offline')
         };
     }
 
@@ -70,16 +71,16 @@ function _computeStatus() {
             return {
                 state: 'syncing',
                 icon: ICONS.syncing,
-                tooltip: 'در حال همگام‌سازی…',
-                ariaLabel: 'در حال همگام‌سازی'
+                tooltip: i18nT('header.status.syncing'),
+                ariaLabel: i18nT('header.status.syncing')
             };
         }
         if (queueSize > 0) {
             return {
                 state: 'pending',
                 icon: ICONS.pending,
-                tooltip: `${toFa(queueSize)} تغییر در انتظار همگام‌سازی`,
-                ariaLabel: `${toFa(queueSize)} تغییر در انتظار`
+                tooltip: i18nT('header.status.pending', { n: toFa(queueSize) }),
+                ariaLabel: i18nT('header.status.ariaPending', { n: toFa(queueSize) })
             };
         }
     }
@@ -88,16 +89,16 @@ function _computeStatus() {
         return {
             state: 'online',
             icon: ICONS.online,
-            tooltip: 'آنلاین',
-            ariaLabel: 'آنلاین'
+            tooltip: i18nT('header.status.online'),
+            ariaLabel: i18nT('header.status.ariaOnline')
         };
     }
 
     return {
         state: 'unknown',
         icon: ICONS.unknown,
-        tooltip: 'در حال بررسی…',
-        ariaLabel: 'در حال بررسی اتصال'
+        tooltip: i18nT('header.status.unknown'),
+        ariaLabel: i18nT('header.status.unknown')
     };
 }
 

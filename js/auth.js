@@ -41,6 +41,7 @@
 import { state, uid, toFa } from './core.js';
 import { events } from './events.js';
 import { getDeviceId } from './net.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -441,10 +442,10 @@ export async function loginWithTelegram(telegramPayload, options) {
     const deviceName = opts.deviceName || _guessDeviceName();
 
     if (!telegramPayload || typeof telegramPayload !== 'object') {
-        return { ok: false, error: 'payload نامعتبر است' };
+        return { ok: false, error: i18nT('errors.payloadInvalid') };
     }
     if (!telegramPayload.hash) {
-        return { ok: false, error: 'امضای Telegram یافت نشد' };
+        return { ok: false, error: i18nT('errors.signatureMissing') };
     }
 
     try {
@@ -462,7 +463,7 @@ export async function loginWithTelegram(telegramPayload, options) {
         const data = await response.json().catch(() => null);
 
         if (!response.ok || !data || data.ok !== true) {
-            const errMsg = data?.error?.message || `خطای سرور (${response.status})`;
+            const errMsg = data?.error?.message || i18nT('errors.serverErrorWithStatus', { status: response.status });
             events.emit('auth:error', { stage: 'telegram', message: errMsg });
             return { ok: false, error: errMsg };
         }
@@ -479,8 +480,8 @@ export async function loginWithTelegram(telegramPayload, options) {
         return { ok: true, user: session.user };
     } catch (err) {
         const errMsg = err?.message === 'Failed to fetch'
-            ? 'اتصال به سرور برقرار نشد'
-            : 'خطا در ورود';
+            ? i18nT('errors.network')
+            : i18nT('errors.loginFailed');
         events.emit('auth:error', { stage: 'telegram', message: errMsg });
         return { ok: false, error: errMsg };
     }
@@ -501,12 +502,12 @@ export async function loginWithTelegram(telegramPayload, options) {
 export async function refreshToken(options) {
     if (_refreshing) {
         // ⚠️ اگر یک refresh در حال اجراست، همین را برگردان
-        return { ok: false, error: 'refresh در حال اجراست' };
+        return { ok: false, error: i18nT('errors.refreshInProgress') };
     }
 
     const session = _readSession();
     if (!session) {
-        return { ok: false, error: 'session یافت نشد' };
+        return { ok: false, error: i18nT('errors.sessionNotFound') };
     }
 
     const opts = options || {};
@@ -531,11 +532,11 @@ export async function refreshToken(options) {
             // توکن منقضی یا نامعتبر → پاک کن
             _clearSession();
             events.emit('auth:expired', {});
-            return { ok: false, error: 'توکن منقضی شده — لطفاً دوباره وارد شوید' };
+            return { ok: false, error: i18nT('errors.tokenExpired') };
         }
 
         if (!response.ok || !data || data.ok !== true) {
-            const errMsg = data?.error?.message || `خطای سرور (${response.status})`;
+            const errMsg = data?.error?.message || i18nT('errors.serverErrorWithStatus', { status: response.status });
             events.emit('auth:error', { stage: 'refresh', message: errMsg });
             return { ok: false, error: errMsg };
         }
@@ -555,8 +556,8 @@ export async function refreshToken(options) {
         return { ok: true, user: newSession.user };
     } catch (err) {
         const errMsg = err?.message === 'Failed to fetch'
-            ? 'اتصال به سرور برقرار نشد'
-            : 'خطا در تازه‌سازی توکن';
+            ? i18nT('errors.network')
+            : i18nT('errors.refreshFailed');
         events.emit('auth:error', { stage: 'refresh', message: errMsg });
         return { ok: false, error: errMsg };
     } finally {
@@ -717,21 +718,21 @@ export function formatExpiry(expiresAt) {
     if (!expiresAt) return '—';
     const days = daysUntilExpiry(expiresAt);
     if (!Number.isFinite(days)) return '—';
-    if (days < 0) return 'منقضی شده';
+    if (days < 0) return i18nT('auth.expiry.expired');
     if (days < 1) {
         const hours = Math.max(1, Math.floor(days * 24));
-        return `کمتر از ${toFa(hours)} ساعت`;
+        return i18nT('auth.expiry.lessThanHour', { n: toFa(hours) });
     }
-    if (days < 30) return `${toFa(Math.floor(days))} روز`;
+    if (days < 30) return i18nT('auth.expiry.days', { n: toFa(Math.floor(days)) });
 
     // ─── برای بازه‌های بلندتر، هم ماه و هم روز را نشان بده ───
     if (days < 365) {
         const months = Math.floor(days / 30);
         const remainingDays = Math.floor(days - months * 30);
         if (remainingDays > 0) {
-            return `${toFa(months)} ماه و ${toFa(remainingDays)} روز`;
+            return i18nT('auth.expiry.monthsAndDays', { months: toFa(months), days: toFa(remainingDays) });
         }
-        return `${toFa(months)} ماه`;
+        return i18nT('auth.expiry.months', { n: toFa(months) });
     }
 
     // ─── بیش از یک سال ───
@@ -739,9 +740,9 @@ export function formatExpiry(expiresAt) {
     const remainingAfterYears = days - years * 365;
     const months = Math.floor(remainingAfterYears / 30);
     if (months > 0) {
-        return `${toFa(years)} سال و ${toFa(months)} ماه`;
+        return i18nT('auth.expiry.yearsAndMonths', { years: toFa(years), months: toFa(months) });
     }
-    return `${toFa(years)} سال`;
+    return i18nT('auth.expiry.years', { n: toFa(years) });
 }
 
 /**
@@ -751,11 +752,11 @@ export function formatExpiry(expiresAt) {
  * @returns {string}
  */
 export function ttlLabel(days) {
-    if (days === 30) return '۱ ماه';
-    if (days === 90) return '۳ ماه';
-    if (days === 180) return '۶ ماه';
-    if (days === 365) return '۱ سال';
-    return `${toFa(days)} روز`;
+    if (days === 30) return i18nT('auth.ttl.month1');
+    if (days === 90) return i18nT('auth.ttl.month3');
+    if (days === 180) return i18nT('auth.ttl.month6');
+    if (days === 365) return i18nT('auth.ttl.year1');
+    return i18nT('auth.ttl.days', { n: toFa(days) });
 }
 
 /**

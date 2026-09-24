@@ -12,6 +12,7 @@ import { state, toFa, escapeHtml } from './core.js';
 import { nearestUpcoming, faShort } from './sessions.js';
 import { findTask, saveTasks } from './store.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+import { t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Backward-compat: registerMapCallbacks (پل موقت به EventEmitter)
@@ -169,7 +170,6 @@ export function loadPrefs() {
         if (typeof p.soundOn === 'boolean') state.prefs.soundOn = p.soundOn;
         if (['task', 'series', 'plan'].includes(p.pendingKind)) state.prefs.pendingKind = p.pendingKind;
         if (['auto', 'dark', 'light'].includes(p.theme)) state.prefs.theme = p.theme;
-        if (['fa', 'en'].includes(p.lang)) state.prefs.lang = p.lang;
         // ⚠️ فیلدهای صوتی جدید (فاز ۵)
         if (typeof p.soundDefault === 'boolean') state.prefs.soundDefault = p.soundDefault;
         if (typeof p.soundPreset === 'string' || p.soundPreset === null) state.prefs.soundPreset = p.soundPreset;
@@ -354,7 +354,7 @@ export function setYouMarker(ll, options) {
             weight: 2,
             fillColor: '#00d4ff',
             fillOpacity: 1
-        }).addTo(map).bindPopup('<div class="pp"><div class="pp-title">موقعیت شما</div></div>');
+        }).addTo(map).bindPopup(`<div class="pp"><div class="pp-title">${i18nT('map.popup.yourLocation')}</div></div>`);
     }
 
     if (Array.isArray(fitBounds) && fitBounds.length >= 2) {
@@ -464,7 +464,11 @@ export function refreshMarkers() {
         const m = L.marker([loc.lat, loc.lng], { icon: dotIcon(t.completed ? 'done' : '') });
         m.on('click', () => { suppressMapClickUntil = Date.now() + 400; });
         const n = nearestUpcoming(t);
-        const dateLine = n ? faShort(n.at) : ((t.sessions && t.sessions.length) ? 'همه جلسات گذشته' : 'بدون سررسید');
+        const dateLine = n
+            ? faShort(n.at)
+            : ((t.sessions && t.sessions.length)
+                ? i18nT('map.popup.allPast')
+                : i18nT('map.popup.noDate'));
 
         const snap = (loc.name && String(loc.name).trim()) || null;
         const saved = invoke('locationLabelFor', loc);
@@ -485,7 +489,7 @@ export function refreshMarkers() {
         } else {
             const latTxt = toFa(loc.lat);
             const lngTxt = toFa(loc.lng);
-            locRow = `<div class="pp-loc pp-loc-unsaved"><span>📍</span><span class="pp-coords">${escapeHtml(latTxt)}، ${escapeHtml(lngTxt)}</span><button class="pp-save-btn" type="button" data-save-popup-location data-lat="${loc.lat}" data-lng="${loc.lng}">📌 ذخیره نام</button></div>`;
+                        locRow = `<div class="pp-loc pp-loc-unsaved"><span>📍</span><span class="pp-coords">${escapeHtml(latTxt)}، ${escapeHtml(lngTxt)}</span><button class="pp-save-btn" type="button" data-save-popup-location data-lat="${loc.lat}" data-lng="${loc.lng}">${i18nT('map.popup.saveName')}</button></div>`;
         }
 
         let cityRow = '';
@@ -495,7 +499,7 @@ export function refreshMarkers() {
             if (city) cityRow = `<div class="pp-city">🌆 ${escapeHtml(city)}</div>`;
         }
 
-        m.bindPopup(`<div class="pp pp-${t.priority}"><div class="pp-title">${escapeHtml(t.text)}</div><div class="pp-date">📅 ${dateLine}</div>${cityRow}${locRow}<div class="pp-row"><button class="pp-btn" data-ppdetail="${escapeHtml(String(t.id))}">نمایش جزئیات</button><button class="pp-btn" data-pproute="${escapeHtml(String(t.id))}">🧭 مسیر</button></div></div>`);
+        m.bindPopup(`<div class="pp pp-${t.priority}"><div class="pp-title">${escapeHtml(t.text)}</div><div class="pp-date">📅 ${dateLine}</div>${cityRow}${locRow}<div class="pp-row"><button class="pp-btn" data-ppdetail="${escapeHtml(String(t.id))}">${i18nT('map.popup.showDetails')}</button><button class="pp-btn" data-pproute="${escapeHtml(String(t.id))}">${i18nT('map.popup.route')}</button></div></div>`);
         m._taskId = t.id;
         markersLayer.addLayer(m);
     };
@@ -614,7 +618,7 @@ export function onMapClick(e) {
                 call('render');
                 refreshMarkers();
                 call('refreshSavedLocationUI');
-                mapHint('محل جلسه ذخیره شد ✓');
+                mapHint(i18nT('map.hint.sessionLocationSaved'));
                 (async () => {
                     try {
                         const { reverseGeocodeBilingual } = await import('./reverse-geocode.js');
@@ -648,6 +652,7 @@ export function onMapClick(e) {
             call('render');
             refreshMarkers();
             call('refreshSavedLocationUI');
+            mapHint(i18nT('map.hint.newLocationSaved'));
             mapHint('محل جدید ذخیره شد ✓');
             flyToTask(found.task.id);
             (async () => {
@@ -677,7 +682,7 @@ export function onMapClick(e) {
     showPickMarker();
     call('updateLocChip');
     switchToTab('tasks');
-    mapHint('📍 محل انتخاب شد — عنوان وظیفه را بنویسید');
+    mapHint(i18nT('map.hint.locationSelected'));
 
     (async () => {
         try {
@@ -716,7 +721,7 @@ export function locateUser(fly) {
         setYouMarker(ll);
         if (fly) map.flyTo(ll, 14, { duration: 1.2 });
         else map.flyTo(ll, 13, { duration: 1.5 });
-    }, () => { if (fly && mapReady) mapHint('دسترسی به موقعیت داده نشد'); }, { timeout: 8000 });
+        }, () => { if (fly && mapReady) mapHint(i18nT('map.hint.locationUnavailable')); }, { timeout: 8000 });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -726,7 +731,7 @@ export function locateUser(fly) {
 export function startLiveTracking() {
     if (liveTrackActive) return;
     if (!mapReady || !navigator.geolocation) {
-        mapHint('موقعیت‌یابی در دسترس نیست');
+        mapHint(i18nT('map.liveTrackingUnavailable'));
         return;
     }
 
@@ -740,7 +745,7 @@ export function startLiveTracking() {
         btn.textContent = '⏹ توقف ردیابی';
     }
 
-    mapHint('ردیابی آنلاین فعال شد — موقعیت هر ۲.۵ ثانیه به‌روز می‌شود', 4000);
+    mapHint(i18nT('map.liveTrackingStart'), 4000);
 
     liveWatchId = navigator.geolocation.watchPosition(
         position => {
@@ -784,7 +789,7 @@ export function startLiveTracking() {
         },
         error => {
             if (error.code === 1) {
-                mapHint('دسترسی به موقعیت مکانی رد شد');
+                mapHint(i18nT('map.liveTrackingDenied'));
                 stopLiveTracking();
             }
         },
@@ -813,7 +818,7 @@ export function stopLiveTracking() {
         btn.textContent = '📡 ردیابی آنلاین';
     }
 
-    mapHint('ردیابی آنلاین متوقف شد');
+    mapHint(i18nT('map.liveTrackingStopped'));
 }
 
 export function isLiveTrackingActive() {

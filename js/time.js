@@ -60,7 +60,7 @@ export async function syncServerTime() {
     ];
 
     icon.textContent = '🕐';
-    icon.title = 'در حال اتصال به سرور زمان...';
+    icon.title = i18nT('header.timeSource.connecting');
     icon.classList.remove('online', 'offline');
 
     for (let i = 0; i < sources.length; i++) {

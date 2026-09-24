@@ -11,6 +11,7 @@ import {
     removePickMarker
 } from './map.js';
 import { refreshSavedLocationUI } from './location-ui.js';
+import { getLang } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -83,7 +84,7 @@ async function fetchPlaces(query, signal) {
         format: 'json',
         addressdetails: '1',
         limit: String(MAX_RESULTS),
-        'accept-language': state.prefs.lang === 'en' ? 'en' : 'fa'
+        'accept-language': getLang() === 'en' ? 'en' : 'fa'
     });
 
     const response = await fetch(`${NOMINATIM_URL}?${params}`, {
