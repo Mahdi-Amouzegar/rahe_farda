@@ -46,7 +46,7 @@ worker/
 dist/
 
 # اسناد معماری (local only — آپلود نمی‌شن)
-ARCHITECTURE_*.md
+ARCHITECTURE*.md
 PHASES*.md
 CHANGELOG.md
 # سند انتقال (local only)
@@ -54,3 +54,6 @@ HANDOFF.md
 
 # حافظه‌ی پروژه (local only)
 PROJECT_MEMORY.md
+
+# Testing (local only)
+TESTING.md
