@@ -1,7 +1,3 @@
-## فایل ۲: `README.fa.md` (فارسی)
-
-**⚠️ این نسخه، ترجمه‌ی ساختاریِ README.md است — نه ترجمه‌ی تحت‌اللفظی. محتوا یکسان است، فقط زبان فارسی و RTL.**
-
 ```markdown
 # راه فردا
 
@@ -229,9 +225,10 @@ npm run preview
 
 # Tests
 npm test
+```
 بک‌اند (Cloudflare Worker + D1) در ریپازیتوری جداگانه است:
 
-bash
+```bash
 git clone https://github.com/Mahdi-Amouzegar/rahe-farda-worker.git
 ۸. نقشه‌ی راه
 وضعیت	مرحله

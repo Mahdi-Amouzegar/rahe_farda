@@ -224,10 +224,13 @@ npm run preview
 
 # Tests
 npm test
+```
+
 The backend (Cloudflare Worker + D1) lives in a separate repository:
 
-bash
+```bash
 git clone https://github.com/Mahdi-Amouzegar/rahe-farda-worker.git
+```
 8. Roadmap
 Status	Milestone
 ✅	Core offline-first planner
