@@ -131,40 +131,14 @@
 
 ### ❌ موکول‌شده
 
+### ❌ موکول‌شده
+
 - ورود با Google (Google Cloud Console در ایران محدود است)
 - ایمیل + رمز عبور (سرویس‌های ایمیل در ایران محدود هستند)
 
 ---
 
 ## ۵. معماری
-
-### نمودار سطح بالا
-
-```mermaid
-flowchart TB
-    subgraph Browser["مرورگر (Local-first)"]
-        UI["UI — فارسی RTL / انگلیسی LTR"]
-        IDB[("IndexedDB — ذخیره‌گاه عملیاتی لوکال")]
-        Outbox["Transactional Outbox — task + op اتمیک"]
-        UI --> IDB
-        IDB --> Outbox
-    end
-
-    subgraph Worker["Cloudflare Worker"]
-        API["Auth · Sessions · Sync Engine · Media Authorization"]
-    end
-
-    subgraph Storage["Storage"]
-        D1[("Cloudflare D1 — metadata سینک‌شده")]
-        ParsPack[("ParsPack — فایل‌های media Private")]
-    end
-
-    Outbox -.->|"همگام‌سازی HTTPS اختیاری"| Worker
-    Worker --> D1
-    Worker --> ParsPack
-```
-
-### اصول کلیدی## ۵. معماری
 
 ### معماری سطح بالا
 
