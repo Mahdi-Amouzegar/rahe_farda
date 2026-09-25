@@ -15,9 +15,9 @@
 //   - فقط اگر امضا تغییر کرد، DOM به‌روز می‌شود
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa } from './core.js';
+import { state } from './core.js';
 import { events, EV } from './events.js';
-import { t as i18nT } from './i18n.js';
+import { formatNumber, t as i18nT } from './i18n.js';
 
 const EL_ID = 'headerStatusIndicator';
 const UPDATE_DEBOUNCE_MS = 100;
@@ -49,22 +49,15 @@ function _computeStatus() {
     const inFlight = sync.inFlight === true;
     const syncEnabled = sync.enabled === true;
 
-    if (offline) {
+        if (offline) {
         if (queueSize > 0) {
             return {
                 state: 'offline',
                 icon: ICONS.offline,
-                tooltip: i18nT('header.status.offlineWithQueue', { n: toFa(queueSize) }),
-                ariaLabel: i18nT('header.status.ariaOffline', { n: toFa(queueSize) })
+                tooltip: i18nT('header.status.offlineWithQueue', { n: formatNumber(queueSize) }),
+                ariaLabel: i18nT('header.status.ariaOffline', { n: formatNumber(queueSize) })
             };
         }
-        return {
-            state: 'offline',
-            icon: ICONS.offline,
-            tooltip: i18nT('header.status.offline'),
-            ariaLabel: i18nT('header.status.offline')
-        };
-    }
 
     if (online && syncEnabled) {
         if (inFlight) {
@@ -75,12 +68,12 @@ function _computeStatus() {
                 ariaLabel: i18nT('header.status.syncing')
             };
         }
-        if (queueSize > 0) {
+                if (queueSize > 0) {
             return {
                 state: 'pending',
                 icon: ICONS.pending,
-                tooltip: i18nT('header.status.pending', { n: toFa(queueSize) }),
-                ariaLabel: i18nT('header.status.ariaPending', { n: toFa(queueSize) })
+                tooltip: i18nT('header.status.pending', { n: formatNumber(queueSize) }),
+                ariaLabel: i18nT('header.status.ariaPending', { n: formatNumber(queueSize) })
             };
         }
     }
@@ -116,7 +109,7 @@ function _apply() {
             ? state.sync.queue.length
             : 0;
         const badgeText = queueSize > 0
-            ? (queueSize > 99 ? '۹۹+' : toFa(queueSize))
+            ? (queueSize > 99 ? '۹۹+' : formatNumber(queueSize))
             : '';
 
         const signature = `${status.state}|${status.icon}|${badgeText}|${status.tooltip}`;

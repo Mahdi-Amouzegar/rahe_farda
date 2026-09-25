@@ -10,7 +10,6 @@
 import {
     state,
     MAX_LENGTH,
-    toFa,
     uid,
     escapeHtml,
     SCHEMA_VERSION,
@@ -27,6 +26,7 @@ import {
 import {
     enqueueUpload as enqueueMediaUpload,
 } from './media-upload.js';
+import { formatNumber } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ثابت‌های Media (Stage D)
@@ -1306,7 +1306,7 @@ export async function deleteTask(id, el) {
     if (!pre.parent && pre.task.kind === 'plan' && (pre.task.children || []).length > 0) {
         const ok = await invoke('showConfirmModal', {
             title: 'حذف برنامه',
-            message: `این برنامه ${toFa(pre.task.children.length)} کار دارد. همه با هم به سطل زباله منتقل شوند؟`,
+            message: `این برنامه ${formatNumber(pre.task.children.length)} کار دارد. همه با هم به سطل زباله منتقل شوند؟`,
             confirmText: 'بله، منتقل کن',
             cancelText: 'انصراف',
             danger: true
@@ -1369,7 +1369,7 @@ export async function clearCompleted() {
     if (ids.length === 0) return;
     const ok = await invoke('showConfirmModal', {
         title: 'پاک کردن انجام‌شده‌ها',
-        message: `${toFa(ids.length)} وظیفه انجام‌شده به سطل زباله منتقل شود؟`,
+        message: `${formatNumber(ids.length)} وظیفه انجام‌شده به سطل زباله منتقل شود؟`,
         confirmText: 'بله، منتقل کن',
         cancelText: 'انصراف',
         danger: true

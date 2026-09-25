@@ -17,7 +17,7 @@
 //   - Periodic Sync: Chrome 80+, Edge 80+ (نیاز به نصب PWA + permission)
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa } from './core.js';
+import { state } from './core.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
 import { dayKey } from './sessions.js';
