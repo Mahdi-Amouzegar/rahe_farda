@@ -9,12 +9,12 @@
 // اولویت پخش: پیش‌فرض → preset → TTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa } from './core.js';
+import { state } from './core.js';
 import { findTask, saveTasks } from './store.js';
 import { allSessions, faShort, dayKey } from './sessions.js';
 import { getNow } from './time.js';
 import { savePrefs } from './map.js';
-import { getLang, t as i18nT } from './i18n.js';
+import { formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Notification support
@@ -446,7 +446,7 @@ export function checkDigest() {
     const todays = allSessions(false).filter(s => dayKey(new Date(s.at)) === day);
     const body = todays.length
         ? i18nT('notifications.digest.hasSessions', {
-            n: toFa(todays.length),
+            n: formatNumber(todays.length),
             list: todays.slice(0, 3).map(s => s.owner).join('، '),
             more: todays.length > 3 ? i18nT('notifications.digest.more') : ''
         })

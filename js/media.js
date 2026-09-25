@@ -45,11 +45,24 @@ export const JPEG_QUALITY = 0.9;
 /** حداکثر تعداد عکس در هر task */
 export const MAX_PHOTOS_PER_TASK = 8;
 
-/** MIME typeهای مجاز */
+/**
+ * MIME typeهای مجاز.
+ *
+ * ⚠️ فاز ۴D.4b-fix-2: JFIF و PJPG اضافه شدند.
+ *    - JFIF: در واقع JPEG است ولی با header متفاوت؛ مرورگرها آن را پشتیبانی می‌کنند.
+ *    - PJPG: Progressive JPEG است؛ MIME غیراستاندارد ولی رایج.
+ *
+ * ⚠️ SVG عمداً در لیست نیست — چون:
+ *    - HTMLCanvas نمی‌تواند SVG را مستقیماً به WebP/JPEG تبدیل کند
+ *    - یک فرمت vector است، نه raster
+ */
 export const ALLOWED_MIME_TYPES = [
     'image/jpeg',
     'image/jpg',
+    'image/jfif',
+    'image/pjpeg',
     'image/png',
+    'image/x-png',
     'image/webp',
     'image/heic',
     'image/heif',
@@ -58,10 +71,18 @@ export const ALLOWED_MIME_TYPES = [
     'image/bmp',
 ];
 
-/** Extensionهای مجاز (lowercase) */
+/**
+ * Extensionهای مجاز (lowercase).
+ *
+ * ⚠️ فاز ۴D.4b-fix-2: پسوندهای JFIF اضافه شدند.
+ */
 export const ALLOWED_EXTENSIONS = [
     '.jpg',
     '.jpeg',
+    '.jpe',
+    '.jif',
+    '.jfi',
+    '.jfif',
     '.png',
     '.webp',
     '.heic',
@@ -152,6 +173,14 @@ export function validateImageFile(file) {
             return { ok: false, reason: i18nT('media.errors.unsupportedFormat') };
         }
         return { ok: true };
+    }
+
+    // ⚠️ فاز ۴D.4b-fix-2: پیام واضح برای SVG
+    if (mime === 'image/svg+xml' || mime === 'image/svg') {
+        return {
+            ok: false,
+            reason: i18nT('media.errors.svgNotSupported'),
+        };
     }
 
     if (!ALLOWED_MIME_TYPES.includes(mime)) {

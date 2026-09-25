@@ -3,7 +3,7 @@
 
 import { state, toFa, escapeHtml } from './core.js';
 import { getNow } from './time.js';
-import { formatDate, getLang, t as i18nT } from './i18n.js';
+import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Formatting
@@ -103,7 +103,7 @@ export function sessionSummaryHtml(task) {
     const sessions = task.sessions || [];
     if (sessions.length === 0) return '';
     if (task.completed) {
-        return `<span class="due-line past-all">📅 ${i18nT('sessions.summary.count', { n: toFa(sessions.length) })}</span>`;
+        return `<span class="due-line past-all">📅 ${i18nT('sessions.summary.count', { n: formatNumber(sessions.length) })}</span>`;
     }
     const n = nearestUpcoming(task);
     if (n) {
@@ -114,9 +114,9 @@ export function sessionSummaryHtml(task) {
         let extra = '';
         if (diffDays === 0) extra = ' ' + i18nT('sessions.summary.today');
         else if (diffDays === 1) extra = ' ' + i18nT('sessions.summary.tomorrow');
-        else extra = ' ' + i18nT('sessions.summary.daysLeft', { n: toFa(diffDays) });
+        else extra = ' ' + i18nT('sessions.summary.daysLeft', { n: formatNumber(diffDays) });
         const count = sessions.length > 1
-            ? ` <span class="sess-count">${i18nT('sessions.summary.count', { n: toFa(sessions.length) })}</span>`
+            ? ` <span class="sess-count">${i18nT('sessions.summary.count', { n: formatNumber(sessions.length) })}</span>`
             : '';
         const wBtn = weatherButtonHtml(task);
         return `<span class="due-line">${i18nT('sessions.summary.nextSession', { date: faShort(n.at) })}${extra}${n.location ? ' 📍' : ''}${wBtn}</span>${count}`;
@@ -133,9 +133,9 @@ export function recurBadge(task, cls) {
     if (!task.recur || task.recur === 'none') return '';
     let suffix = '';
     if (task.recur === 'custom' && task.recurN > 1) {
-        suffix = ' ' + i18nT('recur.everyNDays', { n: toFa(task.recurN) });
+        suffix = ' ' + i18nT('recur.everyNDays', { n: formatNumber(task.recurN) });
     } else if (task.recur === 'hourly' && task.recurN >= 1) {
-        suffix = ' ' + i18nT('recur.everyNHours', { n: toFa(task.recurN) });
+        suffix = ' ' + i18nT('recur.everyNHours', { n: formatNumber(task.recurN) });
     } else if (task.recur === 'weeklyDays') {
         suffix = ' ' + i18nT('recur.weeklyDays');
     } else if (task.recur === 'monthlyDays') {

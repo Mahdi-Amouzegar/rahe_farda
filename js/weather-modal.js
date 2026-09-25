@@ -1,7 +1,7 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // weather-modal.js -- مودال نمایش پیش‌بینی هوا با Open-Meteo
 
-import { state, toFa, escapeHtml, trapFocus } from './core.js';
+import { state, escapeHtml, trapFocus } from './core.js';
 import { faShort, nearestUpcoming } from './sessions.js';
 import { findTask } from './store.js';
 import {
@@ -11,7 +11,7 @@ import {
     findDayIndex,
     computeDateRange
 } from './weather.js';
-import { getLang, t as i18nT } from './i18n.js';
+import { formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -32,12 +32,12 @@ let _currentDayIndex = 0;
 
 function faTemp(n) {
     if (n == null || !Number.isFinite(+n)) return '—';
-    return toFa(Math.round(+n)) + '°';
+    return formatNumber(Math.round(+n)) + '°';
 }
 
 function faNum(n, unit) {
     if (n == null || !Number.isFinite(+n)) return '—';
-    return toFa(Math.round(+n)) + (unit ? ' ' + unit : '');
+    return formatNumber(Math.round(+n)) + (unit ? ' ' + unit : '');
 }
 
 /**
@@ -61,8 +61,9 @@ function formatPlace(loc) {
     }
     if (typeof loc.name === 'string' && loc.name.trim()) return loc.name.trim();
 
+
     // ۳. مختصات
-    return `${toFa(loc.lat)}، ${toFa(loc.lng)}`;
+    return `${formatNumber(loc.lat)}، ${formatNumber(loc.lng)}`;
 }
 
 function resetModalState() {

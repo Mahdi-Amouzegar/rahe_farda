@@ -38,10 +38,10 @@
 //   auth:error              — هر خطای دیگری در جریان ورود/تازه‌سازی
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, uid, toFa } from './core.js';
+import { state, uid } from './core.js';
 import { events } from './events.js';
 import { getDeviceId } from './net.js';
-import { t as i18nT } from './i18n.js';
+import { formatNumber, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -721,18 +721,18 @@ export function formatExpiry(expiresAt) {
     if (days < 0) return i18nT('auth.expiry.expired');
     if (days < 1) {
         const hours = Math.max(1, Math.floor(days * 24));
-        return i18nT('auth.expiry.lessThanHour', { n: toFa(hours) });
+        return i18nT('auth.expiry.lessThanHour', { n: formatNumber(hours) });
     }
-    if (days < 30) return i18nT('auth.expiry.days', { n: toFa(Math.floor(days)) });
+    if (days < 30) return i18nT('auth.expiry.days', { n: formatNumber(Math.floor(days)) });
 
     // ─── برای بازه‌های بلندتر، هم ماه و هم روز را نشان بده ───
     if (days < 365) {
         const months = Math.floor(days / 30);
         const remainingDays = Math.floor(days - months * 30);
         if (remainingDays > 0) {
-            return i18nT('auth.expiry.monthsAndDays', { months: toFa(months), days: toFa(remainingDays) });
+            return i18nT('auth.expiry.monthsAndDays', { months: formatNumber(months), days: formatNumber(remainingDays) });
         }
-        return i18nT('auth.expiry.months', { n: toFa(months) });
+        return i18nT('auth.expiry.months', { n: formatNumber(months) });
     }
 
     // ─── بیش از یک سال ───
@@ -740,9 +740,9 @@ export function formatExpiry(expiresAt) {
     const remainingAfterYears = days - years * 365;
     const months = Math.floor(remainingAfterYears / 30);
     if (months > 0) {
-        return i18nT('auth.expiry.yearsAndMonths', { years: toFa(years), months: toFa(months) });
+        return i18nT('auth.expiry.yearsAndMonths', { years: formatNumber(years), months: formatNumber(months) });
     }
-    return i18nT('auth.expiry.years', { n: toFa(years) });
+    return i18nT('auth.expiry.years', { n: formatNumber(years) });
 }
 
 /**
@@ -756,7 +756,7 @@ export function ttlLabel(days) {
     if (days === 90) return i18nT('auth.ttl.month3');
     if (days === 180) return i18nT('auth.ttl.month6');
     if (days === 365) return i18nT('auth.ttl.year1');
-    return i18nT('auth.ttl.days', { n: toFa(days) });
+    return i18nT('auth.ttl.days', { n: formatNumber(days) });
 }
 
 /**

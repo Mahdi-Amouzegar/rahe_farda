@@ -1,12 +1,16 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // location-ui.js -- saved locations: local IndexedDB + human-readable labels (ESM) — فاز ۴ گام ۴
 //
+// ⚠️ فاز ۴D.4c:
+//   - toFa → formatNumber (اعداد locale-aware)
+//   - ادغام importهای جداگانه i18n در یک import واحد
+//
 // ⚠️ این نسخه:
 //   - _callbacks و registerLocationCallbacks با EventEmitter جایگزین شد
 //   - sync با فلگ _syncing محافظت شده تا loop بین location:updated و refreshSavedLocationUI جلوگیری شود
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa, escapeHtml, uid, trapFocus, showConfirmModal } from './core.js';
+import { state, escapeHtml, uid, trapFocus, showConfirmModal } from './core.js';
 import { findTask, saveTasks } from './store.js';
 import {
     mapHint,
@@ -19,8 +23,7 @@ import {
 } from './map.js';
 import { openDetail } from './detail.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
-import { t as i18nT } from './i18n.js';
-import { getLang } from './i18n.js';
+import { formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants & local state
@@ -151,7 +154,7 @@ function coords(loc) {
     const n = normalize(loc);
     if (!n) return '';
     const a = n.lat.toFixed(5), b = n.lng.toFixed(5);
-    return `${toFa(a)}، ${toFa(b)}`;
+    return `${formatNumber(a)}، ${formatNumber(b)}`;
 }
 
 function label(loc) {
@@ -431,7 +434,7 @@ function renderList() {
     const list = box.querySelector('.saved-locations-list');
     if (!list) return;
     const countEl = box.querySelector('#savedLocationsCount');
-    if (countEl) countEl.textContent = locations.length ? `(${toFa(locations.length)}/${toFa(MAX_SAVED_LOCATIONS)})` : '';
+    if (countEl) countEl.textContent = locations.length ? `(${formatNumber(locations.length)}/${formatNumber(MAX_SAVED_LOCATIONS)})` : '';
     const sorted = [...locations].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
     const html = sorted.length
         ? sorted.map(x => `<button type="button" class="saved-location-chip" data-saved-location="${escapeHtml(String(x.id))}" title="${escapeHtml(coords(x))}">${escapeHtml(x.name)}</button>`).join('')
@@ -443,7 +446,7 @@ function renderManageList() {
     const body = document.getElementById('savedLocationsBody');
     if (!body) return;
     const modalCount = document.getElementById('savedLocationsModalCount');
-    if (modalCount) modalCount.textContent = locations.length ? `(${toFa(locations.length)}/${toFa(MAX_SAVED_LOCATIONS)})` : '';
+    if (modalCount) modalCount.textContent = locations.length ? `(${formatNumber(locations.length)}/${formatNumber(MAX_SAVED_LOCATIONS)})` : '';
     const sorted = [...locations].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
     if (!sorted.length) {
         body.innerHTML = `<div class="session-empty">${i18nT('location.emptyList')}</div>`;
@@ -591,7 +594,7 @@ async function saveLocationWithName(loc, name) {
 
     const existing = savedFor(n);
     if (!existing && locations.length >= MAX_SAVED_LOCATIONS) {
-        mapHint(i18nT('location.limitReached', { max: toFa(MAX_SAVED_LOCATIONS) }), 5000);
+        mapHint(i18nT('location.limitReached', { max: formatNumber(MAX_SAVED_LOCATIONS) }), 5000);
         return null;
     }
 
@@ -961,7 +964,7 @@ function bind() {
 
 function startNewLocationFromMap() {
     if (locations.length >= MAX_SAVED_LOCATIONS) {
-        mapHint(i18nT('location.limitReached', { max: toFa(MAX_SAVED_LOCATIONS) }), 5000);
+        mapHint(i18nT('location.limitReached', { max: formatNumber(MAX_SAVED_LOCATIONS) }), 5000);
         return;
     }
     pendingNewLocationFromMap = true;

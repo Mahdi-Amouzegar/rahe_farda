@@ -562,5 +562,65 @@ export function formatDateTime(date) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Public API — Number formatting (Phase 4D.1)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * فرمت یک عدد بر اساس زبان فعلی.
+ *
+ * ⚠️ fa → 'fa-IR' (ارقام فارسی + جداکننده فارسی)
+ * ⚠️ en → 'en-US' (ارقام لاتین + کاما)
+ *
+ * ⚠️ این تابع در Phase 4D جایگزین `toFa()` می‌شود در همه‌جا،
+ *    به‌جز اعداد تقویم شمسی (که همیشه فارسی می‌مانند — طبق تصمیم 4D).
+ *
+ * ⚠️ ورودی می‌تواند رشته‌ی عددی باشد (مثلاً خروجی `toFixed(1)`).
+ *
+ * @param {number|string} n
+ * @returns {string} عدد فرمت‌شده یا رشته‌ی خالی اگر ورودی نامعتبر بود
+ */
+export function formatNumber(n) {
+    const num = typeof n === 'string' ? Number(n) : n;
+    if (!Number.isFinite(num)) return '';
+    try {
+        return new Intl.NumberFormat(
+            _currentLang === 'en' ? 'en-US' : 'fa-IR'
+        ).format(num);
+    } catch {
+        return String(num);
+    }
+}
+
+/**
+ * فرمت حجم بر اساس زبان فعلی.
+ *
+ * ⚠️ خروجی:
+ *   fa → «۵ مگابایت» (با فاصله)
+ *   en → «5 MB» (با فاصله)
+ *
+ * ⚠️ برای حجم‌های < ۱KB، عدد گرد می‌شود.
+ * ⚠️ برای حجم‌های ≥ ۱KB، یک رقم اعشار (KB) یا دو رقم اعشار (MB/GB) حفظ می‌شود.
+ *
+ * ⚠️ ورودی نامعتبر → '—'
+ *
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return '—';
+    const n = Math.round(bytes);
+    if (n < 1024) {
+        return t('units.bytes', { n: formatNumber(n) });
+    }
+    if (n < 1024 * 1024) {
+        return t('units.kb', { n: formatNumber((n / 1024).toFixed(1)) });
+    }
+    if (n < 1024 * 1024 * 1024) {
+        return t('units.mb', { n: formatNumber((n / (1024 * 1024)).toFixed(2)) });
+    }
+    return t('units.gb', { n: formatNumber((n / (1024 * 1024 * 1024)).toFixed(2)) });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // پایان i18n.js
 // ═══════════════════════════════════════════════════════════════════════════

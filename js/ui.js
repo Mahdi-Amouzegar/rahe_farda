@@ -6,6 +6,9 @@
 //   - PRIORITY_LABELS حذف شد — به‌جای آن tasks.priority.* از i18n
 //   - formatDate از i18n برای تاریخ‌های locale-aware
 //
+// ⚠️ فاز ۴D (Number i18n):
+//   - toFa → formatNumber برای اعداد locale-aware
+//
 // ⚠️ این نسخه:
 //   - render() را به renderFull + renderDiff تقسیم می‌کند
 //   - از render-diff.js برای تشخیص تغییرات استفاده می‌کند
@@ -15,7 +18,6 @@
 
 import {
     state,
-    toFa,
     escapeHtml,
     MAX_LENGTH,
     faDate,
@@ -55,7 +57,7 @@ import {
     diffTasks,
     isSafeForDiff
 } from './render-diff.js';
-import { formatDate, getLang, t as i18nT } from './i18n.js';
+import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -252,7 +254,7 @@ export function renderStats(total, done) {
     });
     const max = Math.max(1, ...counts);
     const rate = total > 0 ? Math.round((done / total) * 100) : 0;
-    const titleText = i18nT('tasks.insight.statsTitle', { rate: toFa(rate) });
+    const titleText = i18nT('tasks.insight.statsTitle', { rate: formatNumber(rate) });
     box.innerHTML = `<div class="stats-title">${titleText}</div><div class="bars">` +
         days.map((d, i) => {
             let wd = '';
@@ -263,7 +265,7 @@ export function renderStats(total, done) {
                 );
             } catch { /* نادیده */ }
             const h = Math.max(3, Math.round((counts[i] / max) * 100));
-            const tooltip = i18nT('tasks.insight.barTooltip', { n: toFa(counts[i]) });
+            const tooltip = i18nT('tasks.insight.barTooltip', { n: formatNumber(counts[i]) });
             return `<div class="bar-col" title="${tooltip}"><div class="bar${counts[i] === 0 ? ' empty' : ''}" style="height: ${h}%;"></div><span>${wd}</span></div>`;
         }).join('') + `</div>`;
 }
@@ -276,7 +278,7 @@ export function renderTemplateList() {
     const el = document.getElementById('tplList');
     if (!el) return;
     el.innerHTML = `<div class="tpl-list">` + PLAN_TEMPLATES.map(x =>
-        `<button type="button" class="tpl-opt" data-tpl="${x.id}"><b>${escapeHtml(x.title)}</b><span>${i18nT('template.childrenCount', { n: toFa(x.children.length) })}</span></button>`
+        `<button type="button" class="tpl-opt" data-tpl="${x.id}"><b>${escapeHtml(x.title)}</b><span>${i18nT('template.childrenCount', { n: formatNumber(x.children.length) })}</span></button>`
     ).join('') + `</div>`;
 }
 
@@ -298,7 +300,7 @@ export function renderTplKids() {
     const el = document.getElementById('tplKids');
     if (!el || !tplDraft) return;
     el.innerHTML = tplDraft.kids.length ? tplDraft.kids.map((k, i) =>
-        `<div class="session-item"><span class="session-num">${toFa(i + 1)}</span>` +
+        `<div class="session-item"><span class="session-num">${formatNumber(i + 1)}</span>` +
         `<span class="session-date">${escapeHtml(k)}</span>` +
         `<button class="btn-icon btn-delete" data-tplkid="${i}" aria-label="${i18nT('template.deleteChild')}">✕</button></div>`
     ).join('') : `<div class="session-empty">${i18nT('template.emptyKids')}</div>`;
@@ -394,7 +396,7 @@ export function setSelectedDay(key) {
 }
 
 export function renderCalendar() {
-    document.getElementById('calLabel').textContent = JALALI_MONTHS[state.calJm - 1] + ' ' + toFa(state.calJy);
+    document.getElementById('calLabel').textContent = JALALI_MONTHS[state.calJm - 1] + ' ' + formatNumber(state.calJy);
     const g = jalaliToGregorian(state.calJy, state.calJm, 1);
     const leading = (new Date(g.gy, g.gm - 1, g.gd).getDay() + 1) % 7;
     const monthLen = jalaliMonthLength(state.calJy, state.calJm);
@@ -416,14 +418,14 @@ export function renderCalendar() {
         const isToday = state.calJy === tj.jy && state.calJm === tj.jm && d === tj.jd;
         const cls = 'picker-day cal-day' + (isToday ? ' today' : '') + (state.selectedDay === k ? ' selected' : '');
         const dots = list.slice(0, 3).map(s => `<span class="dot d-${s.priority || 'low'}"></span>`).join('');
-        const more = list.length > 3 ? `<span class="dot-more">${toFa(list.length - 3)}+</span>` : '';
-        const sessionsPart = list.length ? i18nT('calendar.daySessions', { n: toFa(list.length) }) : '';
+        const more = list.length > 3 ? `<span class="dot-more">${formatNumber(list.length - 3)}+</span>` : '';
+        const sessionsPart = list.length ? i18nT('calendar.daySessions', { n: formatNumber(list.length) }) : '';
         const ariaLabel = i18nT('calendar.dayAria', {
-            day: toFa(d),
+            day: formatNumber(d),
             month: JALALI_MONTHS[state.calJm - 1],
             sessions: sessionsPart
         });
-        html += `<button class="${cls}" data-calday="${k}" aria-label="${ariaLabel}">${toFa(d)}<span class="cal-dots">${dots}${more}</span></button>`;
+        html += `<button class="${cls}" data-calday="${k}" aria-label="${ariaLabel}">${formatNumber(d)}<span class="cal-dots">${dots}${more}</span></button>`;
     }
     document.getElementById('calDays').innerHTML = html;
 }
@@ -532,7 +534,7 @@ function childHtml(c) {
             ${recur}
             ${n ? `<span class="child-meta-item">📅 ${faShort(n.at)}</span>` : ''}
             ${hasLoc ? `<span class="child-meta-item" title="${i18nT('location.hasLocation')}">📍</span>` : ''}
-            ${hasPhotos ? `<span class="child-meta-item" title="${toFa(c.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
+            ${hasPhotos ? `<span class="child-meta-item" title="${formatNumber(c.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${wBtn}
         </div>` : ''}
     </div>`;
@@ -572,9 +574,9 @@ function planHtml(task) {
         </div>
         <div class="task-meta plan-meta-row">
             <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>${recurBadge(task)}
-            <span>${i18nT('taskItem.plan.subCount', { done: toFa(st.done), total: toFa(st.total) })}</span>
+            <span>${i18nT('taskItem.plan.subCount', { done: formatNumber(st.done), total: formatNumber(st.total) })}</span>
             ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
-            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
+            ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${hasLoc ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
             <div class="mini-progress"><div class="mini-progress-fill" style="width: ${pct}%;"></div></div>
             ${st.total > 0 && st.done < st.total ? `<button class="mini-link" data-action="check-all" aria-label="${i18nT('taskItem.operations.checkAll')}">✓ ${i18nT('taskItem.operations.checkAll')}</button>` : ''}
@@ -652,7 +654,7 @@ function taskItemHtml(task) {
             <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>
             ${recurBadge(task)}
             <span class="created-date">${faDate(task.createdAt)}</span>
-            ${(task.photos || []).length ? `<span title="${toFa(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
+            ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${task.location ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
         </div>
         ${sessionSummaryHtml(task)}
@@ -681,7 +683,7 @@ function buildTrashMessage(ids) {
         const kindLabel = i18nT(`kind.${task.kind === 'plan' ? 'plan' : task.kind === 'series' ? 'series' : 'task'}`);
         return i18nT('snackbar.trashSingle', { kind: kindLabel, text: task.text });
     }
-    return i18nT('snackbar.trashMultiple', { n: toFa(ids.length) });
+    return i18nT('snackbar.trashMultiple', { n: formatNumber(ids.length) });
 }
 
 export function showUndoFor(ids, label) {
@@ -743,7 +745,7 @@ function renderFull(filtered, total, done) {
     }).join('');
 
     hydrateWeatherIcons(taskList);
-    updateTaskListStatus(i18nT('tasks.status.showingCount', { n: toFa(filtered.length) }));
+    updateTaskListStatus(i18nT('tasks.status.showingCount', { n: formatNumber(filtered.length) }));
     state.justAddedId = null;
 }
 
@@ -832,14 +834,14 @@ export function render() {
     const progressPct = document.getElementById('progressPct');
     const progressBar = document.getElementById('progressBar');
 
-    if (totalCountEl) totalCountEl.textContent = toFa(total);
-    if (doneCountEl) doneCountEl.textContent = toFa(done);
-    if (remainCountEl) remainCountEl.textContent = toFa(total - done);
+    if (totalCountEl) totalCountEl.textContent = formatNumber(total);
+    if (doneCountEl) doneCountEl.textContent = formatNumber(done);
+    if (remainCountEl) remainCountEl.textContent = formatNumber(total - done);
     renderStats(total, done);
     const activeCount = total - done;
 
     const tb = document.getElementById('trashCount');
-    if (tb) tb.textContent = state.trash.length ? ` (${toFa(state.trash.length)})` : '';
+    if (tb) tb.textContent = state.trash.length ? ` (${formatNumber(state.trash.length)})` : '';
 
     const chip = document.getElementById('dayChip');
     if (chip) {
@@ -877,11 +879,11 @@ export function render() {
         const f = b.dataset.filter;
         if (!f || !(f in COUNTS)) return;
         const label = i18nT(FILTER_KEYS[f]);
-        b.textContent = `${label} (${toFa(COUNTS[f])})`;
+        b.textContent = `${label} (${formatNumber(COUNTS[f])})`;
     });
 
     if (progressFill) progressFill.style.width = pct + '%';
-    if (progressPct) progressPct.textContent = toFa(pct) + '٪';
+    if (progressPct) progressPct.textContent = formatNumber(pct) + '٪';
     if (progressBar) progressBar.setAttribute('aria-valuenow', pct);
 
     const doneActionsEl = document.getElementById('doneActions');
@@ -920,7 +922,3 @@ export function resetRenderSignature() {
     _lastRenderSignature = '';
     _lastVisibleTasks = [];
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ⚠️ گام ۱۵: SHIM‌ها حذف شدند
-// ═══════════════════════════════════════════════════════════════════════════

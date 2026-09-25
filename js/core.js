@@ -3,7 +3,13 @@
 //
 // ⚠️ این نسخه helperهای export/import را اضافه کرده است.
 // ⚠️ فاز ۵ گام ۵: state.net و state.sync برای شبکه و صف sync
+// ⚠️ فاز ۴D گام ۳: formatBytes و faDate به i18n منتقل شدند
 // ═══════════════════════════════════════════════════════════════════════════
+
+import {
+    formatBytes as i18nFormatBytes,
+    formatDateTime as i18nFormatDateTime,
+} from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -145,17 +151,30 @@ export const PRIORITY_LABELS = {
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * فرمت عدد به فارسی (ارقام فارسی + جداکننده فارسی).
+ *
+ * ⚠️ فاز ۴D: این تابع فقط برای اعداد قطعاً فارسی باقی می‌ماند
+ *    (مثل ارقام تقویم شمسی). برای اعداد locale-aware از
+ *    `formatNumber()` در i18n.js استفاده کن.
+ *
+ * ⚠️ برای اعداد بزرگ، به‌طور خودکار جداکننده اضافه می‌کند (۱۲٬۳۴۵).
+ */
 export const toFa = n => Number(n).toLocaleString('fa-IR');
 
+/**
+ * فرمت تاریخ + ساعت بر اساس زبان فعلی.
+ *
+ * ⚠️ فاز ۴D: این تابع حالا به i18n واگذار شده است.
+ *    fa → «۱۵ دی ۱۴۰۳، ۱۴:۳۰» (تقویم جلالی)
+ *    en → «January 5, 2025, 2:30 PM» (تقویم میلادی)
+ *
+ * ⚠️ برای backward-compat نگه داشته شده. نام `faDate` تاریخی است
+ *    ولی حالا locale-aware است.
+ */
 export function faDate(iso) {
-    try {
-        const d = new Date(iso);
-        if (isNaN(d)) return '';
-        return d.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }) +
-            '، ساعت ' + d.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-        return '';
-    }
+    if (!iso) return '';
+    return i18nFormatDateTime(iso);
 }
 
 export function uid() {
@@ -194,13 +213,17 @@ export function debounce(fn, ms) {
 // Export/Import helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function formatBytes(bytes) {
-    if (!Number.isFinite(bytes) || bytes < 0) return '—';
-    if (bytes < 1024) return `${toFa(Math.round(bytes))} بایت`;
-    if (bytes < 1024 * 1024) return `${toFa((bytes / 1024).toFixed(1))} کیلوبایت`;
-    if (bytes < 1024 * 1024 * 1024) return `${toFa((bytes / (1024 * 1024)).toFixed(2))} مگابایت`;
-    return `${toFa((bytes / (1024 * 1024 * 1024)).toFixed(2))} گیگابایت`;
-}
+/**
+ * فرمت حجم بر اساس زبان فعلی.
+ *
+ * ⚠️ فاز ۴D: این تابع حالا در i18n.js پیاده شده است.
+ *    اینجا فقط re-export می‌شود تا backward-compat حفظ شود.
+ *
+ * ⚠️ خروجی:
+ *    fa → «۵ مگابایت»
+ *    en → «5 MB»
+ */
+export const formatBytes = i18nFormatBytes;
 
 export function downloadJSON(data, filename) {
     try {

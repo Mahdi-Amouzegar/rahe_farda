@@ -10,6 +10,9 @@
 //   - refreshSoundPresetList() برای به‌روزرسانی لیست آهنگ‌ها در تغییر زبان
 //   - بستن operation-list با کلیک بیرون
 //
+// ⚠️ فاز ۴D.4c:
+//   - toFa → formatNumber برای اعداد locale-aware
+//
 // ⚠️ این نسخه:
 //   - wireEvents() مستقیم برای همه listenerها
 //   - DueChipsManager جایگزین _dueHome
@@ -22,7 +25,6 @@
 
 import {
     state,
-    toFa,
     escapeHtml,
     uid,
     showConfirmModal,
@@ -180,6 +182,7 @@ import {
     applyToDOM,
     setLang,
     getLang,
+    formatNumber,
     t,
     t as i18nT
 } from './i18n.js';
@@ -726,13 +729,36 @@ document.getElementById('seriesSubWeek').addEventListener('click', e => {
     if (i >= 0) { state.seriesDays.splice(i, 1); b.classList.remove('on'); }
     else { state.seriesDays.push(v); b.classList.add('on'); }
 });
-(function renderSeriesMonth() {
+/**
+ * رندر chip-row روزهای ماه (series > monthlyDays).
+ *
+ * ⚠️ فاز ۴D.4c-fix: تابع قابل‌فراخوانی — در سوئیچ زبان دوباره صدا زده می‌شود.
+ */
+function renderSeriesMonth() {
     const mc = document.getElementById('seriesMonthChips');
     if (!mc) return;
     let h = '';
-    for (let d = 1; d <= 31; d++) h += `<button type="button" class="day-chip" data-smday="${d}">${toFa(d)}</button>`;
+    for (let d = 1; d <= 31; d++) h += `<button type="button" class="day-chip" data-smday="${d}">${formatNumber(d)}</button>`;
     mc.innerHTML = h;
-})();
+}
+renderSeriesMonth();
+
+/**
+ * رندر chip-row ساعت‌ها (series > hourlyN).
+ *
+ * ⚠️ فاز ۴D.4c-fix: از این پس از JS ساخته می‌شود (نه HTML hardcoded)
+ *    تا locale-aware باشد.
+ */
+function renderSeriesHours() {
+    const container = document.querySelector('#seriesSubHours .chip-row');
+    if (!container) return;
+    const HOURS = [2, 4, 6, 8, 12, 24];
+    container.innerHTML = HOURS.map(h =>
+        `<button type="button" class="day-chip" data-snh="${h}">${formatNumber(h)}</button>`
+    ).join('');
+}
+renderSeriesHours();
+
 document.getElementById('seriesMonthChips').addEventListener('click', e => {
     const b = e.target.closest('[data-smday]');
     if (!b) return;
@@ -1027,8 +1053,8 @@ function updateExportMeta() {
         : 0;
     const estimated = baseSize + photosSize;
     meta.innerHTML = `
-        <div class="export-meta-row"><span>${t('export.metaTasks')}</span> <strong>${toFa(taskCount)}</strong></div>
-        <div class="export-meta-row"><span>${t('export.metaTrash')}</span> <strong>${toFa(trashCount)}</strong></div>
+        <div class="export-meta-row"><span>${t('export.metaTasks')}</span> <strong>${formatNumber(taskCount)}</strong></div>
+        <div class="export-meta-row"><span>${t('export.metaTrash')}</span> <strong>${formatNumber(trashCount)}</strong></div>
         <div class="export-meta-row"><span>${t('export.metaSize')}</span> <strong>${formatBytes(estimated)}</strong></div>
     `;
 }
@@ -1122,8 +1148,8 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
             metaEl.innerHTML = `
                 <div class="import-meta-row"><span>${t('import.metaVersion')}</span> <strong>${escapeHtml(schemaVersion)}</strong></div>
                 <div class="import-meta-row"><span>${t('import.metaExportedAt')}</span> <strong>${escapeHtml(exportedAt)}</strong></div>
-                <div class="import-meta-row"><span>${t('import.metaTasks')}</span> <strong>${toFa(taskCount)}</strong></div>
-                <div class="import-meta-row"><span>${t('import.metaTrash')}</span> <strong>${toFa(trashCount)}</strong></div>
+                <div class="import-meta-row"><span>${t('import.metaTasks')}</span> <strong>${formatNumber(taskCount)}</strong></div>
+                <div class="import-meta-row"><span>${t('import.metaTrash')}</span> <strong>${formatNumber(trashCount)}</strong></div>
                 ${hasPhotos ? `<div class="import-meta-warn">${t('import.hasPhotosWarning')}</div>` : ''}
             `;
         }
@@ -1175,8 +1201,8 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
                 applyMapVisibility();
                 applyProMode();
             }
-            const parts = [t('import.success', { n: toFa(result.imported) })];
-            if (result.skipped > 0) parts.push(t('import.successSkipped', { n: toFa(result.skipped) }));
+            const parts = [t('import.success', { n: formatNumber(result.imported) })];
+            if (result.skipped > 0) parts.push(t('import.successSkipped', { n: formatNumber(result.skipped) }));
             if (result.warning) parts.push(result.warning);
             events.emit(EV.UI_SNACKBAR, [], parts.join(' — '));
         } else {
@@ -1295,6 +1321,9 @@ if (langBtnEl) {
         applyDisplaySettings();
         resetRenderSignature();
         render();
+        renderSeriesMonth();      // ⚠️ فاز ۴D.4c-fix
+        renderSeriesHours();      // ⚠️ فاز ۴D.4c-fix
+        refreshTimeSelects();     // ⚠️ فاز ۴D.4c-fix
         updateAccountStatusText();
         refreshSoundPresetList();
         updateFooter();
@@ -1325,6 +1354,9 @@ if (_welcomeLangGroup) {
         applyDisplaySettings();
         resetRenderSignature();
         render();
+        renderSeriesMonth();      // ⚠️ فاز ۴D.4c-fix
+        renderSeriesHours();      // ⚠️ فاز ۴D.4c-fix
+        refreshTimeSelects();     // ⚠️ فاز ۴D.4c-fix
         updateAccountStatusText();
         refreshSoundPresetList();
         updateFooter();
@@ -2213,22 +2245,43 @@ function attachSmartSuggest(el, targetId) {
     });
 }
 
-(function initTimeSelects() {
+/**
+ * پر کردن optionهای picker ساعت/دقیقه.
+ *
+ * ⚠️ فاز ۴D.4c-fix: تابع قابل‌فراخوانی — در سوئیچ زبان دوباره صدا زده می‌شود.
+ * ⚠️ قبل از پر کردن جدید، optionهای قبلی پاک می‌شوند.
+ *
+ * ⚠️ مقدار انتخاب‌شده حفظ می‌شود.
+ */
+function refreshTimeSelects() {
     const hourSel = document.getElementById('pickerHour');
     const minSel = document.getElementById('pickerMinute');
+    if (!hourSel || !minSel) return;
+
+    const prevHour = hourSel.value;
+    const prevMin = minSel.value;
+
+    hourSel.innerHTML = '';
+    minSel.innerHTML = '';
+
     for (let h = 0; h < 24; h++) {
         const o = document.createElement('option');
         o.value = String(h).padStart(2, '0');
-        o.textContent = toFa(h);
+        o.textContent = formatNumber(h);
         hourSel.appendChild(o);
     }
     for (let m = 0; m < 60; m += 5) {
         const o = document.createElement('option');
         o.value = String(m).padStart(2, '0');
-        o.textContent = toFa(m);
+        o.textContent = formatNumber(m);
         minSel.appendChild(o);
     }
-})();
+
+    // ⚠️ بازیابی مقدار انتخاب‌شده (اگر وجود داشت)
+    if (prevHour) hourSel.value = prevHour;
+    if (prevMin) minSel.value = prevMin;
+}
+refreshTimeSelects();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot

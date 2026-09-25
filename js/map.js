@@ -1,6 +1,11 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // map.js -- Leaflet map + markers + visibility prefs (ESM) — فاز ۴ گام ۳
 //
+// ⚠️ فاز ۴D.4c:
+//   - toFa → formatNumber (اعداد locale-aware)
+//   - fmtDist/fmtDur → i18nT('units.*') برای واحدهای ترجمه‌شده
+//   - رفع باگ: state.prefs.lang → getLang() (بعد از Phase 4C)
+//
 // ⚠️ این نسخه:
 //   - _callbacks و registerMapCallbacks را با EventEmitter جایگزین می‌کند
 //   - call() برای fire-and-forget، invoke() برای getterها
@@ -8,11 +13,11 @@
 //   - dual-emit موقت برای سازگاری با route-ui.js فعلی
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa, escapeHtml } from './core.js';
+import { state, escapeHtml } from './core.js';
 import { nearestUpcoming, faShort } from './sessions.js';
 import { findTask, saveTasks } from './store.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
-import { t as i18nT } from './i18n.js';
+import { formatNumber, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Backward-compat: registerMapCallbacks (پل موقت به EventEmitter)
@@ -158,8 +163,12 @@ const PREFS_KEY = 'spaceTodoPrefs';
 
 export function loadPrefs() {
     try {
-        const p = JSON.parse(localStorage.getItem(PREFS_KEY));
-        if (!p) return;
+        const raw = localStorage.getItem(PREFS_KEY);
+        
+        const p = JSON.parse(raw);
+        if (!p) {
+            return;
+        }
         if (typeof p.mapVisible === 'boolean') state.prefs.mapVisible = p.mapVisible;
         if (typeof p.remindOn === 'boolean') state.prefs.remindOn = p.remindOn;
         if ([15, 30, 60, 180, 1440].includes(+p.remindMin)) state.prefs.remindMin = +p.remindMin;
@@ -170,18 +179,57 @@ export function loadPrefs() {
         if (typeof p.soundOn === 'boolean') state.prefs.soundOn = p.soundOn;
         if (['task', 'series', 'plan'].includes(p.pendingKind)) state.prefs.pendingKind = p.pendingKind;
         if (['auto', 'dark', 'light'].includes(p.theme)) state.prefs.theme = p.theme;
-        // ⚠️ فیلدهای صوتی جدید (فاز ۵)
         if (typeof p.soundDefault === 'boolean') state.prefs.soundDefault = p.soundDefault;
         if (typeof p.soundPreset === 'string' || p.soundPreset === null) state.prefs.soundPreset = p.soundPreset;
         if (typeof p.soundPresetOn === 'boolean') state.prefs.soundPresetOn = p.soundPresetOn;
         if (typeof p.soundTtsOn === 'boolean') state.prefs.soundTtsOn = p.soundTtsOn;
         if (typeof p.soundTtsVoice === 'string' || p.soundTtsVoice === null) state.prefs.soundTtsVoice = p.soundTtsVoice;
-    } catch { /* پیش‌فرض */ }
+        
+        // ⚠️ DEBUG — بعد از همه‌ی ifها
+    } catch (err) {
+    }
 }
 
+/**
+ * ذخیره‌ی prefs در localStorage.
+ *
+ * ⚠️ فاز ۴D.4c-fix:
+ *   - حالا `lang` را هم ذخیره می‌کند (از i18n می‌خواند)
+ *   - قبلاً lang توسط savePrefs پاک می‌شد → زبان بعد از رفرش به fa برمی‌گشت
+ *   - الان `lang` همیشه همراه با prefs ذخیره می‌شود
+ *
+ * ⚠️ چرا lang از i18n خوانده می‌شود؟
+ *   - `i18n.js` تنها منبع زبان است (تصمیم Phase 4C)
+ *   - `state.prefs.lang` حذف شده بود
+ *   - ولی `savePrefs` باید `lang` را ذخیره کند تا بعد از رفرش باقی بماند
+ */
+/**
+ * ذخیره‌ی prefs در localStorage.
+ *
+ * ⚠️ فاز ۴D.4c-fix (نسخه ۳ — نهایی):
+ *   - `lang` را از localStorage فعلی حفظ می‌کند (نه از `getLang()`)
+ *   - دلیل: `savePrefs` ممکن است قبل از `initI18n` صدا زده شود
+ *     و در آن لحظه `getLang()` مقدار پیش‌فرض `'fa'` را برمی‌گرداند
+ *   - فقط `setLang()` در i18n.js حق تغییر `lang` را دارد
+ */
 export function savePrefs() {
-    try { localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs)); }
-    catch { /* نادیده */ }
+    try {
+        const raw = localStorage.getItem(PREFS_KEY);
+        let existing = {};
+        try {
+            existing = raw ? JSON.parse(raw) : {};
+            if (!existing || typeof existing !== 'object') existing = {};
+        } catch { existing = {}; }
+
+        const payload = { ...state.prefs };
+
+        // ⚠️ lang را از localStorage فعلی حفظ کن (فقط setLang آن را تغییر می‌دهد)
+        if (typeof existing.lang === 'string') {
+            payload.lang = existing.lang;
+        }
+
+        localStorage.setItem(PREFS_KEY, JSON.stringify(payload));
+    } catch { /* نادیده */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -476,7 +524,7 @@ export function refreshMarkers() {
             saved &&
             (function () {
                 try {
-                    const coordsStr = `${toFa(loc.lat)}، ${toFa(loc.lng)}`;
+                    const coordsStr = `${formatNumber(loc.lat)}، ${formatNumber(loc.lng)}`;
                     return saved !== coordsStr;
                 } catch { return false; }
             })()
@@ -487,14 +535,15 @@ export function refreshMarkers() {
         if (displayName) {
             locRow = `<div class="pp-loc"><span>📌</span><span>${escapeHtml(displayName)}</span></div>`;
         } else {
-            const latTxt = toFa(loc.lat);
-            const lngTxt = toFa(loc.lng);
+            const latTxt = formatNumber(loc.lat);
+            const lngTxt = formatNumber(loc.lng);
                         locRow = `<div class="pp-loc pp-loc-unsaved"><span>📍</span><span class="pp-coords">${escapeHtml(latTxt)}، ${escapeHtml(lngTxt)}</span><button class="pp-save-btn" type="button" data-save-popup-location data-lat="${loc.lat}" data-lng="${loc.lng}">${i18nT('map.popup.saveName')}</button></div>`;
         }
 
         let cityRow = '';
         if (loc.cityNames) {
-            const lang = state.prefs.lang === 'en' ? 'en' : 'fa';
+            // ⚠️ فاز ۴D.4c: رفع باگ — state.prefs.lang حذف شده بود
+            const lang = getLang() === 'en' ? 'en' : 'fa';
             const city = loc.cityNames[lang] || loc.cityNames.fa || loc.cityNames.en;
             if (city) cityRow = `<div class="pp-city">🌆 ${escapeHtml(city)}</div>`;
         }
@@ -521,7 +570,7 @@ export function refreshMarkers() {
         if (list.length === 1) { addMarker(list[0].t, list[0].loc); return; }
         const lat = list.reduce((a, it) => a + it.loc.lat, 0) / list.length;
         const lng = list.reduce((a, it) => a + it.loc.lng, 0) / list.length;
-        const m = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: `<span class="mk-cluster">${toFa(list.length)}</span>`, iconSize: [34, 34], iconAnchor: [17, 17] }) });
+        const m = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: `<span class="mk-cluster">${formatNumber(list.length)}</span>`, iconSize: [34, 34], iconAnchor: [17, 17] }) });
         m.on('click', () => { suppressMapClickUntil = Date.now() + 400; map.flyTo([lat, lng], Math.min(map.getZoom() + 2, 19), { duration: .6 }); });
         markersLayer.addLayer(m);
     });
@@ -550,14 +599,17 @@ export function flyToTask(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function fmtDist(m) {
-    if (m < 1000) return `${toFa(Math.round(m))} متر`;
-    return `${toFa((m / 1000).toFixed(1))} کیلومتر`;
+    if (m < 1000) return i18nT('units.meter', { n: formatNumber(Math.round(m)) });
+    return i18nT('units.km', { n: formatNumber((m / 1000).toFixed(1)) });
 }
 
 export function fmtDur(s) {
     const m = Math.round(s / 60);
-    if (m < 60) return `${toFa(m)} دقیقه`;
-    return `${toFa(Math.floor(m / 60))} ساعت و ${toFa(m % 60)} دقیقه`;
+    if (m < 60) return i18nT('units.minute', { n: formatNumber(m) });
+    return i18nT('units.hoursAndMinutes', {
+        h: formatNumber(Math.floor(m / 60)),
+        m: formatNumber(m % 60)
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

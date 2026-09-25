@@ -698,6 +698,144 @@
         color: var(--accent-pink);
     }
 
+    /* ═══════════════════════════════════════════════════════════════════════
+       ⚠️ فاز ۴D.4b-fix: Photo Limit UI
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .photo-actions--full .photo-upload-btn--disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+        border-color: var(--border-subtle);
+        color: var(--text-faint);
+    }
+
+    .photo-limit-hint {
+        display: block;
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-inline-start: 3px solid var(--accent-yellow);
+        border-radius: var(--radius-sm);
+        background: var(--accent-yellow-soft);
+        color: var(--accent-yellow);
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.7;
+    }
+
+    html.theme-light .photo-limit-hint {
+        background: rgba(217, 119, 6, 0.08);
+        color: var(--accent-yellow);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       ⚠️ فاز ۴D.4b-fix-2: Photo Snackbar (info-type)
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .photo-snackbar {
+        position: fixed;
+        bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+        left: 50%;
+        transform: translate(-50%, 120px);
+        z-index: 250;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 18px;
+        border-radius: var(--radius-md);
+        background: linear-gradient(145deg, var(--bg-3), var(--bg-12));
+        border: 1.5px solid var(--accent-yellow-border);
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.55);
+        font-size: 0.84rem;
+        color: var(--text-primary);
+        opacity: 0;
+        transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity var(--transition-base);
+        pointer-events: none;
+        max-width: min(90vw, 520px);
+        width: max-content;
+    }
+
+    .photo-snackbar.show {
+        transform: translate(-50%, 0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .photo-snackbar-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .photo-snackbar-msg {
+        font-weight: 700;
+        color: var(--accent-yellow);
+        line-height: 1.7;
+    }
+
+    .photo-snackbar-details {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding-top: 6px;
+        border-top: 1px solid var(--border-subtle);
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        max-height: 180px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    .photo-snackbar-detail {
+        overflow-wrap: anywhere;
+        line-height: 1.6;
+        direction: rtl;
+        text-align: start;
+    }
+
+    .photo-snackbar-close {
+        appearance: none;
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 50%;
+        background: var(--bg-4);
+        color: var(--text-muted);
+        font: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.16s ease, color 0.16s ease;
+    }
+
+    .photo-snackbar-close:hover {
+        background: var(--accent-pink-soft);
+        color: var(--accent-pink);
+    }
+
+    html.theme-light .photo-snackbar {
+        box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+    }
+
+    /* ⚠️ در موبایل، snackbar بالای bottom-action-bar قرار می‌گیرد */
+    @media (max-width: 900px) {
+        .photo-snackbar {
+            bottom: calc(var(--bottom-bar-height) + 1rem + env(safe-area-inset-bottom, 0px));
+            max-width: calc(100vw - 24px);
+            padding: 12px 14px;
+            font-size: 0.78rem;
+        }
+
+        .photo-snackbar-details {
+            max-height: 140px;
+        }
+    }
+
     @keyframes photo-badge-pulse {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.15); }

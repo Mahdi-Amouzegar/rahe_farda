@@ -498,6 +498,12 @@
       "addedSome": "{n} عکس اضافه شد، {m} رد شد",
       "noneAdded": "هیچ عکسی اضافه نشد: {reason}",
       "unknownError": "خطای نامشخص",
+      "moreErrors": "و {n} مورد دیگر",
+      "limitReached": "{n} عکس حداکثر مجاز است",
+      "limitReachedHint": "حد مجاز {max} عکس پر شده است. برای افزودن عکس جدید، ابتدا یکی از عکس‌ها را حذف کنید.",
+      "addedShort": "{n} عکس اضافه شد",
+      "ignoredByLimit": "{n} عکس از حد مجاز گذشت (حداکثر {max})",
+      "failedProcess": "{n} عکس پردازش نشد",
       "limitReached": "سقف {n} عکس",
       "noFile": "فایلی انتخاب نشد",
       "deleted": "عکس حذف شد",
@@ -1131,6 +1137,7 @@
   },
   "media": {
     "errors": {
+      "svgNotSupported": "فرمت SVG پشتیبانی نمی‌شود. لطفاً از فرمت‌های JPG، PNG، WebP، GIF یا HEIC استفاده کنید.",
       "invalidFile": "فایل نامعتبر است",
       "emptyFile": "فایل خالی است",
       "tooLarge": "حجم فایل بیش از حد مجاز است (حداکثر {max})",
@@ -1180,5 +1187,23 @@
     "yes": "بله",
     "no": "خیر",
     "back": "بازگشت"
+  },
+  "units": {
+    "hoursAndMinutes": "{h} ساعت و {m} دقیقه",
+      "bytes": "{n} بایت",
+      "kb": "{n} کیلوبایت",
+      "mb": "{n} مگابایت",
+      "gb": "{n} گیگابایت",
+      "minute": "{n} دقیقه",
+      "hour": "{n} ساعت",
+      "day": "{n} روز",
+      "month": "{n} ماه",
+      "year": "{n} سال",
+      "meter": "{n} متر",
+      "km": "{n} کیلومتر"
+  },
+  "numbers": {
+      "hour": "{n}",
+      "dayOfMonth": "{n}"
   }
 }

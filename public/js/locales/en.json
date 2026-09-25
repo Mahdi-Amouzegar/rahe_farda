@@ -499,6 +499,11 @@
       "addedSome": "{n} photos added, {m} rejected",
       "noneAdded": "No photos added: {reason}",
       "unknownError": "Unknown error",
+      "moreErrors": "and {n} more",
+      "limitReachedHint": "You've reached the limit of {max} photos. Delete one photo to add a new one.",
+      "addedShort": "{n} photo(s) added",
+      "ignoredByLimit": "{n} photo(s) ignored (max {max})",
+      "failedProcess": "{n} photo(s) failed",
       "limitReached": "Limit of {n} photos",
       "noFile": "No file selected",
       "deleted": "Photo deleted",
@@ -1133,6 +1138,7 @@
   },
   "media": {
     "errors": {
+      "svgNotSupported": "SVG format is not supported. Please use JPG, PNG, WebP, GIF, or HEIC.",
       "invalidFile": "Invalid file",
       "emptyFile": "File is empty",
       "tooLarge": "File exceeds the allowed size (max {max})",
@@ -1182,5 +1188,23 @@
     "yes": "Yes",
     "no": "No",
     "back": "Back"
+  },
+  "units": {
+      "hoursAndMinutes": "{h} h {m} min",
+      "bytes": "{n} B",
+      "kb": "{n} KB",
+      "mb": "{n} MB",
+      "gb": "{n} GB",
+      "minute": "{n} min",
+      "hour": "{n} h",
+      "day": "{n} d",
+      "month": "{n} mo",
+      "year": "{n} y",
+      "meter": "{n} m",
+      "km": "{n} km"
+  },
+  "numbers": {
+      "hour": "{n}",
+      "dayOfMonth": "{n}"
   }
 }

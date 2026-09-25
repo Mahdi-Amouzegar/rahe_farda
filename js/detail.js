@@ -11,7 +11,7 @@
 //   - رفتار صفحه جزئیات (ویرایش، جلسات، عکس، timer، smart suggest) بدون تغییر است
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, toFa, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
+import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
 import { faShort, hasSessionAt, parseFaDateTime } from './sessions.js';
@@ -36,7 +36,67 @@ import {
 } from './map.js';
 import { openPicker } from './picker.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
-import { formatDate, getLang, t as i18nT } from './i18n.js';
+import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ فاز ۴D.4b-fix-2: Photo Snackbar
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// snackbar اختصاصی برای پیام‌های مهم عکس (خطاهای پردازش، رد شدن به‌خاطر limit).
+//
+// ⚠️ چرا snackbar جدید؟
+//   - snackbar موجود در ui.js دکمه‌ی «Undo» دارد — برای عکس نامناسب است
+//   - پیام‌های عکس نیاز به دکمه‌ی «بستن» و زمان نمایش بیشتر دارند
+//   - کاربر باید نام فایل‌های رد‌شده را ببیند
+
+let _photoSnackTimer = null;
+
+/**
+ * نمایش یک snackbar برای پیام‌های عکس.
+ *
+ * ⚠️ این snackbar در پایین صفحه ظاهر می‌شود، مستقل از اسکرول کاربر.
+ *
+ * @param {string} message — پیام اصلی
+ * @param {string[]} [details] — جزئیات (نام فایل‌ها، دلایل)
+ * @param {number} [durationMs] — مدت نمایش (پیش‌فرض: ۸ ثانیه)
+ */
+function showPhotoSnackbar(message, details, durationMs = 8000) {
+    const bar = document.getElementById('photoSnackbar');
+    if (!bar) return;
+
+    const msgEl = document.getElementById('photoSnackbarMsg');
+    const detailsEl = document.getElementById('photoSnackbarDetails');
+    const closeBtn = document.getElementById('photoSnackbarClose');
+
+    if (msgEl) msgEl.textContent = message;
+
+    if (detailsEl) {
+        if (Array.isArray(details) && details.length > 0) {
+            detailsEl.innerHTML = details
+                .map(d => `<div class="photo-snackbar-detail">• ${escapeHtml(d)}</div>`)
+                .join('');
+            detailsEl.style.display = '';
+        } else {
+            detailsEl.innerHTML = '';
+            detailsEl.style.display = 'none';
+        }
+    }
+
+    // ─── نمایش ───
+    bar.classList.add('show');
+    clearTimeout(_photoSnackTimer);
+    _photoSnackTimer = setTimeout(() => {
+        bar.classList.remove('show');
+    }, durationMs);
+
+    // ─── دکمه بستن ───
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            clearTimeout(_photoSnackTimer);
+            bar.classList.remove('show');
+        };
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Backward-compat: registerDetailCallbacks (پل موقت)
@@ -436,7 +496,7 @@ export function renderDetailSessions() {
     if (!task) return;
     const list = [...(task.sessions || [])].sort((a, b) => new Date(a.at) - new Date(b.at));
     const countEl = document.getElementById('sessCount');
-    if (countEl) countEl.textContent = list.length > 0 ? `(${toFa(list.length)})` : '';
+    if (countEl) countEl.textContent = list.length > 0 ? `(${formatNumber(list.length)})` : '';
     const el = document.getElementById('sessList');
     if (!el) return;
     if (list.length === 0) {
@@ -454,9 +514,9 @@ export function renderDetailSessions() {
         const pastLabel = past ? ` ${i18nT('detail.session.past')}` : '';
         const remindAria = i18nT('detail.session.remindAria');
         const locAria = i18nT('detail.session.locationAria');
-        const delAria = i18nT('detail.session.removeAria', { n: toFa(i + 1) });
+        const delAria = i18nT('detail.session.removeAria', { n: formatNumber(i + 1) });
         return `<div class="session-item ${past ? 'past' : ''}">
-            <span class="session-num">${toFa(i + 1)}</span>
+            <span class="session-num">${formatNumber(i + 1)}</span>
             <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
             <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}">
                 <option value=""${s.remindMin == null ? ' selected' : ''}>${i18nT('detail.session.remindDefault')}</option>
@@ -485,9 +545,41 @@ async function renderDetailPhotos() {
     const countEl = document.getElementById('photoCount');
     if (countEl) {
         countEl.textContent = list.length
-            ? `(${toFa(list.length)} / ${toFa(MAX_PHOTOS_PER_TASK)})`
+            ? `(${formatNumber(list.length)} / ${formatNumber(MAX_PHOTOS_PER_TASK)})`
             : '';
     }
+
+    // ⚠️ فاز ۴D.4b-fix: غیرفعال کردن دکمه‌ها وقتی به سقف رسیده‌ایم
+    const isFull = list.length >= MAX_PHOTOS_PER_TASK;
+    const photoActions = document.querySelector('.photo-actions');
+    if (photoActions) {
+        photoActions.classList.toggle('photo-actions--full', isFull);
+        const uploadBtns = photoActions.querySelectorAll('.photo-upload-btn');
+        uploadBtns.forEach(btn => {
+            if (isFull) {
+                btn.setAttribute('aria-disabled', 'true');
+                btn.classList.add('photo-upload-btn--disabled');
+            } else {
+                btn.removeAttribute('aria-disabled');
+                btn.classList.remove('photo-upload-btn--disabled');
+            }
+        });
+    }
+
+    // ⚠️ فاز ۴D.4b-fix: پیام همیشه‌موجود وقتی به سقف رسیده‌ایم
+    const limitHint = document.getElementById('photoLimitHint');
+    if (limitHint) {
+        if (isFull) {
+            limitHint.textContent = i18nT('detail.photo.limitReachedHint', {
+                max: formatNumber(MAX_PHOTOS_PER_TASK)
+            });
+            limitHint.style.display = '';
+        } else {
+            limitHint.textContent = '';
+            limitHint.style.display = 'none';
+        }
+    }
+
     const grid = document.getElementById('photoGrid');
     if (!grid) return;
 
@@ -576,9 +668,9 @@ function faDuration(sec) {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    if (h > 0) return i18nT('detail.timer.duration.hoursMinutes', { h: toFa(h), m: toFa(m) });
-    if (m > 0) return i18nT('detail.timer.duration.minutes', { m: toFa(m) });
-    return i18nT('detail.timer.duration.seconds', { s: toFa(s) });
+    if (h > 0) return i18nT('detail.timer.duration.hoursMinutes', { h: formatNumber(h), m: formatNumber(m) });
+    if (m > 0) return i18nT('detail.timer.duration.minutes', { m: formatNumber(m) });
+    return i18nT('detail.timer.duration.seconds', { s: formatNumber(s) });
 }
 
 function renderTimer() {
@@ -651,7 +743,7 @@ function renderRecurRows() {
     const mc = document.getElementById('fRecurMonthChips');
     if (mc) {
         let mhtml = '';
-        for (let d = 1; d <= 31; d++) mhtml += `<button type="button" class="day-chip${(task.recurDays || []).includes(d) ? ' on' : ''}" data-mday="${d}">${toFa(d)}</button>`;
+        for (let d = 1; d <= 31; d++) mhtml += `<button type="button" class="day-chip${(task.recurDays || []).includes(d) ? ' on' : ''}" data-mday="${d}">${formatNumber(d)}</button>`;
         mc.innerHTML = mhtml;
     }
 }
@@ -936,7 +1028,7 @@ export function bindDetailInputs() {
             call('render');
             flashSaved();
         } else {
-            flashSaved(i18nT('detail.warn.rangeError', { max: toFa(maxN) }));
+            flashSaved(i18nT('detail.warn.rangeError', { max: formatNumber(maxN) }));
         }
     });
     document.getElementById('detailLocRoute').addEventListener('click', () => {
@@ -996,14 +1088,17 @@ export function bindDetailInputs() {
 
         task.photos = task.photos || [];
 
+        const originalCount = photoInput.files ? photoInput.files.length : 0;
+
         const remaining = MAX_PHOTOS_PER_TASK - task.photos.length;
         if (remaining <= 0) {
             photoInput.value = '';
-            flashSaved(i18nT('detail.photo.limitReached', { n: toFa(MAX_PHOTOS_PER_TASK) }));
+            flashSaved(i18nT('detail.photo.limitReached', { n: formatNumber(MAX_PHOTOS_PER_TASK) }));
             return;
         }
 
         const files = [...photoInput.files].slice(0, remaining);
+        const ignoredByLimit = originalCount - files.length;
         photoInput.value = '';
 
         if (!files.length) {
@@ -1013,6 +1108,7 @@ export function bindDetailInputs() {
 
         let successCount = 0;
         let failureCount = 0;
+        /** @type {Array<{ name: string, reason: string }>} */
         const errors = [];
 
         flashSaved(i18nT('detail.photo.processing'));
@@ -1021,7 +1117,8 @@ export function bindDetailInputs() {
             const validation = validateImageFile(file);
             if (!validation.ok) {
                 failureCount++;
-                errors.push(validation.reason);
+                // ⚠️ فاز ۴D.4b-fix-2: ذخیره‌ی نام فایل + دلیل
+                errors.push({ name: file.name || '—', reason: validation.reason });
                 continue;
             }
 
@@ -1042,7 +1139,10 @@ export function bindDetailInputs() {
                 successCount++;
             } catch (err) {
                 failureCount++;
-                errors.push(err instanceof Error ? err.message : i18nT('detail.photo.processingError'));
+                errors.push({
+                    name: file.name || '—',
+                    reason: err instanceof Error ? err.message : i18nT('detail.photo.processingError'),
+                });
             }
         }
 
@@ -1052,14 +1152,57 @@ export function bindDetailInputs() {
             call('render');
         }
 
-        if (failureCount === 0) {
-            flashSaved(i18nT('detail.photo.added', { n: toFa(successCount) }));
-        } else if (successCount === 0) {
-            flashSaved(i18nT('detail.photo.noneAdded', { reason: errors[0] || i18nT('detail.photo.unknownError') }));
-        } else {
-            flashSaved(i18nT('detail.photo.addedSome', { n: toFa(successCount), m: toFa(failureCount) }));
+        // ⚠️ فاز ۴D.4b-fix-2: پیام از طریق snackbar نمایش داده می‌شود
+        //    (نه flashSaved که به پایین صفحه می‌رود و کاربر نمی‌بیند)
+
+        const hasProblem = failureCount > 0 || ignoredByLimit > 0;
+
+        if (hasProblem) {
+            // ─── ساخت پیام اصلی ───
+            const parts = [];
+            if (successCount > 0) {
+                parts.push(i18nT('detail.photo.addedShort', { n: formatNumber(successCount) }));
+            }
+            if (ignoredByLimit > 0) {
+                parts.push(i18nT('detail.photo.ignoredByLimit', {
+                    n: formatNumber(ignoredByLimit),
+                    max: formatNumber(MAX_PHOTOS_PER_TASK)
+                }));
+            }
+            if (failureCount > 0) {
+                parts.push(i18nT('detail.photo.failedProcess', { n: formatNumber(failureCount) }));
+            }
+
+            const mainMessage = parts.join(' — ');
+
+            // ─── ساخت جزئیات (نام فایل‌ها + دلیل) ───
+            // ⚠️ حداکثر ۵ مورد نمایش می‌دهیم تا snackbar خیلی بزرگ نشود
+            const detailLines = [];
+            const MAX_DETAILS = 5;
+            for (let i = 0; i < Math.min(errors.length, MAX_DETAILS); i++) {
+                const e = errors[i];
+                detailLines.push(`${e.name}: ${e.reason}`);
+            }
+            if (errors.length > MAX_DETAILS) {
+                detailLines.push(
+                    i18nT('detail.photo.moreErrors', { n: formatNumber(errors.length - MAX_DETAILS) })
+                );
+            }
+
+            showPhotoSnackbar(mainMessage, detailLines, 10000);
+        } else if (successCount > 0) {
+            // ─── فقط موفقیت ───
+            showPhotoSnackbar(
+                i18nT('detail.photo.addedShort', { n: formatNumber(successCount) }),
+                [],
+                3000
+            );
+        } else if (files.length === 0) {
+            // ─── هیچ فایلی برای پردازش نبود ───
+            flashSaved(i18nT('detail.photo.noFile'));
         }
     });
+    
     document.getElementById('photoGrid').addEventListener('click', async e => {
         const del = e.target.closest('[data-photo-del]');
         if (del) {

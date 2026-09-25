@@ -226,25 +226,18 @@
                                         <button type="button" data-srecur="dates" data-i18n="tasks.series.dates">تاریخ سررسید</button>
                                     </div>
                                     <div id="seriesSubHours" style="display: none;">
-                                        <div class="chip-row" style="margin-bottom: 8px;">
-                                            <button type="button" class="day-chip" data-snh="2">۲</button>
-                                            <button type="button" class="day-chip" data-snh="4">۴</button>
-                                            <button type="button" class="day-chip" data-snh="6">۶</button>
-                                            <button type="button" class="day-chip" data-snh="8">۸</button>
-                                            <button type="button" class="day-chip" data-snh="12">۱۲</button>
-                                            <button type="button" class="day-chip" data-snh="24">۲۴</button>
-                                        </div>
+                                        <div class="chip-row" style="margin-bottom: 8px;"></div>
                                         <label class="more-row"><span data-i18n="tasks.series.everyNHours">هر چند ساعت؟</span><input type="number" id="seriesN" min="1" max="168" value="8"></label>
                                     </div>
                                     <div id="seriesSubWeek" style="display: none;">
                                         <div class="chip-row">
-                                            <button type="button" class="day-chip" data-swday="6">شنبه</button>
-                                            <button type="button" class="day-chip" data-swday="0">یکشنبه</button>
-                                            <button type="button" class="day-chip" data-swday="1">دوشنبه</button>
-                                            <button type="button" class="day-chip" data-swday="2">سه‌شنبه</button>
-                                            <button type="button" class="day-chip" data-swday="3">چهارشنبه</button>
-                                            <button type="button" class="day-chip" data-swday="4">پنجشنبه</button>
-                                            <button type="button" class="day-chip" data-swday="5">جمعه</button>
+                                            <button type="button" class="day-chip" data-swday="6" data-i18n="recur.dayOfWeek.sat"></button>
+                                            <button type="button" class="day-chip" data-swday="0" data-i18n="recur.dayOfWeek.sun"></button>
+                                            <button type="button" class="day-chip" data-swday="1" data-i18n="recur.dayOfWeek.mon"></button>
+                                            <button type="button" class="day-chip" data-swday="2" data-i18n="recur.dayOfWeek.tue"></button>
+                                            <button type="button" class="day-chip" data-swday="3" data-i18n="recur.dayOfWeek.wed"></button>
+                                            <button type="button" class="day-chip" data-swday="4" data-i18n="recur.dayOfWeek.thu"></button>
+                                            <button type="button" class="day-chip" data-swday="5" data-i18n="recur.dayOfWeek.fri"></button>
                                         </div>
                                     </div>
                                     <div id="seriesSubMonth" style="display: none;">
@@ -478,10 +471,12 @@
                             <div class="photo-grid" id="photoGrid"></div>
                             <div class="photo-actions">
                                 <label class="due-btn photo-upload-btn" for="photoInput" style="cursor: pointer;" data-i18n="detail.sections.photos.addFromGallery">📁 افزودن از گالری</label>
-                                <input type="file" id="photoInput" accept="image/*" multiple hidden>
+                                <input type="file" id="photoInput" accept="image/jpeg,image/jpg,image/jfif,image/pjpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,image/bmp" multiple hidden>
                                 <label class="due-btn photo-upload-btn photo-camera-btn" for="photoCameraInput" style="cursor: pointer;" data-i18n="detail.sections.photos.takePhoto">📷 گرفتن عکس</label>
-                                <input type="file" id="photoCameraInput" accept="image/*" capture="environment" hidden>
+                                <input type="file" id="photoCameraInput" accept="image/jpeg,image/jpg,image/jfif,image/pjpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,image/bmp" capture="environment" hidden>
                             </div>
+                            <div class="photo-limit-hint" id="photoLimitHint" style="display: none;" role="status" aria-live="polite"></div>
+                            <div class="photo-limit-hint" id="photoLimitHint" style="display: none;" role="status" aria-live="polite"></div>
                         </div>
                     </div>
                 </section>
@@ -505,6 +500,13 @@
     </section>
 
     <div class="snackbar" id="snackbar" role="status" aria-live="polite"><span id="snackMsg"></span><button id="snackUndo" type="button" data-i18n="snackbar.undo">بازگردانی</button></div>
+    <div class="photo-snackbar" id="photoSnackbar" role="status" aria-live="polite">
+        <div class="photo-snackbar-content">
+            <div class="photo-snackbar-msg" id="photoSnackbarMsg"></div>
+            <div class="photo-snackbar-details" id="photoSnackbarDetails" style="display: none;"></div>
+        </div>
+        <button type="button" class="photo-snackbar-close" id="photoSnackbarClose" aria-label="بستن" data-i18n-aria-label="common.close">✕</button>
+    </div>
     <div class="lightbox" id="lightbox" style="display: none;" role="dialog" aria-modal="true" data-i18n-aria-label="detail.sections.photos.viewAlt" aria-label="نمایش تصویر" tabindex="-1"><img id="lightboxImg" data-i18n-aria-label="detail.sections.photos.viewAlt" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" style="display: none;">
