@@ -1,499 +1,312 @@
-# راه فردا
+# Rahe Farda
 
-**راه فردا** یک برنامه‌ریز شخصی فارسی و راست‌به‌چپ برای مدیریت کارها، برنامه‌ها و دوره‌های تکرارشونده است.
+> 🇮🇷 **[نسخه‌ی فارسی / Persian version →](./README.fa.md)**
 
-این برنامه با هدف کمک به برنامه‌ریزی فعالیت‌های روزانه و آینده، مدیریت زمان، مکان و یادآورها و پیگیری میزان پیشرفت طراحی شده است. راه فردا بدون نیاز به ایجاد حساب کاربری قابل استفاده است و بخش مهمی از اطلاعات را روی دستگاه کاربر نگهداری می‌کند.
+**A local-first Persian (Jalali) personal planner — with offline support and optional multi-device cloud sync.**
 
-فعالیت‌های برنامه در سه دسته اصلی سازمان‌دهی می‌شوند:
-
-- **کار:** فعالیت‌های مستقل و معمولی که می‌توان آنها را برای یک زمان مشخص برنامه‌ریزی و پیگیری کرد.
-- **برنامه:** فعالیت‌های چندمرحله‌ای که از چند وظیفه یا زیرکار تشکیل شده‌اند.
-- **دوره:** فعالیت‌هایی که در چند تاریخ یا به‌صورت تکرارشونده انجام می‌شوند؛ مانند کلاس، مطالعه یا تمرین منظم.
-
----
-
-## کار
-
-بخش **کار** برای ثبت و مدیریت فعالیت‌های مستقل روزانه و آینده است.
-
-امکانات این بخش شامل:
-
-- ایجاد، ویرایش و حذف کارها
-- تعیین تاریخ و ساعت انجام
-- ثبت توضیحات بیشتر برای هر فعالیت
-- افزودن شماره تلفن
-- افزودن آدرس وب‌سایت
-- افزودن تصاویر و فایل‌های تصویری
-- تعیین مکان فعالیت روی نقشه
-- مشاهده فاصله و مسیر تا مکان موردنظر
-- تنظیم یادآور
-- علامت‌گذاری کار به‌عنوان انجام‌شده
-- انتقال موارد حذف‌شده به سطل بازیافت
-- جستجو و فیلتر کردن فعالیت‌ها
-- استفاده از ورودی صوتی و تبدیل گفتار به متن فارسی برای بخش‌های متنی
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://mahdi-amouzegar.github.io/rahe_farda/)
+[![Built with Vite](https://img.shields.io/badge/built%20with-Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Cloudflare Workers](https://img.shields.io/badge/backend-Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![License](https://img.shields.io/badge/license-Proprietary-red)](#license)
 
 ---
 
-## برنامه
+## 1. What is Rahe Farda?
 
-**برنامه** برای فعالیت‌هایی است که انجام آنها به چند مرحله یا چند وظیفه کوچک‌تر نیاز دارد.
+Rahe Farda is a **Persian-first, RTL-native personal planner** designed around the **Jalali (Solar Hijri) calendar**. It helps you manage daily tasks, multi-step projects, and recurring series — with optional map integration, offline support, and multi-device sync.
 
-برای مثال، برنامه «سفر» می‌تواند شامل چند زیرکار مانند رزرو بلیت، آماده‌کردن وسایل، خرید و حرکت باشد.
+**Three types of activities:**
 
-امکانات این بخش شامل:
+| Type | Description |
+|------|-------------|
+| **Task** | A single activity, optionally with a due date and location. |
+| **Plan** | A multi-step activity composed of sub-tasks. |
+| **Series** | A recurring activity across multiple dates (daily, weekly, monthly, or custom). |
 
-- ایجاد یک برنامه و تعریف زیرکارهای آن
-- مدیریت و پیگیری وضعیت هر زیرکار
-- مشاهده میزان پیشرفت برنامه
-- تعیین زمان و تاریخ برای مراحل مختلف
-- افزودن توضیحات و اطلاعات تکمیلی
-- ثبت شماره تلفن و آدرس سایت مرتبط
-- افزودن تصاویر و فایل‌های تصویری
-- تعیین مکان و مشاهده آن روی نقشه
-- یادآوری مراحل مختلف
-- استفاده از ورودی صوتی برای ثبت سریع اطلاعات
-- حذف و بازیابی برنامه‌ها و زیرکارها از طریق سطل بازیافت
+Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the date parsing (`فردا ساعت ۵`), the number rendering, and the UI flow are all Persian-native by design — with full English support as a second language.
 
 ---
 
-## دوره
+## 2. Why Rahe Farda?
 
-**دوره** برای فعالیت‌هایی است که در چند نوبت و در تاریخ‌های مختلف انجام می‌شوند؛ مانند کلاس زبان، مطالعه روزانه، ورزش یا یک دوره آموزشی.
-
-امکانات این بخش شامل:
-
-- ایجاد فعالیت‌های تکرارشونده
-- تعیین زمان و تاریخ‌های انجام
-- پیگیری انجام‌شدن جلسات
-- مشاهده وضعیت و روند پیشرفت
-- ثبت توضیحات و اطلاعات تکمیلی
-- افزودن تلفن، آدرس سایت و تصاویر مرتبط
-- تنظیم یادآور برای زمان‌های مشخص
-- مشاهده فعالیت‌های گذشته و آینده
-- جستجو و فیلتر فعالیت‌ها
+- 📅 **Jalali calendar native** — not a translation layer on top of Gregorian.
+- 📴 **Offline-first** — the app works without an internet connection for core features.
+- 🚫 **No account required** — all core features work anonymously. Cloud sync is optional and requires a Telegram account.
+- 🌐 **Bilingual** — Persian (RTL) and English (LTR) with a single toggle.
+- 📱 **Installable** — PWA on any device, plus Android via TWA.
+- 🔒 **Local-first** — your data is stored locally by default; cloud sync is opt-in.
+- 🗺️ **Location-aware** — saved places, route calculation, live tracking.
+- 🎤 **Voice input** — speech-to-text in Persian and English.
+- 🛡️ **Security built into the architecture** — authentication, authorization, session/device management, idempotent sync, private media storage, per-feature security gates.
 
 ---
 
-## برنامه‌ریزی زمان و تقویم
+## 3. Key Features
 
-راه فردا ابزارهایی برای برنامه‌ریزی بر اساس تاریخ و ساعت در اختیار کاربر قرار می‌دهد:
+### Task Management
+- Create, edit, delete, complete tasks
+- Due dates with Jalali calendar picker
+- Priority levels, descriptions, phone, address, website
+- Photo attachments (up to 8 per task, auto-converted to WebP)
+- Smart date parsing from Persian text (`فردا ساعت ۵`, `۳ روز دیگر`)
+- Trash with 30-day retention
 
-- تقویم جلالی
-- برنامه‌ریزی فعالیت‌ها برای تاریخ و ساعت مشخص
-- نمایش فعالیت‌های روزانه
-- مشاهده فعالیت‌های گذشته و آینده
-- به‌روزرسانی تاریخ و ساعت
-- یادآورهای زمان‌بندی‌شده
-- خلاصه صبحگاهی از برنامه‌های پیش‌رو
-- حرکت بین تاریخ‌ها و روزهای مختلف
-- نمایش مناسب تاریخ‌ها در رابط فارسی
+### Plans & Series
+- Multi-step plans with sub-tasks and progress tracking
+- Recurring series (daily, weekly, monthly, hourly, custom intervals)
+- Templates for common workflows (travel, moving, exam prep, etc.)
 
----
+### Calendar & Time
+- Native Jalali calendar
+- Day view with filters
+- Morning digest with upcoming events
+- Server-corrected time with offline fallback
 
-## مکان‌ها و نقشه
+### Maps & Locations
+- Place search (Nominatim / OSM)
+- Saved locations with custom names
+- Route calculation (car, bike, foot)
+- Live location tracking
+- Weather forecast for upcoming events (Open-Meteo)
 
-یکی از بخش‌های اصلی راه فردا، مدیریت مکان و ارتباط فعالیت‌ها با موقعیت جغرافیایی است.
+### Notifications & Reminders
+- Session reminders with configurable lead time
+- Three sound modes: default chime, preset, and TTS
+- Desktop notifications via PWA
+- Morning digest
 
-### جستجوی مکان
+### Sync & Multi-Device (Optional)
+- Telegram login for cloud sync
+- Device linking via one-time sync codes
+- **Transactional offline sync** — local changes and their sync operations are persisted atomically in IndexedDB, with crash recovery and idempotent server processing
+- Cloudflare D1 as authoritative cloud state for synced data
 
-در بالای بخش نقشه، امکان جستجوی مکان وجود دارد.
+### Media (Photos)
+- Automatic WebP conversion with JPEG fallback
+- Presigned-URL upload to ParsPack (S3-compatible storage)
+- EXIF stripped on the client
+- Max 5MB input, max 8 photos per task
 
-امکانات جستجو شامل:
-
-- جستجوی مکان، آدرس و شهر
-- پشتیبانی از جستجوی فارسی
-- پیشنهاد خودکار نتایج هنگام تایپ
-- استفاده از دکمه میکروفون برای جستجوی صوتی
-- انتخاب نتیجه از فهرست پیشنهادها
-- انتقال خودکار نقشه به مکان انتخاب‌شده
-- نمایش نشانگر مکان انتخاب‌شده
-
-برای کاهش تعداد درخواست‌های اینترنتی، جستجو با تأخیر کوتاه انجام می‌شود و نتایج اخیر نیز در حافظه موقت نگهداری می‌شوند.
-
-### ذخیره مکان‌ها
-
-مکان‌های پرکاربرد را می‌توان با **نام دلخواه** ذخیره کرد تا بعداً سریع‌تر به آنها دسترسی داشت.
-
-برای مثال:
-
-- خانه
-- محل کار
-- دانشگاه
-- باشگاه
-- مطب پزشک
-- فروشگاه موردنظر
-
-مکان ذخیره‌شده می‌تواند هنگام ایجاد یا ویرایش فعالیت دوباره مورد استفاده قرار گیرد.
-
-### مسیر و فاصله
-
-برای فعالیت‌هایی که مقصد مشخص دارند، راه فردا می‌تواند:
-
-- فاصله تا مقصد را محاسبه کند
-- مسیر تا مقصد را نمایش دهد
-- مسیرهای مختلف جابه‌جایی را نمایش دهد
-- اطلاعات مسیر پیاده، دوچرخه و خودرو را ارائه کند
-- خلاصه مسیر را در اختیار کاربر قرار دهد
+### UI & Accessibility
+- Persian (RTL) and English (LTR)
+- Light, Dark, and Auto themes
+- Simple and Pro modes
+- Responsive for mobile and desktop
+- Keyboard-friendly interface
 
 ---
 
-## ردیابی زنده موقعیت
+## 4. Current Status
 
-در نسخه `v1.3.0.0` امکان **ردیابی زنده موقعیت کاربر** به نقشه اضافه شده است.
+### ✅ Implemented (Available Today)
 
-با فعال‌کردن ردیابی:
+- Offline-first planner with Jalali calendar
+- Tasks, Plans, Series, sub-tasks
+- Maps, place search, routes, live tracking
+- Weather forecast
+- Reminders and morning digest
+- Voice input (Persian + English)
+- Photo attachments with WebP conversion
+- PWA install (browser + Android TWA)
+- Telegram login with session/device management
+- Multi-device sync with transactional outbox
+- Bilingual interface (Persian + English)
 
-- موقعیت کاربر به‌صورت دوره‌ای به‌روزرسانی می‌شود
-- در اولین موقعیت معتبر، نقشه برای نمایش موقعیت و مقصد تنظیم می‌شود
-- اگر مسیر فعالی وجود داشته باشد، موقعیت و مقصد در محدوده مناسب نمایش داده می‌شوند
-- در ادامه، نقشه فقط در صورت خارج‌شدن موقعیت از محدوده دید جابه‌جا می‌شود
-- زوم انتخاب‌شده توسط کاربر تا حد امکان حفظ می‌شود
-- در صورت تغییر موقعیت، مسیر فعال می‌تواند به‌صورت خودکار به‌روزرسانی شود
+### ⏳ In Progress / Next
 
-این رفتار باعث می‌شود هنگام حرکت، نقشه بدون اینکه دائماً کنترل زوم را از کاربر بگیرد، موقعیت فعلی را دنبال کند.
+- **Phase 4D** — Number & unit localization (Jalali numbers in Persian, Latin in English)
 
----
+### 🗓️ Planned
 
-## یادآورها و خلاصه صبحگاهی
+- Communication (connections, blocks, direct messages)
+- Groups (create, invite, members, group tasks, group timeline)
+- Group sync with independent change sequences
+- Sidebar navigation with unified search
+- Welcome wizard
+- Backup & Restore v2
+- Account lifecycle (deletion, transfer, anonymization)
+- Rate limiting and final security audit
 
-راه فردا برای کمک به پیگیری برنامه روزانه، امکانات یادآوری و خلاصه روزانه دارد:
+### ❌ Deferred
 
-- تعیین یادآور برای فعالیت‌ها
-- انتخاب فاصله زمانی یادآوری
-- یادآوری جلسات
-- صدای یادآور
-- خلاصه صبحگاهی
-- مشاهده فعالیت‌های پیش‌رو
-- پیگیری کارهای انجام‌شده و باقی‌مانده
-
-تنظیمات مربوط به یادآورها از بخش تنظیمات قابل مدیریت است.
-
----
-
-## جستجو، فیلتر و مرتب‌سازی
-
-راه فردا برای پیدا کردن سریع فعالیت‌ها امکان جستجو و فیلتر را فراهم می‌کند.
-
-امکانات شامل:
-
-- جستجوی فعالیت‌ها
-- فیلتر کردن فهرست
-- محدودکردن نتایج بر اساس وضعیت و ویژگی‌های فعالیت
-- مرتب‌سازی نتایج
-- دسترسی سریع‌تر به کارها، برنامه‌ها و دوره‌ها
-
-در **حالت ساده**، رابط کاربری برای جلوگیری از شلوغی ساده‌تر نگه داشته می‌شود و فیلترها و گزینه‌های مرتب‌سازی پیشرفته در دسترس نیستند.
-
-در **حالت حرفه‌ای**، فیلتر و مرتب‌سازی در اختیار کاربر قرار می‌گیرد.
+- Google Login (Google Cloud Console restricted in Iran)
+- Email + Password (email services restricted in Iran)
 
 ---
 
-## گزارش پیشرفت
+## 5. Architecture
 
-راه فردا امکان مشاهده روند فعالیت‌ها و پیشرفت را به شکل نموداری فراهم می‌کند.
+### High-Level Diagram
 
-گزارش‌ها شامل:
+┌──────────────────────── Browser ───────────────────────┐
+│ │
+│ UI (Persian RTL / English LTR) │
+│ │ │
+│ IndexedDB ← local operational store │
+│ │ │
+│ Transactional Outbox ← atomic task + sync op │
+│ │ │
+└───┼────────────────────────────────────────────────────┘
+│ optional HTTPS sync (opt-in)
+▼
+┌────────────── Cloudflare Worker ───────────────────────┐
+│ Auth · Sessions · Sync Engine · Media Authorization │
+└──────────────┬──────────────────────┬──────────────────┘
+▼ ▼
+┌──────────────┐ ┌────────────────┐
+│ Cloudflare │ │ ParsPack │
+│ D1 │ │ (S3 private) │
+│ (metadata) │ │ (media files) │
+└──────────────┘ └────────────────┘
 
-- **نمودار خطی** برای مشاهده روند تغییرات و پیشرفت در طول زمان
-- **نمودار میله‌ای** برای مقایسه میزان فعالیت یا پیشرفت در بازه‌های مختلف
-- بررسی عملکرد روزهای گذشته
-- مشاهده روند انجام فعالیت‌ها
-- کمک به درک بهتر میزان پیشرفت
+text
 
----
+### Key Principles
 
-## اطلاعات تکمیلی فعالیت‌ها
-
-برای هر فعالیت می‌توان اطلاعات تکمیلی موردنیاز را ذخیره کرد، از جمله:
-
-- توضیحات بیشتر
-- شماره تلفن
-- آدرس وب‌سایت
-- تصاویر و فایل‌های تصویری
-- مکان
-- تاریخ
-- ساعت
-- یادآورها
-- اطلاعات مربوط به جلسات و مراحل فعالیت
-
----
-
-## الگوها (Templates)
-
-برای فعالیت‌هایی که معمولاً چند بار تکرار می‌شوند، می‌توان از الگوها استفاده کرد.
-
-برای مثال، یک الگوی «سفر» می‌تواند تعدادی از کارهای معمول سفر را از قبل در خود داشته باشد و هنگام برنامه‌ریزی، آنها را سریع به فهرست فعالیت‌ها اضافه کند.
-
-این قابلیت برای ساخت برنامه‌های تکرارشونده و جلوگیری از ورود دوباره اطلاعات مفید است.
+- **Local-first** — the browser is the operational source of truth for personal data.
+- **D1 as authoritative cloud state** — only for data that has been explicitly synced.
+- **Media lives outside D1** — files go to private object storage via short-lived presigned URLs.
+- **Central sync contract** — every feature uses the same sync path; no per-feature protocols.
+- **Security as a cross-cutting concern** — every phase ends with a security gate; a final audit is planned after Phase 9.
 
 ---
 
-## حالت ساده، حرفه‌ای و پیشرفته
+## 6. Tech Stack
 
-راه فردا تلاش می‌کند امکانات زیاد برنامه باعث پیچیده‌شدن تجربه کاربر نشود.
-
-### حالت ساده
-
-در حالت ساده:
-
-- امکانات اصلی در دسترس هستند
-- رابط کاربری خلوت‌تر است
-- گزینه‌های پیشرفته کمتر نمایش داده می‌شوند
-- فیلتر و مرتب‌سازی پیشرفته پنهان می‌شوند
-- تقویم و سطل بازیافت همچنان در دسترس باقی می‌مانند
-
-### حالت حرفه‌ای
-
-در حالت حرفه‌ای، امکانات و کنترل‌های بیشتری در اختیار کاربر قرار می‌گیرد؛ از جمله:
-
-- فیلترهای بیشتر
-- گزینه‌های مرتب‌سازی
-- کنترل‌های پیشرفته‌تر فعالیت‌ها
-- دسترسی سریع‌تر به امکانات مدیریتی
-
-فعال‌کردن حالت حرفه‌ای اطلاعات یا قابلیت‌های اصلی برنامه را حذف نمی‌کند.
+| Layer | Technology |
+|-------|------------|
+| Frontend | Vanilla HTML / CSS / JS (no framework) + Vite 6 |
+| Backend | Cloudflare Workers (TypeScript) |
+| Database | Cloudflare D1 (SQLite) |
+| Object Storage | ParsPack (S3-compatible, MinIO backend) |
+| Auth | Telegram Login + sessions/devices (Google & Email deferred) |
+| Maps | Leaflet + OpenStreetMap |
+| Geocoding | Nominatim |
+| Routing | OSRM (routing.openstreetmap.de) |
+| Weather | Open-Meteo |
+| Hosting | GitHub Pages (client) + Cloudflare Workers (API) |
+| Testing | Vitest + jsdom |
 
 ---
 
-## ورودی صوتی و تبدیل گفتار به متن
+## 7. Getting Started
 
-در بخش‌هایی که نیاز به تایپ اطلاعات وجود دارد، امکان استفاده از **گفتار و تبدیل خودکار صحبت به متن فارسی** فراهم شده است.
+### As a User
 
-این قابلیت می‌تواند برای ورود سریع اطلاعاتی مانند:
+**[→ Open the Live Demo](https://mahdi-amouzegar.github.io/rahe_farda/)**
 
-- عنوان فعالیت
-- توضیحات
-- اطلاعات تکمیلی
-- جستجوی مکان
-- سایر فیلدهای متنی
+Or install it as a PWA:
 
-استفاده شود.
+1. Open the demo URL in Chrome, Edge, or Safari.
+2. Use "Install" in the address bar (or "Add to Home Screen" on mobile).
+3. No account required — start adding tasks immediately.
 
-در جستجوی نقشه نیز دکمه میکروفون برای ورود صوتی عبارت جستجو در نظر گرفته شده است.
+### As a Developer
 
----
+```bash
+# Clone
+git clone https://github.com/Mahdi-Amouzegar/rahe_farda.git
+cd rahe_farda
 
-## سطل بازیافت
+# Install
+npm install
 
-موارد حذف‌شده در **سطل بازیافت** نگهداری می‌شوند و امکان مدیریت آنها وجود دارد.
+# Dev server
+npm run dev
 
-این بخش برای کاهش احتمال حذف ناخواسته اطلاعات در نظر گرفته شده و امکان بازیابی موارد حذف‌شده را فراهم می‌کند.
+# Build
+npm run build
 
----
+# Preview
+npm run preview
 
-## تنظیمات و مجوزهای سیستم
+# Tests
+npm test
+The backend (Cloudflare Worker + D1) lives in a separate repository:
 
-بخش تنظیمات امکان مدیریت بخش‌های مختلف برنامه را فراهم می‌کند.
+bash
+git clone https://github.com/Mahdi-Amouzegar/rahe-farda-worker.git
+8. Roadmap
+Status	Milestone
+✅	Core offline-first planner
+✅	Authentication & device linking
+✅	Multi-device sync infrastructure
+✅	Media storage (WebP + ParsPack)
+✅	English interface
+⏳	Number & unit localization
+🗓️	Communication & groups (database + API)
+🗓️	Group synchronization
+🗓️	Communication & group UI
+🗓️	Backup / restore v2
+🗓️	Account lifecycle & security hardening
+🗓️	Final security audit
+9. Privacy
+Rahe Farda is designed for personal, offline-first use:
 
-از جمله:
+Core features work without an account. Your data is stored locally by default.
 
-- حالت نمایش
-- زبان رابط
-- یادآورها
-- خلاصه صبحگاهی
-- صدای یادآور
-- حالت حرفه‌ای
-- نصب برنامه
-- حریم خصوصی
+Cloud sync is optional. Telegram login is required only if you enable multi-device sync.
 
-همچنین وضعیت و دسترسی مجوزهای سیستم برای موارد زیر قابل بررسی و آزمایش است:
+Third-party services are used only for specific features — maps, geocoding, routing, weather, and speech recognition. The data sent to these services is limited to what is required for the requested operation. Task content is not sent as part of normal map, weather, or geocoding operations.
 
-- اعلان‌ها
-- موقعیت مکانی
-- میکروفون
+Media files are stored in a private bucket, accessible only via short-lived presigned URLs issued by the backend after authentication.
 
----
+For full details, see the in-app Privacy page.
 
-## زبان و رابط کاربری
+10. License
+© 1405 / 2026 Mahdi Amouzegar. All rights reserved.
 
-راه فردا برای استفاده فارسی‌زبانان طراحی شده و از ویژگی‌های زیر پشتیبانی می‌کند:
+This is source-available software, not open-source.
 
-- رابط کاربری فارسی و راست‌به‌چپ (RTL)
-- پشتیبانی از انگلیسی و چپ‌به‌راست (LTR)
-- طراحی واکنش‌گرا برای موبایل و دسکتاپ
-- رابط کاربری مناسب نمایشگرهای کوچک
-- حالت روشن (Light)
-- حالت تاریک (Dark)
-- حالت خودکار (Auto) بر اساس تنظیمات سیستم
+You may:
 
-تقویم و کنترل‌های مربوط به تاریخ نیز برای نمایش فارسی و جلالی بهینه شده‌اند.
+View the source code on GitHub.
 
----
+Clone the repository for personal use.
 
-## پوسته و حالت نمایش
+Report bugs and suggest features via GitHub Issues.
 
-راه فردا از سه حالت نمایش پشتیبانی می‌کند:
+You may NOT:
 
-- **روشن (Light)**
-- **تاریک (Dark)**
-- **خودکار (Auto)**
+Redistribute, sublicense, or sell the software.
 
-در حالت خودکار، ظاهر برنامه با تنظیمات رنگ سیستم هماهنگ می‌شود.
+Modify and publish derivative works.
 
-همچنین تنظیمات Theme پیش از نمایش اولیه صفحه اعمال می‌شوند تا از تغییر ناگهانی ظاهر برنامه هنگام بارگذاری جلوگیری شود.
+Use the code in other projects without written permission.
 
-این رفتار برای استفاده در مرورگر و نسخه نصب‌شده PWA/TWA نیز در نظر گرفته شده است.
+Use the name, logo, or branding without written permission.
 
----
+Issues and bug reports are welcome. Pull requests are not accepted.
 
-## استفاده بدون حساب کاربری
+For licensing inquiries, please reach out via LinkedIn.
 
-راه فردا برای استفاده شخصی طراحی شده و برای امکانات اصلی آن نیازی به:
+Acknowledgments
+Rahe Farda is built on the shoulders of these open projects:
 
-- ثبت‌نام
-- ورود به حساب کاربری
-- ایجاد حساب آنلاین
+Leaflet — map rendering
 
-وجود ندارد.
+OpenStreetMap — map tiles
 
-اطلاعات برنامه در سمت کاربر نگهداری می‌شود و برنامه برای استفاده معمول به یک حساب کاربری مرکزی وابسته نیست.
+Nominatim — geocoding
 
----
+OSRM — routing
 
-## PWA و نصب روی دستگاه
+Open-Meteo — weather forecast
 
-راه فردا به‌صورت **Progressive Web App (PWA)** طراحی شده و امکان نصب آن روی دستگاه وجود دارد.
+Vazirmatn — Persian font
 
-همچنین نسخه Android با استفاده از **Trusted Web Activity (TWA)** قابل بسته‌بندی است.
+Vite — build tool
 
-برای اتصال نسخه Android به دامنه برنامه از **Digital Asset Links** استفاده می‌شود.
+Cloudflare Workers — backend platform
 
----
+ParsPack — S3-compatible object storage
 
-## استفاده آفلاین و وابستگی به اینترنت
+Made with ❤ by Mahdi Amouzegar
 
-راه فردا برای استفاده شخصی طراحی شده و بخشی از امکانات آن می‌تواند بدون حساب کاربری و با اتکا به اطلاعات ذخیره‌شده روی دستگاه مورد استفاده قرار گیرد.
+Rahe Farda — Your tasks, your time, your path.
 
-با این حال، **همه امکانات برنامه کاملاً آفلاین نیستند**.
-
-برخی قابلیت‌ها برای دریافت اطلاعات جدید یا ارتباط با سرویس‌های آنلاین به اینترنت نیاز دارند، از جمله:
-
-- **به‌روزرسانی تاریخ و ساعت از سرویس‌های آنلاین**
-- **نقشه**
-- **جستجوی مکان و شهر**
-- **پیشنهادهای جستجوی مکان**
-- **دریافت اطلاعات مسیر**
-- **محاسبه و به‌روزرسانی مسیر**
-- **ردیابی و دریافت موقعیت جغرافیایی در سرویس‌های مربوط به نقشه**
-- **تبدیل گفتار به متن**
-- **جستجوی صوتی مکان‌ها**
-
-بنابراین برای استفاده از این قابلیت‌ها باید اتصال اینترنت در دسترس باشد.
+text
 
 ---
 
-## حریم خصوصی و داده‌های کاربر
-
-راه فردا برای استفاده شخصی و بدون حساب کاربری طراحی شده است.
-
-داده‌های اصلی برنامه در سمت کاربر نگهداری می‌شوند و برنامه برای استفاده معمول نیازمند حساب مرکزی نیست.
-
-قابلیت‌هایی که نیاز به سرویس‌های خارجی دارند، مانند نقشه، جستجوی مکان، مسیر، زمان آنلاین یا تبدیل گفتار به متن، برای انجام وظیفه خود با سرویس مربوطه ارتباط برقرار می‌کنند.
-
----
-
-## سازگاری و تجربه کاربری
-
-در نسخه‌های اخیر تمرکز ویژه‌ای روی تجربه استفاده در موبایل و دسکتاپ انجام شده است، از جمله:
-
-- طراحی واکنش‌گرا
-- منوهای عملیات مناسب لمس در موبایل
-- بهبود موقعیت منوهای عملیات نسبت به دکمه مربوطه
-- بهبود بخش جزئیات فعالیت
-- بهبود نمایش نقشه
-- بهبود نمایش تقویم فارسی
-- بهبود نمایش فوتر در موبایل
-- اصلاح خطاهای مربوط به مسیر و ردیابی زنده
-- حذف فایل favicon غیرضروری و حجیم
-- بهبود سیاست امنیتی CSP برای سرویس جستجوی مکان
-
----
-
-## ویژگی‌های اصلی در یک نگاه
-
-### مدیریت فعالیت
-
-- کار
-- برنامه چندمرحله‌ای
-- دوره‌های تکرارشونده
-- زیرکارها و جلسات
-- توضیحات تکمیلی
-- تلفن
-- آدرس وب‌سایت
-- تصاویر
-- تاریخ و ساعت
-- یادآورها
-
-### زمان و برنامه‌ریزی
-
-- تقویم جلالی
-- برنامه‌ریزی روزانه
-- تاریخ و ساعت
-- خلاصه صبحگاهی
-- یادآور
-- مشاهده فعالیت‌های گذشته و آینده
-
-### نقشه و مکان
-
-- نقشه
-- جستجوی مکان
-- جستجوی شهر و آدرس
-- جستجوی فارسی
-- پیشنهاد خودکار
-- جستجوی صوتی
-- انتخاب نتیجه روی نقشه
-- ذخیره مکان با نام دلخواه
-- فاصله تا مقصد
-- مسیر پیاده
-- مسیر دوچرخه
-- مسیر خودرو
-- ردیابی زنده
-- به‌روزرسانی موقعیت
-- به‌روزرسانی مسیر فعال
-- حفظ زوم کاربر
-
-### مدیریت و گزارش
-
-- جستجوی فعالیت‌ها
-- فیلتر
-- مرتب‌سازی
-- حالت ساده
-- حالت حرفه‌ای
-- گزارش پیشرفت
-- نمودار خطی
-- نمودار میله‌ای
-- الگوها
-- سطل بازیافت
-
-### ورودی و اطلاعات
-
-- تبدیل گفتار به متن فارسی
-- ورود صوتی برای جستجو
-- توضیحات بیشتر
-- تلفن
-- آدرس سایت
-- تصاویر
-
-### تنظیمات
-
-- Light
-- Dark
-- Auto
-- فارسی / انگلیسی
-- RTL / LTR
-- یادآورها
-- خلاصه صبحگاهی
-- صدای یادآور
-- مدیریت مجوز اعلان
-- مدیریت مجوز موقعیت مکانی
-- مدیریت مجوز میکروفون
-- حالت حرفه‌ای
-- نصب روی دستگاه
-
-### نصب
-
-- PWA
-- Android / TWA
-- Digital Asset Links
-
----
