@@ -145,6 +145,7 @@ flowchart TB
         UI["UI — Persian RTL / English LTR"]
         IDB[("IndexedDB — local operational store")]
         Outbox["Transactional Outbox — atomic task + sync op"]
+
         UI --> IDB
         IDB --> Outbox
     end
@@ -158,9 +159,9 @@ flowchart TB
         ParsPack[("ParsPack — private media files")]
     end
 
-    Outbox -.->|"optional HTTPS sync"| Worker
-    Worker --> D1
-    Worker --> ParsPack
+    Outbox -. "optional HTTPS sync" .-> API
+    API --> D1
+    API --> ParsPack
 ```
 
 ### Key Principles
