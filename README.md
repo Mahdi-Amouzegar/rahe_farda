@@ -84,7 +84,7 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 
 ### Media (Photos)
 - Automatic WebP conversion with JPEG fallback
-- Presigned-URL upload to ParsPack (S3-compatible storage)
+- Private media storage with backend-authorized uploads
 - EXIF stripped on the client
 - Max 5MB input, max 8 photos per task
 
@@ -130,8 +130,8 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 
 ### ❌ Deferred
 
-- Google Login (Google Cloud Console restricted in Iran)
-- Email + Password (email services restricted in Iran)
+- Google Login
+- Email + Password
 
 ---
 
@@ -146,19 +146,19 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 | Browser | Transactional Outbox | Stores sync operations atomically with local changes | IndexedDB → Outbox |
 | Cloud | Cloudflare Worker | Authentication, sessions, sync engine, and media authorization | Outbox → HTTPS → Worker |
 | Storage | Cloudflare D1 | Stores synchronized metadata | Worker → D1 |
-| Storage | ParsPack | Stores private media files | Worker → ParsPack |
+| Storage | Private object storage | Stores private media files | Worker → Object Storage |
 
 ### Data Flow
 
-**UI → IndexedDB → Transactional Outbox → Cloudflare Worker → D1 / ParsPack**
+**UI → IndexedDB → Transactional Outbox → Sync API → Cloud Storage**
 
 ### Key Principles
 
 - **Local-first:** The browser remains the primary operational environment.
 - **Offline-capable:** Local data can be used without an active network connection.
 - **Transactional sync:** Local changes and their corresponding sync operations are committed atomically.
-- **Server-authorized access:** The Worker controls authentication, synchronization, and media authorization.
-- **Separated storage:** Metadata is stored in D1, while private media files are stored separately.
+- **Server-authorized access:** The backend controls authentication, synchronization, and access to cloud data.
+- **Separated storage:** Metadata and media are stored separately.
 
 ---
 
@@ -169,8 +169,8 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 | Frontend | Vanilla HTML / CSS / JS (no framework) + Vite 6 |
 | Backend | Cloudflare Workers (TypeScript) |
 | Database | Cloudflare D1 (SQLite) |
-| Object Storage | ParsPack (S3-compatible, MinIO backend) |
-| Auth | Telegram Login + sessions/devices (Google & Email deferred) |
+| Object Storage | Private S3-compatible object storage |
+| Auth | Authenticated cloud sync (provider details may evolve) |
 | Maps | Leaflet + OpenStreetMap |
 | Geocoding | Nominatim |
 | Routing | OSRM (routing.openstreetmap.de) |
@@ -239,11 +239,11 @@ Rahe Farda is designed for personal, offline-first use:
 
 Core features work without an account. Your data is stored locally by default.
 
-Cloud sync is optional. Telegram login is required only if you enable multi-device sync.
+Cloud sync is optional. Authentication is required only if you enable multi-device sync.
 
 Third-party services are used only for specific features — maps, geocoding, routing, weather, and speech recognition. The data sent to these services is limited to what is required for the requested operation. Task content is not sent as part of normal map, weather, or geocoding operations.
 
-Media files are stored in a private bucket, accessible only via short-lived presigned URLs issued by the backend after authentication.
+Media files are stored in private object storage and are accessible only through backend-authorized access.
 
 For full details, see the in-app Privacy page.
 
