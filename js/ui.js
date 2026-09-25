@@ -46,9 +46,11 @@ import {
 } from './store.js';
 import {
     JALALI_MONTHS,
+    getMonthName,
     gregorianToJalali,
     jalaliToGregorian,
-    jalaliMonthLength
+    jalaliMonthLength,
+    gregorianMonthLength
 } from './jalali.js';
 import { scheduleMarkerRefresh } from './map.js';
 import { getWeatherIcon } from './weather.js';
@@ -57,7 +59,7 @@ import {
     diffTasks,
     isSafeForDiff
 } from './render-diff.js';
-import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
+import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -383,9 +385,17 @@ export function closeTrash() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function shiftCalMonth(delta) {
-    state.calJm += delta;
-    if (state.calJm < 1) { state.calJm = 12; state.calJy -= 1; }
-    if (state.calJm > 12) { state.calJm = 1; state.calJy += 1; }
+    const mode = getCalendarMode();
+
+    if (mode === 'gregorian') {
+        state.calGm += delta;
+        if (state.calGm < 1) { state.calGm = 12; state.calGy -= 1; }
+        if (state.calGm > 12) { state.calGm = 1; state.calGy += 1; }
+    } else {
+        state.calJm += delta;
+        if (state.calJm < 1) { state.calJm = 12; state.calJy -= 1; }
+        if (state.calJm > 12) { state.calJm = 1; state.calJy += 1; }
+    }
     renderCalendar();
 }
 
@@ -395,13 +405,53 @@ export function setSelectedDay(key) {
     renderCalendar();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Calendar weekdays helpers
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ فاز ۴D.5: تقویم دو-حالته
+//   - در fa: تقویم جلالی، شنبه اول هفته
+//   - در en: تقویم میلادی، یکشنبه اول هفته (طبق تصمیم D-1)
+
+const CALENDAR_WEEKDAYS_JALALI = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'];
+const CALENDAR_WEEKDAYS_GREGORIAN = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/**
+ * تشخیص نوع تقویم تقویم جلسات بر اساس زبان.
+ *
+ * ⚠️ در تقویم جلسات، mode از getLang() خونده می‌شه
+ *    (برخلاف picker که state.pickerCalendar داره).
+ *
+ * @returns {'jalali'|'gregorian'}
+ */
+function getCalendarMode() {
+    return getLang() === 'en' ? 'gregorian' : 'jalali';
+}
+
+/**
+ * رندر روزهای هفته در container تقویم جلسات.
+ *
+ * @param {HTMLElement|null} container
+ * @param {'jalali'|'gregorian'} mode
+ */
+function renderCalendarWeekdays(container, mode) {
+    if (!container) return;
+    const keys = mode === 'gregorian' ? CALENDAR_WEEKDAYS_GREGORIAN : CALENDAR_WEEKDAYS_JALALI;
+    container.innerHTML = keys.map(k =>
+        `<span>${i18nT(`calendar.weekdays.${k}`)}</span>`
+    ).join('');
+}
+
 export function renderCalendar() {
-    document.getElementById('calLabel').textContent = JALALI_MONTHS[state.calJm - 1] + ' ' + formatNumber(state.calJy);
-    const g = jalaliToGregorian(state.calJy, state.calJm, 1);
-    const leading = (new Date(g.gy, g.gm - 1, g.gd).getDay() + 1) % 7;
-    const monthLen = jalaliMonthLength(state.calJy, state.calJm);
-    const now = getNow();
-    const tj = gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const mode = getCalendarMode();
+
+    // ─── رندر روزهای هفته ───
+    // ⚠️ TODO-4D.5-CALENDAR-WEEKDAYS: این خط حیاتی است.
+    //    اگر حذف بشه، تقویم بدون روزهای هفته نمایش داده می‌شه.
+    const weekdaysEl = document.getElementById('calWeekdays');
+    renderCalendarWeekdays(weekdaysEl, mode);
+
+    // ─── جمع‌آوری جلسات بر اساس dayKey ───
     const byDay = {};
     allSessions(false).forEach(s => {
         const d = new Date(s.at);
@@ -409,6 +459,29 @@ export function renderCalendar() {
         const k = dayKey(d);
         (byDay[k] = byDay[k] || []).push(s);
     });
+
+    if (mode === 'gregorian') {
+        renderCalendarGregorian(byDay);
+    } else {
+        renderCalendarJalali(byDay);
+    }
+}
+
+/**
+ * رندر تقویم جلالی (حالت fa).
+ */
+function renderCalendarJalali(byDay) {
+    const label = document.getElementById('calLabel');
+    if (label) {
+        label.textContent = JALALI_MONTHS[state.calJm - 1] + ' ' + formatYear(state.calJy);
+    }
+
+    const g = jalaliToGregorian(state.calJy, state.calJm, 1);
+    const leading = (new Date(g.gy, g.gm - 1, g.gd).getDay() + 1) % 7;
+    const monthLen = jalaliMonthLength(state.calJy, state.calJm);
+    const now = getNow();
+    const tj = gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
     let html = '';
     for (let i = 0; i < leading; i++) html += '<span class="picker-day empty"></span>';
     for (let d = 1; d <= monthLen; d++) {
@@ -430,17 +503,72 @@ export function renderCalendar() {
     document.getElementById('calDays').innerHTML = html;
 }
 
+/**
+ * رندر تقویم میلادی (حالت en).
+ */
+function renderCalendarGregorian(byDay) {
+    const gy = state.calGy;
+    const gm = state.calGm; // ۱-۱۲
+
+    const label = document.getElementById('calLabel');
+    if (label) {
+        label.textContent = getMonthName('en', gm, 'gregorian') + ' ' + formatYear(gy);
+    }
+
+    // ⚠️ در میلادی (en)، یکشنبه اول هفته است (getDay=0 → 0).
+    const firstWeekday = new Date(gy, gm - 1, 1).getDay();
+    const leading = firstWeekday;
+    const monthLen = gregorianMonthLength(gy, gm);
+
+    const now = getNow();
+    const tg = { gy: now.getFullYear(), gm: now.getMonth() + 1, gd: now.getDate() };
+    const monthName = getMonthName('en', gm, 'gregorian');
+
+    let html = '';
+    for (let i = 0; i < leading; i++) html += '<span class="picker-day empty"></span>';
+    for (let d = 1; d <= monthLen; d++) {
+        const k = gy + '-' + gm + '-' + d;
+        const list = byDay[k] || [];
+        const isToday = gy === tg.gy && gm === tg.gm && d === tg.gd;
+        const cls = 'picker-day cal-day' + (isToday ? ' today' : '') + (state.selectedDay === k ? ' selected' : '');
+        const dots = list.slice(0, 3).map(s => `<span class="dot d-${s.priority || 'low'}"></span>`).join('');
+        const more = list.length > 3 ? `<span class="dot-more">${formatNumber(list.length - 3)}+</span>` : '';
+        const sessionsPart = list.length ? i18nT('calendar.daySessions', { n: formatNumber(list.length) }) : '';
+        const ariaLabel = i18nT('calendar.dayAria', {
+            day: formatNumber(d),
+            month: monthName,
+            sessions: sessionsPart
+        });
+        html += `<button class="${cls}" data-calday="${k}" aria-label="${ariaLabel}">${formatNumber(d)}<span class="cal-dots">${dots}${more}</span></button>`;
+    }
+    document.getElementById('calDays').innerHTML = html;
+}
+
 export function openCal() {
-    let base;
+    const mode = getCalendarMode();
+    const now = getNow();
+
+    // ─── تاریخ مبنا ───
+    // ⚠️ state.selectedDay همیشه میلادی (YYYY-M-D) است (چون dayKey میلادی است).
+    let baseGy, baseGm, baseGd;
     if (state.selectedDay) {
         const [y, m, d] = state.selectedDay.split('-').map(Number);
-        base = gregorianToJalali(y, m, d);
+        baseGy = y; baseGm = m; baseGd = d;
     } else {
-        const n = getNow();
-        base = gregorianToJalali(n.getFullYear(), n.getMonth() + 1, n.getDate());
+        baseGy = now.getFullYear();
+        baseGm = now.getMonth() + 1;
+        baseGd = now.getDate();
     }
-    state.calJy = base.jy;
-    state.calJm = base.jm;
+
+    if (mode === 'gregorian') {
+        state.calGy = baseGy;
+        state.calGm = baseGm;
+    } else {
+        const j = gregorianToJalali(baseGy, baseGm, baseGd);
+        state.calJy = j.jy;
+        state.calJm = j.jm;
+    }
+
     renderCalendar();
     const overlay = document.getElementById('calOverlay');
     overlay.style.display = 'flex';
@@ -883,7 +1011,8 @@ export function render() {
     });
 
     if (progressFill) progressFill.style.width = pct + '%';
-    if (progressPct) progressPct.textContent = formatNumber(pct) + '٪';
+    // ⚠️ فاز ۴D.6: علامت درصد locale-aware (fa → ٪، en → %)
+    if (progressPct) progressPct.textContent = formatPercent(pct);
     if (progressBar) progressBar.setAttribute('aria-valuenow', pct);
 
     const doneActionsEl = document.getElementById('doneActions');
@@ -893,21 +1022,30 @@ export function render() {
     const visibleIds = filtered.map(t => String(t.id));
     const signature = buildRenderSignature(state, visibleIds);
 
-    if (signature !== _lastRenderSignature) {
+        if (signature !== _lastRenderSignature) {
         renderFull(filtered, total, done);
         _lastRenderSignature = signature;
-        _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
+        _lastVisibleTasks = filtered.map(t => ({
+            ...t,
+            children: t.children ? t.children.map(c => ({ ...c })) : []
+        }));
         return;
     }
 
     const diffSucceeded = renderDiff(filtered);
     if (!diffSucceeded) {
         renderFull(filtered, total, done);
-        _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
+        _lastVisibleTasks = filtered.map(t => ({
+            ...t,
+            children: t.children ? t.children.map(c => ({ ...c })) : []
+        }));
         return;
     }
 
-    _lastVisibleTasks = filtered.map(t => ({ ...t, children: t.children ? [...t.children] : [] }));
+    _lastVisibleTasks = filtered.map(t => ({
+        ...t,
+        children: t.children ? t.children.map(c => ({ ...c })) : []
+    }));
 }
 
 function updateTaskListStatus(msg) {

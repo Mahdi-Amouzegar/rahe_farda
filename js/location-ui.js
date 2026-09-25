@@ -788,7 +788,7 @@ function selectLocation(item) {
     showPickMarker();
     sync();
     switchToTab('tasks');
-    mapHint(i18nT('map.hint.savedLocationSelected'));mapHint('محل ذخیره‌شده انتخاب شد — عنوان را بنویسید');
+    mapHint(i18nT('map.hint.savedLocationSelected'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

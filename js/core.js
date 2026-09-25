@@ -67,9 +67,16 @@ export const state = {
     selectedDay: null,
     calJy: 0,
     calJm: 1,
+    // ⚠️ فاز ۴D.5: تقویم میلادی (تقویم جلسات)
+    calGy: 0,                  // سال میلادی
+    calGm: 1,                  // ماه میلادی (۱-۱۲)
     pickerMode: 'add',
     pickerJy: 0,
     pickerJm: 1,
+    // ⚠️ فاز ۴D.5: تقویم میلادی (picker)
+    pickerCalendar: 'jalali',  // 'jalali' | 'gregorian'
+    pickerGy: 0,               // سال میلادی
+    pickerGm: 1,               // ماه میلادی (۱-۱۲)
     pickerDay: null,
     pickerCallback: null,
     currentDetailId: null,

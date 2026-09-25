@@ -183,6 +183,7 @@ import {
     setLang,
     getLang,
     formatNumber,
+    formatPercent,
     t,
     t as i18nT
 } from './i18n.js';
@@ -622,9 +623,24 @@ function renderPlanDatesForm() {
     }
 }
 
+/**
+ * فرمت کوتاه تاریخ بر اساس زبان فعلی.
+ *
+ * ⚠️ فاز ۴D.5: locale-aware
+ *   - در fa: تاریخ شمسی (مثلاً «۱۵ آذر»)
+ *   - در en: تاریخ میلادی (مثلاً «December 5»)
+ *
+ * ⚠️ نام تابع `fmtDateFa` تاریخی است — ولی حالا locale-aware است.
+ *
+ * @param {string} iso
+ * @returns {string}
+ */
 function fmtDateFa(iso) {
     try {
-        return new Date(iso).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' });
+        return new Date(iso).toLocaleDateString(
+            getLang() === 'en' ? 'en-US' : 'fa-IR',
+            { day: 'numeric', month: 'long' }
+        );
     } catch { return ''; }
 }
 
@@ -899,6 +915,13 @@ document.getElementById('tplCreate').addEventListener('click', () => {
     closeTemplateModal();
     createPlanCustom(name, kids, { startAt, endAt });
 });
+/**
+ * رندر خط تاریخ‌های شروع/پایان در مودال قالب.
+ *
+ * ⚠️ فاز ۴D.5: locale-aware
+ *   - در fa: تاریخ شمسی
+ *   - در en: تاریخ میلادی
+ */
 function renderTplDates() {
     const el = document.getElementById('tplDatesLine');
     const draft = getTplDraft();
@@ -907,13 +930,19 @@ function renderTplDates() {
         el.textContent = '';
         return;
     }
+
+    // ⚠️ فاز ۴D.5: locale-aware (به‌جای hardcoded 'fa-IR')
     const fmt = iso => {
         try {
-            return new Date(iso).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' });
+            return new Date(iso).toLocaleDateString(
+                getLang() === 'en' ? 'en-US' : 'fa-IR',
+                { day: 'numeric', month: 'long' }
+            );
         } catch {
             return '';
         }
     };
+
     const parts = [];
     if (draft.startAt) parts.push(t('detail.sections.planDates.from') + ' ' + fmt(draft.startAt));
     if (draft.endAt) parts.push(t('detail.sections.planDates.to') + ' ' + fmt(draft.endAt));

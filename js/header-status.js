@@ -49,7 +49,8 @@ function _computeStatus() {
     const inFlight = sync.inFlight === true;
     const syncEnabled = sync.enabled === true;
 
-        if (offline) {
+    // ─── حالت offline ───
+    if (offline) {
         if (queueSize > 0) {
             return {
                 state: 'offline',
@@ -58,8 +59,12 @@ function _computeStatus() {
                 ariaLabel: i18nT('header.status.ariaOffline', { n: formatNumber(queueSize) })
             };
         }
+        // ⚠️ اگر offline بود ولی queue خالی بود، ادامه می‌دهیم به حالت‌های بعدی
+    }
 
+    // ─── حالت online + sync فعال ───
     if (online && syncEnabled) {
+        // در حال sync
         if (inFlight) {
             return {
                 state: 'syncing',
@@ -68,7 +73,8 @@ function _computeStatus() {
                 ariaLabel: i18nT('header.status.syncing')
             };
         }
-                if (queueSize > 0) {
+        // در انتظار sync
+        if (queueSize > 0) {
             return {
                 state: 'pending',
                 icon: ICONS.pending,
@@ -78,6 +84,7 @@ function _computeStatus() {
         }
     }
 
+    // ─── حالت online (بدون sync فعال) ───
     if (online) {
         return {
             state: 'online',
@@ -87,6 +94,7 @@ function _computeStatus() {
         };
     }
 
+    // ─── حالت نامشخص ───
     return {
         state: 'unknown',
         icon: ICONS.unknown,

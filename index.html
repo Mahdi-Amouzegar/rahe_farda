@@ -476,7 +476,6 @@
                                 <input type="file" id="photoCameraInput" accept="image/jpeg,image/jpg,image/jfif,image/pjpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,image/bmp" capture="environment" hidden>
                             </div>
                             <div class="photo-limit-hint" id="photoLimitHint" style="display: none;" role="status" aria-live="polite"></div>
-                            <div class="photo-limit-hint" id="photoLimitHint" style="display: none;" role="status" aria-live="polite"></div>
                         </div>
                     </div>
                 </section>
@@ -559,7 +558,7 @@
         <div class="picker cal-wide" role="dialog" aria-modal="true" data-i18n-aria-label="calendar.aria" aria-label="تقویم جلسات">
             <div class="picker-title" data-i18n="calendar.title">📅 تقویم جلسات</div>
             <div class="picker-nav"><button class="picker-nav-btn" id="calPrev" data-i18n-aria-label="picker.prevMonth" aria-label="ماه قبل">‹</button><div class="picker-month" id="calLabel"></div><button class="picker-nav-btn" id="calNext" data-i18n-aria-label="picker.nextMonth" aria-label="ماه بعد">›</button></div>
-            <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
+            <div class="picker-weekdays" id="calWeekdays"></div>
             <div class="picker-days" id="calDays"></div>
             <div class="picker-actions"><button class="btn-clear" id="calClose" data-i18n="calendar.close">بستن</button></div>
         </div>
@@ -570,7 +569,7 @@
             <div class="picker-title" data-i18n="picker.title">انتخاب سررسید</div>
             <div class="picker-chips"><button type="button" data-preset="evening" data-i18n="picker.todayEvening">امروز عصر</button><button type="button" data-preset="tomorrow" data-i18n="picker.tomorrowMorning">فردا ۹ صبح</button><button type="button" data-preset="week" data-i18n="picker.nextWeek">هفته بعد</button></div>
             <div class="picker-nav"><button class="picker-nav-btn" id="pickerPrev" data-i18n-aria-label="picker.prevMonth" aria-label="ماه قبل">‹</button><div class="picker-month" id="pickerMonthLabel"></div><button class="picker-nav-btn" id="pickerNext" data-i18n-aria-label="picker.nextMonth" aria-label="ماه بعد">›</button></div>
-            <div class="picker-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
+            <div class="picker-weekdays" id="pickerWeekdays"></div>
             <div class="picker-days" id="pickerDays"></div>
             <div class="picker-time"><span data-i18n="picker.hour">ساعت</span><select id="pickerHour" data-i18n-aria-label="picker.hourAria" aria-label="ساعت سررسید"></select><span>:</span><select id="pickerMinute" data-i18n-aria-label="picker.minuteAria" aria-label="دقیقه سررسید"></select></div>
             <div class="picker-error" id="pickerError" aria-live="polite"></div>

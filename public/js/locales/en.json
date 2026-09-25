@@ -799,7 +799,16 @@
     "aria": "Sessions calendar",
     "close": "Close",
     "dayAria": "{day} {month}{sessions}",
-    "daySessions": ", {n} sessions"
+    "daySessions": ", {n} sessions",
+    "weekdays": {
+      "sat": "Sat",
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri"
+    }
   },
 
   "trash": {

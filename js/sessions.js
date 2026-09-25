@@ -350,9 +350,20 @@ export function parseFaDateTime(text, now) {
     let explicitDay = false;
     let m;
 
+    // ⚠️ ترتیب مهم است:
+    //   ۱. پس‌فردا (شامل «فردا» است)
+    //   ۲. فردا شب (شامل «فردا» و «شب» است)
+    //   ۳. امشب (شامل «شب» است)
+    //   ۴. فردا
+    //   ۵. امروز
+    //   ۶. شب تنها
+    //   ۷. هفته بعد
     if (has('پس‌فردا', 'پس فردا')) { day = addDays(d0, 2); explicitDay = true; }
+    else if (has('فردا شب', 'فردا شب')) { day = addDays(d0, 1); explicitDay = true; }
+    else if (has('امشب')) { day = d0; explicitDay = true; }
     else if (has('فردا')) { day = addDays(d0, 1); explicitDay = true; }
     else if (has('امروز')) { day = d0; explicitDay = true; }
+    else if (has('شب')) { day = d0; explicitDay = true; }
     else if (has('هفته بعد', 'هفته آینده', 'هفته‌ی بعد')) { day = addDays(d0, 7); explicitDay = true; }
     else if ((m = t.match(/(\d{1,2})\s*روز\s*(دیگه|دیگر|بعد)/))) {
         const n = parseInt(m[1], 10);
@@ -385,7 +396,16 @@ export function parseFaDateTime(text, now) {
 
     if (!day && h === null) return null;
     if (!day) day = d0;
-    if (h === null) h = 9;
+    if (h === null) {
+        // ⚠️ پیش‌فرض ساعت بر اساس کلمه‌ی روز
+        if (has('امشب')) h = 21;
+        else if (has('صبح')) h = 9;
+        else if (has('ظهر')) h = 12;
+        else if (has('عصر')) h = 17;
+        else if (has('غروب')) h = 19;
+        else if (has('شب')) h = 21;
+        else h = 9;
+    }
 
     let dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, mi, 0, 0);
     if (dt.getTime() <= now.getTime()) {

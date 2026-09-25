@@ -1,11 +1,39 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// jalali.js -- pure Jalali calendar math (no DOM) (ESM)
+// jalali.js -- pure calendar math (Jalali + Gregorian months) (no DOM) (ESM)
+//
+// ⚠️ فاز ۴D.5: نام ماه‌های میلادی (GREGORIAN_MONTHS_FA/EN) اضافه شدند.
+//    این فایل همچنان pure است — به i18n.js وابسته نیست.
 
 export const JALALI_BREAKS = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
 
 export const JALALI_MONTHS = [
     'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
     'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+];
+
+/**
+ * نام ماه‌های میلادی به فارسی.
+ *
+ * ⚠️ طبق تست Intl.DateTimeFormat('fa-IR', { month: 'long' }):
+ *   - May → «مه» (نه «می»)
+ *   - July → «ژوئیه» (نه «جولای»)
+ *
+ * ⚠️ این مقادیر باید با `Intl.DateTimeFormat('fa-IR')` یکدست باشند،
+ *    چون در `formatDate()` (i18n.js) از Intl استفاده می‌شود.
+ */
+export const GREGORIAN_MONTHS_FA = [
+    'ژانویه', 'فوریه', 'مارس', 'آوریل', 'مه', 'ژوئن',
+    'ژوئیه', 'اوت', 'سپتامبر', 'اکتبر', 'نوامبر', 'دسامبر'
+];
+
+/**
+ * نام ماه‌های میلادی به انگلیسی.
+ *
+ * ⚠️ طبق استاندارد CLDR.
+ */
+export const GREGORIAN_MONTHS_EN = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 const jdiv = (a, b) => Math.trunc(a / b);
@@ -95,6 +123,61 @@ export function jalaliMonthLength(jy, jm) {
     if (jm <= 6) return 31;
     if (jm <= 11) return 30;
     return jalCal(jy).leap === 0 ? 30 : 29;
+}
+
+/**
+ * گرفتن نام ماه بر اساس زبان و نوع تقویم.
+ *
+ * ⚠️ این تابع **خالص** است — به i18n.js وابسته نیست.
+ *    زبان (`lang`) از بیرون می‌آید (معمولاً از `getLang()`).
+ *
+ * ⚠️ پارامترها:
+ *   - lang     : 'fa' | 'en'
+ *   - month    : شماره‌ی ماه (۱-۱۲)
+ *   - calendar : 'jalali' | 'gregorian' (پیش‌فرض: 'jalali')
+ *
+ * @param {string} lang
+ * @param {number} month
+ * @param {string} [calendar='jalali']
+ * @returns {string} نام ماه یا رشته‌ی خالی
+ */
+export function getMonthName(lang, month, calendar = 'jalali') {
+    // ─── اعتبارسنجی ماه ───
+    if (!Number.isFinite(month) || month < 1 || month > 12) {
+        return '';
+    }
+    const idx = Math.floor(month) - 1;
+
+    // ─── تقویم میلادی ───
+    if (calendar === 'gregorian') {
+        if (lang === 'en') {
+            return GREGORIAN_MONTHS_EN[idx] || '';
+        }
+        return GREGORIAN_MONTHS_FA[idx] || '';
+    }
+
+    // ─── تقویم جلالی (پیش‌فرض) ───
+    return JALALI_MONTHS[idx] || '';
+}
+
+/**
+ * طول یک ماه میلادی (۲۸، ۲۹، ۳۰، یا ۳۱ روز).
+ *
+ * ⚠️ از `Date` مرورگر استفاده می‌کند — که خودش leap year میلادی را
+ *    می‌داند (۲۹ فوریه در سال‌های کبیسه).
+ *
+ * @param {number} gy - سال میلادی
+ * @param {number} gm - ماه میلادی (۱-۱۲)
+ * @returns {number} تعداد روزهای ماه (۱-۳۱)
+ */
+export function gregorianMonthLength(gy, gm) {
+    if (!Number.isFinite(gy) || !Number.isFinite(gm)) return 0;
+    if (gm < 1 || gm > 12) return 0;
+
+    // ⚠️ ترفند استاندارد: روز ۰ از ماه بعد = آخرین روز ماه جاری
+    //    new Date(2024, 2, 0) → ۲۹ فوریه ۲۰۲۴ (سال کبیسه)
+    //    new Date(2023, 2, 0) → ۲۸ فوریه ۲۰۲۳
+    return new Date(Math.floor(gy), Math.floor(gm), 0).getDate();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

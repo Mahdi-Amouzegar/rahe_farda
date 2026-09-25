@@ -702,7 +702,13 @@ function toggleTimer() {
 // Recur
 // ═══════════════════════════════════════════════════════════════════════════
 
-const WEEK_ORDER = [
+// ⚠️ فاز ۴D.5: ترتیب روزهای هفته locale-aware
+//   - در fa: شنبه اول (کد: 6)
+//   - در en: یکشنبه اول (کد: 0)
+//
+// ⚠️ کد روز (0-6) در JS: 0=یکشنبه، 1=دوشنبه، ...، 6=شنبه
+//    در getDay() مرورگر: همیشه 0=Sunday است، مستقل از locale.
+const WEEK_ORDER_JALALI = [
     ['recur.dayOfWeek.sat', 6],
     ['recur.dayOfWeek.sun', 0],
     ['recur.dayOfWeek.mon', 1],
@@ -711,6 +717,24 @@ const WEEK_ORDER = [
     ['recur.dayOfWeek.thu', 4],
     ['recur.dayOfWeek.fri', 5],
 ];
+
+const WEEK_ORDER_GREGORIAN = [
+    ['recur.dayOfWeek.sun', 0],
+    ['recur.dayOfWeek.mon', 1],
+    ['recur.dayOfWeek.tue', 2],
+    ['recur.dayOfWeek.wed', 3],
+    ['recur.dayOfWeek.thu', 4],
+    ['recur.dayOfWeek.fri', 5],
+    ['recur.dayOfWeek.sat', 6],
+];
+
+/**
+ * گرفتن ترتیب روزهای هفته بر اساس زبان.
+ * @returns {Array<[string, number]>}
+ */
+function getWeekOrder() {
+    return getLang() === 'en' ? WEEK_ORDER_GREGORIAN : WEEK_ORDER_JALALI;
+}
 
 function renderRecurRows() {
     const task = getDetailTask();
@@ -735,7 +759,9 @@ function renderRecurRows() {
 
     const wc = document.getElementById('fRecurWeekChips');
     if (wc) {
-        wc.innerHTML = WEEK_ORDER.map(([key, v]) =>
+        // ⚠️ فاز ۴D.5: ترتیب روزها بر اساس زبان
+        const weekOrder = getWeekOrder();
+        wc.innerHTML = weekOrder.map(([key, v]) =>
             `<button type="button" class="day-chip${(task.recurDays || []).includes(v) ? ' on' : ''}" data-wday="${v}">${i18nT(key)}</button>`
         ).join('');
     }

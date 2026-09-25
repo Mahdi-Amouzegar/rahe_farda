@@ -441,6 +441,7 @@ export function applyToDOM(root) {
     });
 
     // ─── data-i18n-aria-label ───
+    // ─── data-i18n-aria-label ───
     scope.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
         const key = el.getAttribute('data-i18n-aria-label');
         if (!key) return;
@@ -449,6 +450,20 @@ export function applyToDOM(root) {
             el.setAttribute('aria-label', value);
         }
     });
+
+    // ⚠️ فاز ۴D.6: عنوان صفحه (<title> در <head>)
+    //    document.querySelectorAll در scope فقط داخل <body> می‌گردد.
+    //    پس <title> را جداگانه مدیریت می‌کنیم.
+    const titleEl = document.querySelector('title[data-i18n]');
+    if (titleEl) {
+        const key = titleEl.getAttribute('data-i18n');
+        if (key) {
+            const value = t(key);
+            if (value !== key) {
+                document.title = value;
+            }
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -588,6 +603,71 @@ export function formatNumber(n) {
         ).format(num);
     } catch {
         return String(num);
+    }
+}
+
+/**
+ * فرمت یک سال بر اساس زبان فعلی — **بدون جداکننده‌ی هزارگان**.
+ *
+ * ⚠️ چرا جدا از `formatNumber`؟
+ *   - سال‌ها در تقویم‌های حرفه‌ای (Google Calendar، iOS Calendar) بدون
+ *     جداکننده نمایش داده می‌شوند: «2024» نه «2,024»
+ *   - سال جلالی هم بدون جداکننده: «۱۴۰۳» نه «۱٬۴۰۳»
+ *   - این با استاندارد بین‌المللی UI سازگارتر است
+ *
+ * ⚠️ خروجی:
+ *   fa → «۱۴۰۳» (ارقام فارسی، بدون جداکننده)
+ *   en → «2024» (ارقام لاتین، بدون جداکننده)
+ *
+ * ⚠️ ورودی نامعتبر → رشته‌ی خالی
+ *
+ * ⚠️ توجه: در تقویم جلالی، سال ۱۴۰۳ با `formatYear(1403)` = «۱۴۰۳».
+ *    در تقویم میلادی، سال 2024 با `formatYear(2024)` = «2024».
+ *    یعنی این تابع تقویم‌آگنوستیک است — فقط عدد را فرمت می‌کند.
+ *
+ * @param {number|string} year
+ * @returns {string}
+ */
+export function formatYear(year) {
+    const num = typeof year === 'string' ? Number(year) : year;
+    if (!Number.isFinite(num)) return '';
+    try {
+        return new Intl.NumberFormat(
+            _currentLang === 'en' ? 'en-US' : 'fa-IR',
+            { useGrouping: false }
+        ).format(num);
+    } catch {
+        return String(num);
+    }
+}
+
+/**
+ * فرمت یک درصد بر اساس زبان فعلی — با علامت درصد locale-aware.
+ *
+ * ⚠️ خروجی:
+ *   fa → «۱۲٪» (ارقام فارسی + علامت درصد فارسی)
+ *   en → «12%» (ارقام لاتین + علامت درصد لاتین)
+ *
+ * ⚠️ ورودی: عدد بین ۰ تا ۱۰۰ (نه کسری).
+ *   مثلاً `formatPercent(50)` = «۵۰٪»، نه «۰.۵٪».
+ *   (چون در `Intl.NumberFormat` با style: 'percent'، ورودی کسری است
+ *    — پس ما تقسیم بر ۱۰۰ می‌کنیم.)
+ *
+ * ⚠️ ورودی نامعتبر → رشته‌ی خالی
+ *
+ * @param {number|string} n
+ * @returns {string}
+ */
+export function formatPercent(n) {
+    const num = typeof n === 'string' ? Number(n) : n;
+    if (!Number.isFinite(num)) return '';
+    try {
+        return new Intl.NumberFormat(
+            _currentLang === 'en' ? 'en-US' : 'fa-IR',
+            { style: 'percent', maximumFractionDigits: 0 }
+        ).format(num / 100);
+    } catch {
+        return String(num) + '%';
     }
 }
 

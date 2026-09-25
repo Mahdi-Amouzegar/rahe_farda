@@ -705,7 +705,6 @@ export function onMapClick(e) {
             refreshMarkers();
             call('refreshSavedLocationUI');
             mapHint(i18nT('map.hint.newLocationSaved'));
-            mapHint('محل جدید ذخیره شد ✓');
             flyToTask(found.task.id);
             (async () => {
                 try {
