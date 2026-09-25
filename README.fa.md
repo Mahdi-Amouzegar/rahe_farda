@@ -1,4 +1,3 @@
-```markdown
 # راه فردا
 
 > 🇬🇧 **[English version →](./README.md)**
@@ -311,4 +310,3 @@ git clone https://github.com/Mahdi-Amouzegar/rahe-farda-worker.git
 **راه فردا — کارهایت، زمانت، مسیرت.**
 
 ---
-```
