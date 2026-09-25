@@ -164,13 +164,30 @@ flowchart TB
     Worker --> ParsPack
 ```
 
+### اصول کلیدی## ۵. معماری
+
+### معماری سطح بالا
+
+| لایه | مؤلفه | مسئولیت | جریان داده |
+|---|---|---|---|
+| مرورگر | UI | رابط کاربری فارسی RTL / انگلیسی LTR | خواندن و به‌روزرسانی داده‌های محلی |
+| مرورگر | IndexedDB | ذخیره‌گاه عملیاتی محلی | UI → IndexedDB |
+| مرورگر | Transactional Outbox | ثبت اتمیک تغییرات و عملیات همگام‌سازی | IndexedDB → Outbox |
+| Cloud | Cloudflare Worker | احراز هویت، مدیریت Session، موتور Sync و مجوز دسترسی به Media | Outbox → HTTPS → Worker |
+| Storage | Cloudflare D1 | ذخیره Metadata همگام‌شده | Worker → D1 |
+| Storage | ParsPack | ذخیره فایل‌های Media خصوصی | Worker → ParsPack |
+
+### جریان داده
+
+**UI → IndexedDB → Transactional Outbox → Cloudflare Worker → D1 / ParsPack**
+
 ### اصول کلیدی
 
-- **Local-first** — مرورگر منبع عملیاتی برای داده‌های شخصی است.
-- **D1 به‌عنوان authoritative cloud state** — فقط برای داده‌هایی که صریحاً sync شده‌اند.
-- **Media خارج از D1** — فایل‌ها به Object Storage Private از طریق Presigned URL کوتاه‌عمر می‌روند.
-- **قرارداد مرکزی Sync** — هر Feature از همان مسیر Sync استفاده می‌کند؛ بدون protocol مخصوص.
-- **Security به‌عنوان Cross-Cutting Concern** — هر فاز با Security Gate تمام می‌شود؛ Final Audit بعد از Phase 9.
+- **Local-first:** مرورگر محیط اصلی اجرای عملیاتی برنامه است.
+- **Offline-capable:** برنامه می‌تواند بدون اتصال فعال شبکه از داده‌های محلی استفاده کند.
+- **همگام‌سازی اتمیک:** تغییرات محلی و عملیات متناظر Sync به‌صورت اتمیک ثبت می‌شوند.
+- **مجوزدهی در سمت سرور:** Worker مسئول کنترل احراز هویت، همگام‌سازی و مجوز دسترسی به Media است.
+- **تفکیک Metadata و Media:** داده‌های Metadata در D1 و فایل‌های Media خصوصی در ParsPack نگهداری می‌شوند.
 
 ---
 
@@ -308,7 +325,5 @@ ParsPack — Storage سازگار با S3
 Made with ❤ by مهدی آموزگار
 
 راه فردا — کارهایت، زمانت، مسیرت.
-
-text
 
 ---
