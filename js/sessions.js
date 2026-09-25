@@ -417,5 +417,280 @@ export function parseFaDateTime(text, now) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// English datetime parser (Phase 4E)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ تفاوت‌های اصلی با fa:
+//   ۱. در en، ترتیب کلمات متغیر است:
+//        "tomorrow at 8am"  → tomorrow, then time
+//        "at 8am tomorrow"  → time, then tomorrow
+//        "8am tomorrow"     → time (without "at"), then tomorrow
+//   ۲. ساعت در en می‌تواند با am/pm بیاد (نه فقط عدد)
+//   ۳. بخش‌های روز (morning, afternoon, ...) می‌توانند standalone باشند:
+//        "tomorrow morning"  → tomorrow at 9am (پیش‌فرض morning)
+//   ۴. modifiers: next/this + weekday
+//   ۵. case-insensitive
+
+/**
+ * نگاشت روزهای هفته در انگلیسی.
+ * ⚠️ مقدار = getDay() مرورگر (0=Sunday, 1=Monday, ..., 6=Saturday)
+ */
+const WEEKDAYS_EN = {
+    'sunday': 0, 'sun': 0,
+    'monday': 1, 'mon': 1,
+    'tuesday': 2, 'tue': 2, 'tues': 2,
+    'wednesday': 3, 'wed': 3,
+    'thursday': 4, 'thu': 4, 'thur': 4, 'thurs': 4,
+    'friday': 5, 'fri': 5,
+    'saturday': 6, 'sat': 6,
+};
+
+/**
+ * بخش‌های روز با ساعت پیش‌فرض.
+ */
+const DAY_PARTS_EN = {
+    'morning': 9,
+    'noon': 12,
+    'afternoon': 14,
+    'evening': 18,
+    'night': 21,
+    'midnight': 0,
+};
+
+/**
+ * پارس متن تاریخ/ساعت در انگلیسی.
+ *
+ * ⚠️ فرمت‌های پشتیبانی‌شده:
+ *   - today, tomorrow, tonight, day after tomorrow
+ *   - next week, next month
+ *   - in X days/weeks/hours
+ *   - X days/weeks from now
+ *   - Monday, Tue, Wed, ... (هفته‌ی بعد)
+ *   - next Monday, this Monday
+ *   - at 8, at 8:30, 8am, 8pm, 2:30 pm
+ *   - morning, afternoon, evening, night, midnight
+ *   - ترکیب: "tomorrow at 8am", "next Monday at 14:00", "in 3 days at 9am"
+ *
+ * ⚠️ case-insensitive.
+ *
+ * @param {string} text
+ * @param {Date} now
+ * @returns {string|null} ISO یا null
+ */
+export function parseEnDateTime(text, now) {
+    if (!text || typeof text !== 'string') return null;
+
+    // ⚠️ lowercase برای case-insensitive
+    const t = text.toLowerCase().trim();
+    const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    const has = (...ws) => ws.some(w => t.includes(w));
+    let day = null;
+    let explicitDay = false;
+    let m;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ۱. روزهای نسبی
+    // ═══════════════════════════════════════════════════════════════════════
+    if (has('day after tomorrow')) {
+        day = addDays(d0, 2);
+        explicitDay = true;
+    }
+    else if (has('tomorrow')) {
+        day = addDays(d0, 1);
+        explicitDay = true;
+    }
+    else if (has('tonight')) {
+        day = d0;
+        explicitDay = true;
+    }
+    else if (has('today')) {
+        day = d0;
+        explicitDay = true;
+    }
+    else if (has('next week')) {
+        day = addDays(d0, 7);
+        explicitDay = true;
+    }
+    else if (has('next month')) {
+        // ⚠️ ماه بعد = +۳۰ روز (تقریب)
+        day = addDays(d0, 30);
+        explicitDay = true;
+    }
+    // ─── in X days/weeks/hours ───
+    else if ((m = t.match(/\bin\s+(\d{1,3})\s+(day|days|week|weeks|hour|hours)\b/))) {
+        const n = parseInt(m[1], 10);
+        const unit = m[2];
+        if (unit.startsWith('day')) {
+            if (n < 1 || n > 365) return null;
+            day = addDays(d0, n);
+        } else if (unit.startsWith('week')) {
+            if (n < 1 || n > 52) return null;
+            day = addDays(d0, n * 7);
+        } else if (unit.startsWith('hour')) {
+            // ⚠️ ساعت‌های آینده — روز رو محاسبه می‌کنیم
+            if (n < 1 || n > 168) return null;
+            day = d0;
+        }
+        explicitDay = true;
+    }
+    // ─── X days/weeks from now ───
+    else if ((m = t.match(/\b(\d{1,3})\s+(day|days|week|weeks)\s+from\s+now\b/))) {
+        const n = parseInt(m[1], 10);
+        const unit = m[2];
+        if (unit.startsWith('day')) {
+            if (n < 1 || n > 365) return null;
+            day = addDays(d0, n);
+        } else if (unit.startsWith('week')) {
+            if (n < 1 || n > 52) return null;
+            day = addDays(d0, n * 7);
+        }
+        explicitDay = true;
+    }
+    // ─── next/this + weekday ───
+    else if ((m = t.match(/\b(next|this)\s+(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)\b/))) {
+        const modifier = m[1]; // 'next' or 'this'
+        const dayName = m[2];
+        const targetDay = WEEKDAYS_EN[dayName];
+        if (targetDay === undefined) return null;
+
+        let diff = (targetDay - d0.getDay() + 7) % 7;
+        if (modifier === 'next') {
+            // ⚠️ "next Monday" = هفته‌ی بعد (حتی اگر امروز Monday باشه)
+            if (diff === 0) diff = 7;
+            // در "next"، همیشه به هفته‌ی بعد می‌ره (نه همین هفته)
+            // پس اگر امروز Monday و می‌گه "next Monday"، ۷ روز بعد
+        } else {
+            // "this Monday" = همین هفته (اگر امروز گذشته، هفته‌ی بعد)
+            if (diff === 0) diff = 7;
+        }
+        day = addDays(d0, diff);
+        explicitDay = true;
+    }
+    // ─── weekday تنها (next occurrence) ───
+    else {
+        for (const name of Object.keys(WEEKDAYS_EN)) {
+            // ⚠️ از word boundary استفاده می‌کنیم تا "sun" در "sunday" تکرار نشه
+            const regex = new RegExp(`\\b${name}\\b`, 'i');
+            if (regex.test(t)) {
+                const targetDay = WEEKDAYS_EN[name];
+                let diff = (targetDay - d0.getDay() + 7) % 7;
+                if (diff === 0) diff = 7; // اگر امروز همون روزه، هفته‌ی بعد
+                day = addDays(d0, diff);
+                explicitDay = true;
+                break;
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ۲. ساعت
+    // ═══════════════════════════════════════════════════════════════════════
+    let h = null;
+    let mi = 0;
+
+    // ─── "at X:Y" یا "at X" ───
+    if ((m = t.match(/\bat\s+(\d{1,2})(?:\s*[:：]\s*(\d{1,2}))?\s*(am|pm)?\b/))) {
+        h = parseInt(m[1], 10);
+        mi = m[2] ? parseInt(m[2], 10) : 0;
+        const ampm = m[3];
+
+        if (h > 23 || mi > 59) return null;
+
+        if (ampm === 'pm' && h < 12) h += 12;
+        else if (ampm === 'am' && h === 12) h = 0;
+        else if (h >= 1 && h <= 6 && !ampm) h += 12; // پیش‌فرض: عصر (مثل fa)
+    }
+    // ─── "X:Y am/pm" یا "Xam" یا "Xpm" ───
+    else if ((m = t.match(/\b(\d{1,2})(?:\s*[:：]\s*(\d{1,2}))?\s*(am|pm)\b/))) {
+        h = parseInt(m[1], 10);
+        mi = m[2] ? parseInt(m[2], 10) : 0;
+        const ampm = m[3];
+
+        if (h > 23 || mi > 59) return null;
+        if (ampm === 'pm' && h < 12) h += 12;
+        else if (ampm === 'am' && h === 12) h = 0;
+    }
+    // ─── "H:MM" بدون at و بدون am/pm ───
+    //
+    // ⚠️ چرا این الگو لازم است؟
+    //    - کاربر می‌تونه بنویسه "tonight 21:00" یا "tomorrow 14:30"
+    //    - این الگو در هیچ‌کدام از دو شرط قبلی نمی‌گیره
+    //    - ولی در fa، این الگو کار می‌کنه (`ساعت ۱۴:۳۰`)
+    else if ((m = t.match(/\b(\d{1,2})\s*[:：]\s*(\d{1,2})\b/))) {
+        h = parseInt(m[1], 10);
+        mi = parseInt(m[2], 10);
+        if (h > 23 || mi > 59) return null;
+        // ⚠️ بدون am/pm، فرض می‌کنیم 24h است (مثل fa)
+        //    ولی اگر h بین 1-6 باشه، احتمالاً عصر است (مثل fa)
+        if (h >= 1 && h <= 6) h += 12;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ۳. بخش‌های روز (اگر ساعت صریح نبود)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // ⚠️ از `includes` استفاده می‌کنیم (نه regex با `\b`) چون:
+    //    - `tonight` شامل `night` است ولی `\bnight\b` نمی‌گیره
+    //      (چون `n` قبلی `o` است و word boundary نیست)
+    //    - `includes` این مشکل رو نداره
+    //
+    // ⚠️ ترتیب مهم است — از خاص‌ترین به عام‌ترین:
+    //    `midnight` قبل از `night` (چون `midnight` شامل `night` است)
+    if (h === null) {
+        // ⚠️ ترتیب مهم — از خاص‌ترین به عام‌ترین:
+        //    - `midnight` شامل `night` است
+        //    - `afternoon` شامل `noon` است
+        //    پس این‌ها باید قبل از کوتاه‌ترها چک بشن
+        if (t.includes('midnight')) h = 0;
+        else if (t.includes('afternoon')) h = 14;
+        else if (t.includes('morning')) h = 9;
+        else if (t.includes('noon')) h = 12;
+        else if (t.includes('evening')) h = 18;
+        else if (t.includes('night')) h = 21;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ۴. اگر هیچ‌کدام پیدا نشد
+    // ═══════════════════════════════════════════════════════════════════════
+    if (!day && h === null) return null;
+    if (!day) day = d0;
+    if (h === null) h = 9; // پیش‌فرض صبح
+
+    let dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, mi, 0, 0);
+    if (dt.getTime() <= now.getTime()) {
+        if (explicitDay) return null;
+        dt = new Date(dt.getTime() + 24 * 3600 * 1000);
+        if (dt.getTime() <= now.getTime()) return null;
+    }
+    return dt.toISOString();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// parseDateText — dispatcher locale-aware
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * پارس متن تاریخ/ساعت بر اساس زبان فعلی.
+ *
+ * ⚠️ این تابع dispatcher است — زبان رو از i18n می‌گیره و
+ *    به parser مناسب پاس می‌ده.
+ *
+ * ⚠️ در fa → parseFaDateTime
+ * ⚠️ در en → parseEnDateTime
+ *
+ * @param {string} text
+ * @param {Date} now
+ * @returns {string|null} ISO یا null
+ */
+export function parseDateText(text, now) {
+    const lang = getLang();
+    if (lang === 'en') {
+        return parseEnDateTime(text, now);
+    }
+    return parseFaDateTime(text, now);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // ⚠️ گام ۱۵: SHIM‌ها حذف شدند
 // ═══════════════════════════════════════════════════════════════════════════

@@ -14,7 +14,7 @@
 import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
-import { faShort, hasSessionAt, parseFaDateTime } from './sessions.js';
+import { faShort, hasSessionAt, parseDateText } from './sessions.js';
 import {
     processImageFile,
     validateImageFile,
@@ -262,7 +262,8 @@ function maybeSuggestDueInDetail(value, targetId) {
 
     if (!v || v === detailSmartDismissedFor[targetId]) return;
 
-    const iso = parseFaDateTime(v, getNow());
+    // ⚠️ فاز ۴E: locale-aware parser (fa → parseFaDateTime، en → parseEnDateTime)
+    const iso = parseDateText(v, getNow());
     if (!iso) return;
 
     const task = getDetailTask();

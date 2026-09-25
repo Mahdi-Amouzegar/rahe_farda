@@ -44,7 +44,7 @@ import {
 import { getNow, syncServerTime } from './time.js';
 import {
     faShort,
-    parseFaDateTime,
+    parseDateText,
     updateDueChips,
     hasSessionAt
 } from './sessions.js';
@@ -2243,7 +2243,8 @@ function maybeSuggestDue(value, targetId) {
 
     if (state.pendingKind === 'series' && state.seriesType !== 'dates') return;
 
-    const iso = parseFaDateTime(v, getNow());
+    // ⚠️ فاز ۴E: locale-aware parser (fa → parseFaDateTime، en → parseEnDateTime)
+    const iso = parseDateText(v, getNow());
     if (!iso) return;
 
     if (state.addDraftSessions.some(s => Math.abs(new Date(s.at).getTime() - new Date(iso).getTime()) < 60000)) return;
