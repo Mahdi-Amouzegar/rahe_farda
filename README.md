@@ -137,40 +137,28 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 
 ## 5. Architecture
 
-### High-Level Diagram
+### High-Level Architecture
 
-```mermaid
-flowchart TB
-    subgraph Browser["Browser (Local-first)"]
-        UI["UI — Persian RTL / English LTR"]
-        IDB[("IndexedDB — local operational store")]
-        Outbox["Transactional Outbox — atomic task + sync op"]
+| Layer | Component | Responsibility | Data Flow |
+|---|---|---|---|
+| Browser | UI | Persian RTL / English LTR user interface | Reads and updates local data |
+| Browser | IndexedDB | Local operational data store | UI → IndexedDB |
+| Browser | Transactional Outbox | Stores sync operations atomically with local changes | IndexedDB → Outbox |
+| Cloud | Cloudflare Worker | Authentication, sessions, sync engine, and media authorization | Outbox → HTTPS → Worker |
+| Storage | Cloudflare D1 | Stores synchronized metadata | Worker → D1 |
+| Storage | ParsPack | Stores private media files | Worker → ParsPack |
 
-        UI --> IDB
-        IDB --> Outbox
-    end
+### Data Flow
 
-    subgraph Worker["Cloudflare Worker"]
-        API["Auth · Sessions · Sync Engine · Media Authorization"]
-    end
-
-    subgraph Storage["Storage"]
-        D1[("Cloudflare D1 — synced metadata")]
-        ParsPack[("ParsPack — private media files")]
-    end
-
-    Outbox -. "optional HTTPS sync" .-> API
-    API --> D1
-    API --> ParsPack
-```
+**UI → IndexedDB → Transactional Outbox → Cloudflare Worker → D1 / ParsPack**
 
 ### Key Principles
 
-- **Local-first** — the browser is the operational source of truth for personal data.
-- **D1 as authoritative cloud state** — only for data that has been explicitly synced.
-- **Media lives outside D1** — files go to private object storage via short-lived presigned URLs.
-- **Central sync contract** — every feature uses the same sync path; no per-feature protocols.
-- **Security as a cross-cutting concern** — every phase ends with a security gate; a final audit is planned after Phase 9.
+- **Local-first:** The browser remains the primary operational environment.
+- **Offline-capable:** Local data can be used without an active network connection.
+- **Transactional sync:** Local changes and their corresponding sync operations are committed atomically.
+- **Server-authorized access:** The Worker controls authentication, synchronization, and media authorization.
+- **Separated storage:** Metadata is stored in D1, while private media files are stored separately.
 
 ---
 
