@@ -139,28 +139,29 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 
 ### High-Level Diagram
 
-┌──────────────────────── Browser ───────────────────────┐
-│ │
-│ UI (Persian RTL / English LTR) │
-│ │ │
-│ IndexedDB ← local operational store │
-│ │ │
-│ Transactional Outbox ← atomic task + sync op │
-│ │ │
-└───┼────────────────────────────────────────────────────┘
-│ optional HTTPS sync (opt-in)
-▼
-┌────────────── Cloudflare Worker ───────────────────────┐
-│ Auth · Sessions · Sync Engine · Media Authorization │
-└──────────────┬──────────────────────┬──────────────────┘
-▼ ▼
-┌──────────────┐ ┌────────────────┐
-│ Cloudflare │ │ ParsPack │
-│ D1 │ │ (S3 private) │
-│ (metadata) │ │ (media files) │
-└──────────────┘ └────────────────┘
+```mermaid
+flowchart TB
+    subgraph Browser["Browser (Local-first)"]
+        UI["UI — Persian RTL / English LTR"]
+        IDB[("IndexedDB — local operational store")]
+        Outbox["Transactional Outbox — atomic task + sync op"]
+        UI --> IDB
+        IDB --> Outbox
+    end
 
-text
+    subgraph Worker["Cloudflare Worker"]
+        API["Auth · Sessions · Sync Engine · Media Authorization"]
+    end
+
+    subgraph Storage["Storage"]
+        D1[("Cloudflare D1 — synced metadata")]
+        ParsPack[("ParsPack — private media files")]
+    end
+
+    Outbox -.->|"optional HTTPS sync"| Worker
+    Worker --> D1
+    Worker --> ParsPack
+```
 
 ### Key Principles
 
