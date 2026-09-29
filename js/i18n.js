@@ -398,6 +398,13 @@ function _applyHtmlAttributes(lang) {
 export function applyToDOM(root) {
     if (typeof document === 'undefined') return;
 
+    // ⚠️ پایان pre-hide زبان: ترجمه‌ها اعمال شدند، صفحه را نمایش بده.
+    //    (کلاس فقط وقتی وجود دارد که زبان ذخیره‌شده en بوده؛ در غیر این صورت no-op است.)
+    //    fallback امن ۴ ثانیه‌ای هم در اسکریپت head صفحه هست.
+    if (document.documentElement) {
+        document.documentElement.classList.remove('i18n-prehide');
+    }
+
     const scope = root || document;
 
     // ─── data-i18n (textContent) ───
