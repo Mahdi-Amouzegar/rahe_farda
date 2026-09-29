@@ -81,6 +81,14 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - Device linking via one-time sync codes
 - **Transactional offline sync** — local changes and their sync operations are persisted atomically in IndexedDB, with crash recovery and idempotent server processing
 - Cloudflare D1 as authoritative cloud state for synced data
+- **Group sync** — per-group change sequences with offline task push, delta pull, and full snapshots (`POST /api/groups/:id/sync`)
+
+### Groups & Communication
+- Groups with members, roles (owner/admin/member), and invitations (7-day TTL, direct-add or invite)
+- Group tasks with creator-only edit and owner moderation
+- Group messages (text/task/location) with cursor pagination and a merged timeline
+- Direct connections, blocks, messages, task shares, and notifications
+- Global search over usernames and public groups
 
 ### Media (Photos)
 - Automatic WebP conversion with JPEG fallback
@@ -111,17 +119,18 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - PWA install (browser + Android TWA)
 - Telegram login with session/device management
 - Multi-device sync with transactional outbox
+- Groups (create, members, invitations) with role-based access
+- Group messages, tasks, and timeline
+- Group sync engine with per-group change sequences
+- Global search (users + public groups)
 - Bilingual interface (Persian + English)
 
 ### ⏳ In Progress / Next
 
-- **Phase 4D** — Number & unit localization (Jalali numbers in Persian, Latin in English)
+- **Phase 8** — Communication & group UI (sidebar navigation, group timeline, invitations and member management, direct messages)
 
 ### 🗓️ Planned
 
-- Communication (connections, blocks, direct messages)
-- Groups (create, invite, members, group tasks, group timeline)
-- Group sync with independent change sequences
 - Sidebar navigation with unified search
 - Welcome wizard
 - Backup & Restore v2
@@ -227,10 +236,13 @@ Status	Milestone
 ✅	Multi-device sync infrastructure
 ✅	Media storage (WebP + ParsPack)
 ✅	English interface
-⏳	Number & unit localization
-🗓️	Communication & groups (database + API)
-🗓️	Group synchronization
-🗓️	Communication & group UI
+✅	Number & unit localization
+✅	Communication (connections, blocks, messages, shares, notifications)
+✅	Groups API (create, members, invitations)
+✅	Group messages, tasks & timeline
+✅	Search (users + public groups)
+✅	Group synchronization
+⏳	Communication & group UI
 🗓️	Backup / restore v2
 🗓️	Account lifecycle & security hardening
 🗓️	Final security audit
