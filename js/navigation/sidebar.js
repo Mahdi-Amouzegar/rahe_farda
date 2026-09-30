@@ -19,6 +19,8 @@ import { getActiveWorkspace, switchWorkspace } from './workspace.js';
 let _opts = null;
 let _opener = null;
 let _untrap = null;
+let _closeTimer = null;
+const _ANIM_MS = 260;
 const _badges = { messages: 0, groups: 0, notifications: 0 };
 let _recentGroups = [];
 
@@ -170,14 +172,21 @@ function renderDrawer() {
 }
 
 /**
- * باز کردن دراور (رندر تازه در هر بازشدن).
+ * باز کردن دراور (رندر تازه در هر بازشدن + ورود نرم با کلاس open).
  */
 export function openDrawer(opener) {
     const root = drawerRoot();
     if (!root) return;
+    if (_closeTimer) {
+        clearTimeout(_closeTimer);
+        _closeTimer = null;
+    }
     _opener = opener || document.activeElement || null;
     renderDrawer();
     root.hidden = false;
+    // ⚠️ reflow اجباری تا transition از حالت بسته اجرا شود
+    void root.offsetWidth;
+    root.classList.add('open');
     document.body.classList.add('drawer-open');
     try {
         if (_untrap) _untrap();
@@ -188,16 +197,21 @@ export function openDrawer(opener) {
 }
 
 /**
- * بستن دراور.
+ * بستن دراور (خروج نرم؛ hidden بعد از پایان انیمیشن ست می‌شود).
  */
 export function closeDrawer() {
     const root = drawerRoot();
-    if (!root || root.hidden) return;
-    root.hidden = true;
+    if (!root || (root.hidden && !root.classList.contains('open'))) return;
+    root.classList.remove('open');
     document.body.classList.remove('drawer-open');
     try {
         if (_untrap) { _untrap(); _untrap = null; }
     } catch { /* silent */ }
+    if (_closeTimer) clearTimeout(_closeTimer);
+    _closeTimer = setTimeout(() => {
+        _closeTimer = null;
+        if (!root.classList.contains('open')) root.hidden = true;
+    }, _ANIM_MS);
     if (_opener && document.contains(_opener) && typeof _opener.focus === 'function') {
         try { _opener.focus(); } catch { /* silent */ }
     }
@@ -246,6 +260,10 @@ export function __resetSidebarForTest() {
     _opts = null;
     _opener = null;
     _untrap = null;
+    if (_closeTimer) {
+        clearTimeout(_closeTimer);
+        _closeTimer = null;
+    }
     _badges.messages = 0;
     _badges.groups = 0;
     _badges.notifications = 0;

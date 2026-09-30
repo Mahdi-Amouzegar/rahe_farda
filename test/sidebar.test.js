@@ -38,6 +38,7 @@ beforeEach(() => {
     authState.loggedIn = true;
     buildDrawer();
     initSidebar({});
+    vi.useFakeTimers();
 });
 
 describe('sidebar — guest', () => {
@@ -58,6 +59,7 @@ describe('sidebar — guest', () => {
         openDrawer();
         document.querySelector('.drawer-login').click();
         expect(called).toBe(1);
+        vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
     });
 });
@@ -94,12 +96,23 @@ describe('sidebar — logged in', () => {
         openDrawer();
         document.querySelector('#drawer [data-workspace="groups"]').click();
         expect(seen).toEqual(['groups']);
+        vi.advanceTimersByTime(300);
+        expect(isDrawerOpen()).toBe(false);
+    });
+
+    it('باز شدن کلاس open می‌گیرد (هوک انیمیشن)', () => {
+        openDrawer();
+        expect(document.getElementById('drawerRoot').classList.contains('open')).toBe(true);
+        closeDrawer();
+        expect(document.getElementById('drawerRoot').classList.contains('open')).toBe(false);
+        vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
     });
 
     it('Escape می‌بندد', () => {
         openDrawer();
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
     });
 

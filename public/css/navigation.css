@@ -4,6 +4,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Drawer
    ⚠️ جهت بازشدن با logical properties: fa (rtl) از راست، en (ltr) از چپ
+   ⚠️ ورود نرم: اسلاید از لبه + fade (کلاس open با کمی تأخیر بعد از unhide
+      اضافه می‌شود تا transition اجرا شود — منطق در sidebar.js)
    ═══════════════════════════════════════════════════════════════════════════ */
 .drawer-root {
     position: fixed;
@@ -19,6 +21,8 @@
     position: absolute;
     inset: 0;
     background: rgba(5, 5, 20, 0.6);
+    opacity: 0;
+    transition: opacity 0.22s ease;
 }
 
 .drawer {
@@ -34,6 +38,32 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.22s ease;
+}
+
+html[dir="rtl"] .drawer {
+    transform: translateX(100%);
+}
+
+html[dir="ltr"] .drawer {
+    transform: translateX(-100%);
+}
+
+.drawer-root.open .drawer-scrim {
+    opacity: 1;
+}
+
+.drawer-root.open .drawer {
+    transform: none;
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .drawer,
+    .drawer-scrim {
+        transition: none;
+    }
 }
 
 .drawer-title {
@@ -144,8 +174,173 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Header slots (T4 — ۵ اسلات، بدون gear)
+   Header slots (T4 — ۵ اسلاتی، بدون gear)
+   ⚠️ بازنویسی قانون قدیمی display:contents (دسکتاپ) که دکمه‌ها را ستونی می‌کند
    ═══════════════════════════════════════════════════════════════════════════ */
+.header .header-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   POLISH (8-1 visual pass — ۳۰ سپتامبر)
+   ۱. Bottom Nav فقط موبایل (خلاف قرارداد در دسکتاپ دیده می‌شد)
+   ۲. هدر دسکتاپ تک‌ردیفه، تگ‌لاین مخفی، تاریخ secondary
+   ۳. هدر موبایل فشرده (تاریخ در عرض کم حذف، دات سینک می‌ماند)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── تگ‌لاین در هدر نیست (همه‌ی عرض‌ها) ─── */
+.tagline-toggle {
+    display: none;
+}
+
+/* ─── ۱. Bottom Nav: مخفی در دسکتاپ ─── */
+@media (min-width: 901px) {
+    .bottom-actions {
+        display: none;
+    }
+}
+
+/* ─── ۲. هدر دسکتاپ: یک ردیف افقی واقعی ─── */
+@media (min-width: 901px) {
+    .header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: start;
+        margin-bottom: 16px;
+    }
+
+    .header .site-logo {
+        width: 40px;
+        height: 40px;
+        margin: 0;
+        flex: none;
+    }
+
+    .header-main {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .header-main h1 {
+        font-size: 1.35rem;
+        margin: 0;
+        white-space: nowrap;
+    }
+
+    .header-context {
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .header-side {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .header-side .today-line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+}
+
+/* ─── تاریخ secondary: در لپ‌تاپ باریک حذف، دات سینک می‌ماند ─── */
+@media (min-width: 901px) and (max-width: 1180px) {
+    #todayLine,
+    #timeSourceIcon {
+        display: none;
+    }
+}
+
+/* ─── ۳. هدر فشرده در موبایل و تبلت عمودی (تا ۹۰۰px): نوار واقعی، نه هیرو ─── */
+@media (max-width: 900px) {
+    .header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-align: start;
+        margin-bottom: 12px;
+    }
+
+    .header .site-logo {
+        width: 36px;
+        height: 36px;
+        margin: 0;
+        flex: none;
+    }
+
+    .header-main {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .header-main h1 {
+        font-size: 1.1rem;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .header-context {
+        font-size: 0.7rem;
+    }
+
+    .header-side {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        flex: none;
+    }
+
+    .header-side .today-line {
+        display: flex;
+        align-items: center;
+        margin: 0;
+    }
+
+    #todayLine,
+    #timeSourceIcon {
+        display: none;
+    }
+
+    .drawer-trigger,
+    .notif-bell,
+    .account-trigger {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+}
+
 .drawer-trigger,
 .notif-bell,
 .account-trigger {
