@@ -53,7 +53,17 @@
     "login": "🔐 ورود / ساخت حساب",
     "loginHint": "برای پیام‌ها و گروه‌ها وارد شوید",
     "hamburger": "باز کردن منو",
-    "close": "بستن منو"
+    "close": "بستن منو",
+    "bellAria": "اعلان‌ها",
+    "accountAria": "حساب من",
+    "bottom": {
+      "drawer": "منو",
+      "drawerAria": "باز کردن منو",
+      "add": "➕ افزودن",
+      "addAria": "افزودن مورد جدید",
+      "notifications": "اعلان‌ها",
+      "notificationsAria": "مشاهده‌ی اعلان‌ها"
+    }
   },
 
   "workspace": {

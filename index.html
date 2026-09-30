@@ -38,6 +38,7 @@
                         <img class="site-logo" src="icons/logo.png" alt="لوگوی برنامه">
                         <div class="header-main">
                             <h1 data-i18n="app.title">راه فردا</h1>
+                            <span class="header-context" id="headerContext"></span>
                             <button class="tagline-toggle" id="heroDescToggle" type="button" data-i18n="app.tagline">کارهایت، زمانت، مسیرت.</button>
                         </div>
                         <div class="header-side">
@@ -51,7 +52,8 @@
                             </p>
                             <div class="header-actions">
                                 <button class="drawer-trigger" id="drawerBtn" type="button" data-i18n-aria-label="nav.hamburger" aria-label="باز کردن منو"><span aria-hidden="true">☰</span></button>
-                                <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" data-i18n-aria-label="header.settings" data-i18n-title="header.settings" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
+                                <button class="notif-bell" id="notifBell" type="button" data-i18n-aria-label="nav.bellAria" aria-label="اعلان‌ها"><span aria-hidden="true">🔔</span><span class="drawer-badge" id="notifBellBadge" hidden></span></button>
+                                <button class="account-trigger" id="accountBtn" type="button" data-i18n-aria-label="nav.accountAria" aria-label="حساب من"><span aria-hidden="true">👤</span></button>
                             </div>
                         </div>
                     </div>
@@ -353,23 +355,25 @@
                     </footer>
 
                     <nav class="bottom-actions" data-i18n-aria-label="bottomActions.ariaQuickAccess" aria-label="دسترسی سریع">
-                        <button class="bottom-action" type="button" data-action="new-task" data-i18n-aria-label="bottomActions.newTask" aria-label="کار جدید">
-                            <span class="bottom-action-icon" aria-hidden="true">➕</span>
-                            <span class="bottom-action-label" data-i18n="bottomActions.newTask">کار جدید</span>
+                        <button class="bottom-action" type="button" data-action="nav-drawer" data-i18n-aria-label="nav.bottom.drawerAria" aria-label="منو">
+                            <span class="bottom-action-icon" aria-hidden="true">☰</span>
+                            <span class="bottom-action-label" data-i18n="nav.bottom.drawer">منو</span>
                         </button>
-                        <button class="bottom-action" type="button" data-action="new-plan" data-i18n-aria-label="bottomActions.newPlan" aria-label="برنامه جدید">
-                            <span class="bottom-action-icon" aria-hidden="true">📂</span>
-                            <span class="bottom-action-label" data-i18n="bottomActions.newPlan">برنامه جدید</span>
+                        <button class="bottom-action" type="button" data-action="nav-add" data-i18n-aria-label="nav.bottom.addAria" aria-label="افزودن">
+                            <span class="bottom-action-icon" aria-hidden="true">⊕</span>
+                            <span class="bottom-action-label" data-i18n="nav.bottom.add">افزودن</span>
                         </button>
-                        <button class="bottom-action" type="button" data-action="new-series" data-i18n-aria-label="bottomActions.newSeries" aria-label="دوره جدید">
-                            <span class="bottom-action-icon" aria-hidden="true">📅</span>
-                            <span class="bottom-action-label" data-i18n="bottomActions.newSeries">دوره جدید</span>
-                        </button>
-                        <button class="bottom-action" type="button" data-action="open-settings" data-i18n-aria-label="bottomActions.settings" aria-label="تنظیمات">
-                            <span class="bottom-action-icon" aria-hidden="true">⚙</span>
-                            <span class="bottom-action-label" data-i18n="bottomActions.settings">تنظیمات</span>
+                        <button class="bottom-action" type="button" data-action="nav-notifications" data-i18n-aria-label="nav.bottom.notificationsAria" aria-label="اعلان‌ها">
+                            <span class="bottom-action-icon" aria-hidden="true">🔔</span>
+                            <span class="bottom-action-label" data-i18n="nav.bottom.notifications">اعلان‌ها</span>
                         </button>
                     </nav>
+
+                    <!-- ⚠️ T4: ریشه‌ی شیت اکشن‌ها -->
+                    <div class="sheet-root" id="sheetRoot" hidden>
+                        <div class="sheet-scrim" id="sheetScrim"></div>
+                        <section class="sheet" id="sheet" role="dialog" aria-modal="true"></section>
+                    </div>
                 </div>
             </div>
 

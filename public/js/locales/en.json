@@ -53,7 +53,17 @@
     "login": "🔐 Log in / Sign up",
     "loginHint": "Log in for messages and groups",
     "hamburger": "Open menu",
-    "close": "Close menu"
+    "close": "Close menu",
+    "bellAria": "Notifications",
+    "accountAria": "My account",
+    "bottom": {
+      "drawer": "Menu",
+      "drawerAria": "Open menu",
+      "add": "➕ Add",
+      "addAria": "Add new item",
+      "notifications": "Alerts",
+      "notificationsAria": "View notifications"
+    }
   },
 
   "workspace": {

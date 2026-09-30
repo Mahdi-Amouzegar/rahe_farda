@@ -142,3 +142,108 @@
     font-size: 1.2rem;
     line-height: 1;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Header slots (T4 — ۵ اسلات، بدون gear)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.drawer-trigger,
+.notif-bell,
+.account-trigger {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-medium);
+    border-radius: 50%;
+    background: var(--bg-3);
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    position: relative;
+}
+
+.drawer-trigger:hover,
+.notif-bell:hover,
+.account-trigger:hover {
+    color: var(--accent-cyan);
+    border-color: var(--accent-cyan-border);
+    background: var(--bg-4);
+}
+
+.notif-bell .drawer-badge {
+    position: absolute;
+    inset-block-start: -4px;
+    inset-inline-end: -4px;
+}
+
+.header-context {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Quick Action Sheet (T4)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sheet-root {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+}
+
+.sheet-root[hidden] {
+    display: none;
+}
+
+.sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 20, 0.6);
+}
+
+.sheet {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--bg-2);
+    border-block-start: 1px solid var(--border-medium);
+    border-start-start-radius: 16px;
+    border-start-end-radius: 16px;
+    padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sheet-title {
+    font-weight: 700;
+    color: var(--text-title);
+    padding: 4px 8px 8px;
+}
+
+.sheet-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.sheet-action:hover {
+    background: var(--bg-4);
+}
+
+.sheet-action-icon {
+    font-size: 1.2rem;
+}

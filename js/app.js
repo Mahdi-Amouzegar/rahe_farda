@@ -157,6 +157,8 @@ import { events, EV } from './events.js';
 // ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
 import { initWorkspace, switchWorkspace } from './navigation/workspace.js';
 import { initSidebar, openDrawer } from './navigation/sidebar.js';
+import { initHeader, refreshHeaderContext } from './navigation/header.js';
+import { initSheet, openSheet } from './ui/sheet.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
@@ -978,11 +980,11 @@ const settingsCloseBtn = document.getElementById('settingsCloseBtn');
 let settingsTrapCleanup = null;
 let settingsReturnFocus = null;
 function toggleSettings(force) {
-    if (!settingsModal || !settingsBtn) return;
+    if (!settingsModal) return;
     const open = typeof force === 'boolean' ? force : settingsModal.hidden;
     settingsModal.hidden = !open;
     settingsModal.hidden = !open;
-    settingsBtn.setAttribute('aria-expanded', String(open));
+    settingsBtn?.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('modal-open', open);
     if (open) {
         settingsReturnFocus = document.activeElement;
@@ -1351,6 +1353,7 @@ if (langBtnEl) {
         const next = getLang() === 'en' ? 'fa' : 'en';
         await setLang(next);
         applyToDOM();
+        refreshHeaderContext();
         applyDisplaySettings();
         resetRenderSignature();
         render();
@@ -1384,6 +1387,7 @@ if (_welcomeLangGroup) {
         if (!btn) return;
         await setLang(btn.dataset.lang);
         applyToDOM();
+        refreshHeaderContext();
         applyDisplaySettings();
         resetRenderSignature();
         render();
@@ -1415,7 +1419,7 @@ document.getElementById('mapToggle').addEventListener('click', () => {
     if (state.prefs.mapVisible) initMap();
 });
 
-/* ---------- Bottom Action Bar ---------- */
+/* ---------- Bottom Action Bar (T4: ☰ | ⊕ | 🔔) ---------- */
 
 // ⚠️ T1b: جایگزین CSP-safe برای onerror inline لوگو (script-src بدون unsafe-inline)
 document.querySelector('.site-logo')?.addEventListener('error', e => {
@@ -1423,30 +1427,51 @@ document.querySelector('.site-logo')?.addEventListener('error', e => {
     if (img) img.hidden = true;
 });
 
+// ⚠️ فاز ۸ (T4): فلوی «شروع مورد جدید» — مشترک بین شیت ⊕ و نقاط دیگر.
+//    رفتار قبلی دکمه‌های new-task/new-plan/new-series بدون تغییر منتقل شده.
+function startNewKind(kind) {
+    switchWorkspace('tasks');
+    switchToTab('tasks');
+    setKind(kind);
+    const createZone = document.querySelector('.create-zone');
+    if (createZone) {
+        createZone.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setTimeout(() => {
+        const ti = document.getElementById('taskInput');
+        if (ti) ti.focus({ preventScroll: true });
+    }, 400);
+}
+
+// ⚠️ فاز ۸ (T4): اکشن‌های شیت ⊕ در فضای وظایف
+function openQuickSheet(opener) {
+    openSheet({
+        title: i18nT('nav.bottom.add') !== 'nav.bottom.add' ? i18nT('nav.bottom.add') : '➕',
+        actions: [
+            { id: 'task', icon: '📝', label: i18nT('bottomActions.newTask') },
+            { id: 'plan', icon: '📂', label: i18nT('bottomActions.newPlan') },
+            { id: 'series', icon: '📅', label: i18nT('bottomActions.newSeries') },
+        ],
+        onSelect: (id) => startNewKind(id),
+        opener,
+    });
+}
+
 document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     const btn = e.target.closest('.bottom-action');
     if (!btn) return;
     const action = btn.dataset.action;
 
-    if (action === 'new-task' || action === 'new-plan' || action === 'new-series') {
-        switchToTab('tasks');
-        const kind = action === 'new-task' ? 'task'
-                   : action === 'new-plan' ? 'plan'
-                   : 'series';
-        setKind(kind);
-        const createZone = document.querySelector('.create-zone');
-        if (createZone) {
-            createZone.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        setTimeout(() => {
-            const ti = document.getElementById('taskInput');
-            if (ti) ti.focus({ preventScroll: true });
-        }, 400);
+    if (action === 'nav-drawer') {
+        openDrawer(btn);
         return;
     }
-
-    if (action === 'open-settings') {
-        toggleSettings(true);
+    if (action === 'nav-add') {
+        openQuickSheet(btn);
+        return;
+    }
+    if (action === 'nav-notifications') {
+        switchWorkspace('notifications');
         return;
     }
 });
@@ -2392,7 +2417,7 @@ initI18n().then(async () => {
     updateFooter();
     initSettings();
 
-    // ⚠️ فاز ۸ (T3): راه‌اندازی Shell — Workspace + Drawer + گیت ورود
+    // ⚠️ فاز ۸ (T3/T4): راه‌اندازی Shell — Workspace + Drawer + Header + گیت ورود
     initWorkspace();
     initSidebar({
         onNavigate: (ws) => switchWorkspace(ws),
@@ -2400,9 +2425,12 @@ initI18n().then(async () => {
         onOpenSettings: () => toggleSettings(true),
         onOpenAccount: () => openAuthModal(),
     });
-    document.getElementById('drawerBtn')?.addEventListener('click', (e) => {
-        openDrawer(e.currentTarget);
+    initHeader({
+        onDrawer: (opener) => openDrawer(opener),
+        onBell: () => switchWorkspace('notifications'),
+        onAccount: () => openAuthModal(),
     });
+    initSheet();
     events.on(EV.AUTH_REQUIRED, () => openAuthModal());
 
     // ⚠️ بعد از i18n، taskها را لود کن
