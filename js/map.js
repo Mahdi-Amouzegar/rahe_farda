@@ -271,7 +271,7 @@ export function destroyMap() {
     const wrap = document.querySelector('.map-wrap');
     if (wrap) wrap.classList.remove('fullscreen');
     const exit = document.getElementById('fsExit');
-    if (exit) exit.style.display = 'none';
+    if (exit) exit.hidden = true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -623,7 +623,7 @@ export function toggleFullscreen() {
     const fsBtn = document.getElementById('fsBtn');
     const fsExit = document.getElementById('fsExit');
     if (fsBtn) fsBtn.textContent = on ? '✕' : '⛶';
-    if (fsExit) fsExit.style.display = on ? '' : 'none';
+    if (fsExit) fsExit.hidden = !on;
     setTimeout(() => { if (mapReady) map.invalidateSize(); }, 80);
 }
 

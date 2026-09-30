@@ -52,10 +52,10 @@ export function updateDueChips() {
     if (!wrap) return;
     if (state.addDraftSessions.length === 0) {
         wrap.innerHTML = '';
-        wrap.style.display = 'none';
+        wrap.hidden = true;
         return;
     }
-    wrap.style.display = 'flex';
+    wrap.hidden = false;
     const sorted = [...state.addDraftSessions].sort((a, b) => new Date(a.at) - new Date(b.at));
     wrap.innerHTML = sorted.map(s =>
         `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-dchip="${escapeHtml(String(s.id))}" aria-label="حذف این سررسید">✕</button></span>`

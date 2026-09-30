@@ -81,7 +81,7 @@ function resetModalState() {
 function openModal() {
     const modal = document.getElementById('weatherModal');
     if (!modal) return;
-    modal.style.display = 'flex';
+    modal.hidden = false;
     if (_weatherTrapCleanup) _weatherTrapCleanup();
     _weatherTrapCleanup = trapFocus(modal);
     const closeBtn = document.getElementById('weatherModalOk');
@@ -94,7 +94,7 @@ function closeModal() {
         _weatherTrapCleanup = null;
     }
     const modal = document.getElementById('weatherModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.hidden = true;
     resetModalState();
 }
 
@@ -322,7 +322,7 @@ export function bindWeatherModal() {
 
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
-        if (modal.style.display === 'flex') {
+        if (!modal.hidden) {
             e.preventDefault();
             e.stopPropagation();
             closeModal();

@@ -131,24 +131,24 @@ let resultsEl = null;
 function showLoading() {
     if (!resultsEl) return;
     resultsEl.innerHTML = '<div class="map-search-loading">در حال جستجو...</div>';
-    resultsEl.style.display = '';
+    resultsEl.hidden = false;
 }
 
 function showEmpty() {
     if (!resultsEl) return;
     resultsEl.innerHTML = '<div class="map-search-empty">مکانی یافت نشد</div>';
-    resultsEl.style.display = '';
+    resultsEl.hidden = false;
 }
 
 function showError(msg) {
     if (!resultsEl) return;
     resultsEl.innerHTML = `<div class="map-search-empty">${escapeHtml(msg)}</div>`;
-    resultsEl.style.display = '';
+    resultsEl.hidden = false;
 }
 
 function hideResults() {
-    if (resultsEl) resultsEl.style.display = 'none';
-    if (clearBtnEl) clearBtnEl.style.display = inputEl && inputEl.value ? '' : 'none';
+    if (resultsEl) resultsEl.hidden = true;
+    if (clearBtnEl) clearBtnEl.hidden = !(inputEl && inputEl.value);
 }
 
 function renderResults(results) {
@@ -165,7 +165,7 @@ function renderResults(results) {
             <span class="map-search-item-sub">${escapeHtml(sub)}</span>
         </button>`;
     }).join('');
-    resultsEl.style.display = '';
+    resultsEl.hidden = false;
     resultsEl._results = results;
 }
 
@@ -271,7 +271,7 @@ function onInput() {
 
     const query = inputEl.value.trim();
 
-    if (clearBtnEl) clearBtnEl.style.display = query ? '' : 'none';
+    if (clearBtnEl) clearBtnEl.hidden = !query;
 
     clearTimeout(debounceTimer);
 
@@ -287,7 +287,7 @@ function onInput() {
 
 function clearSearch() {
     if (inputEl) inputEl.value = '';
-    if (clearBtnEl) clearBtnEl.style.display = 'none';
+    if (clearBtnEl) clearBtnEl.hidden = true;
     hideResults();
     if (inputEl) inputEl.focus();
 }
@@ -324,7 +324,7 @@ export function initMapSearch() {
     });
 
     document.addEventListener('click', e => {
-        if (!resultsEl || resultsEl.style.display === 'none') return;
+        if (!resultsEl || resultsEl.hidden) return;
         if (e.target.closest('.map-search')) return;
         hideResults();
     });

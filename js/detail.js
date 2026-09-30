@@ -75,10 +75,10 @@ function showPhotoSnackbar(message, details, durationMs = 8000) {
             detailsEl.innerHTML = details
                 .map(d => `<div class="photo-snackbar-detail">• ${escapeHtml(d)}</div>`)
                 .join('');
-            detailsEl.style.display = '';
+            detailsEl.hidden = false;
         } else {
             detailsEl.innerHTML = '';
-            detailsEl.style.display = 'none';
+            detailsEl.hidden = true;
         }
     }
 
@@ -184,7 +184,7 @@ function openLightbox(src) {
     const previousFocus = document.activeElement;
 
     img.src = src;
-    lb.style.display = 'flex';
+    lb.hidden = false;
 
     if (lightboxTrapCleanup) {
         try { lightboxTrapCleanup(); } catch { /* silent */ }
@@ -229,7 +229,7 @@ function closeLightbox() {
         lb._escHandler = null;
     }
 
-    lb.style.display = 'none';
+    lb.hidden = true;
     img.removeAttribute('src');
 
     const prev = lb._previousFocus;
@@ -245,7 +245,7 @@ function closeLightbox() {
 
 function hideDetailSmart() {
     const chip = document.getElementById('detailSmartChip');
-    if (chip) chip.style.display = 'none';
+    if (chip) chip.hidden = true;
     detailSmartTargetId = null;
 }
 
@@ -277,7 +277,7 @@ function maybeSuggestDueInDetail(value, targetId) {
     const textEl = document.getElementById('detailSmartChipText');
     if (textEl) textEl.textContent = i18nT(sourceKey, { date: faShort(iso) });
     const chip = document.getElementById('detailSmartChip');
-    if (chip) chip.style.display = 'flex';
+    if (chip) chip.hidden = false;
 
     const acceptBtn = document.getElementById('detailSmartAccept');
     const dismissBtn = document.getElementById('detailSmartDismiss');
@@ -324,10 +324,10 @@ function renderPlanDates() {
     if (!section) return;
 
     if (task.kind !== 'plan') {
-        section.style.display = 'none';
+        section.hidden = true;
         return;
     }
-    section.style.display = '';
+    section.hidden = false;
 
     const line = document.getElementById('detailPlanDatesLine');
     const startBtn = document.getElementById('detailPlanStartBtn');
@@ -353,11 +353,11 @@ function renderPlanDates() {
         else if (task.startAt) parts.push(`${fromLabel} ${formatDateShort(task.startAt)}`);
         else if (task.endAt) parts.push(`${toLabel} ${formatDateShort(task.endAt)}`);
         line.textContent = parts.length ? parts.join(' ') : '';
-        line.style.display = parts.length ? '' : 'none';
+        line.hidden = parts.length === 0;
     }
 
     if (clearBtn) {
-        clearBtn.style.display = (task.startAt || task.endAt) ? '' : 'none';
+        clearBtn.hidden = !(task.startAt || task.endAt);
     }
 }
 
@@ -368,7 +368,7 @@ function renderPlanDates() {
 export function openDetail(id) {
     const pageEl = document.getElementById('detailPage');
     if (pageEl) pageEl.classList.toggle('professional-mode', state.prefs.proMode === true);
-    const wasAlreadyOpen = pageEl && pageEl.style.display === 'block';
+    const wasAlreadyOpen = pageEl && !pageEl.hidden;
     const prevScroll = wasAlreadyOpen ? pageEl.scrollTop : 0;
 
     state.currentDetailId = id;
@@ -379,9 +379,9 @@ export function openDetail(id) {
 
     document.getElementById('detailTitle').textContent = (task.kind === 'plan' ? '📁 ' : '') + task.text;
     document.getElementById('fTitle').value = task.text;
-    document.getElementById('fLocField').style.display = '';
+    document.getElementById('fLocField').hidden = false;
     const locAccordion = document.querySelector('.detail-accordion.location');
-    if (locAccordion) locAccordion.style.display = '';
+    if (locAccordion) locAccordion.hidden = false;
     document.getElementById('fDesc').value = task.description || '';
     document.getElementById('fPhone').value = task.phone || '';
     document.getElementById('fAddr').value = task.address || '';
@@ -401,7 +401,7 @@ export function openDetail(id) {
     renderTimer();
     clearInterval(timerTick);
     timerTick = setInterval(() => { if (getDetailTask()) renderTimer(); }, 60000);
-    pageEl.style.display = 'block';
+    pageEl.hidden = false;
     if (window.matchMedia('(max-width: 900px)').matches) {
         document.body.style.overflow = 'hidden';
     }
@@ -424,7 +424,7 @@ export function closeDetail() {
     const closedId = state.currentDetailId;
     state.currentDetailId = null;
     clearInterval(timerTick);
-    document.getElementById('detailPage').style.display = 'none';
+    document.getElementById('detailPage').hidden = true;
     document.body.style.overflow = '';
     call('hideMobilePickBanner');
     call('render');
@@ -442,7 +442,7 @@ function enterLocationPickMode(taskId, mode) {
 
         if (window.matchMedia('(max-width: 900px)').matches) {
             const pageEl = document.getElementById('detailPage');
-            if (pageEl) pageEl.style.display = 'none';
+            if (pageEl) pageEl.hidden = true;
             document.body.style.overflow = '';
         }
 
@@ -465,14 +465,14 @@ function updateUrlLink() {
     const task = getDetailTask();
     const safe = task ? sanitizeUrl(task.url || '') : '';
     if (!safe) {
-        link.style.display = 'none';
+        link.hidden = true;
         link.removeAttribute('href');
-        copy.style.display = 'none';
+        copy.hidden = true;
         return;
     }
     link.href = safe;
-    link.style.display = '';
-    copy.style.display = '';
+    link.hidden = false;
+    copy.hidden = false;
 }
 
 function updateCallBtn() {
@@ -480,12 +480,12 @@ function updateCallBtn() {
     const task = getDetailTask();
     const raw = task ? (task.phone || '').trim() : '';
     if (!raw) {
-        btn.style.display = 'none';
+        btn.hidden = true;
         btn.removeAttribute('href');
         return;
     }
     btn.href = 'tel:' + raw.replace(/[\s()-]/g, '');
-    btn.style.display = '';
+    btn.hidden = false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -574,10 +574,10 @@ async function renderDetailPhotos() {
             limitHint.textContent = i18nT('detail.photo.limitReachedHint', {
                 max: formatNumber(MAX_PHOTOS_PER_TASK)
             });
-            limitHint.style.display = '';
+            limitHint.hidden = false;
         } else {
             limitHint.textContent = '';
-            limitHint.style.display = 'none';
+            limitHint.hidden = true;
         }
     }
 
@@ -742,11 +742,11 @@ function renderRecurRows() {
     if (!task) return;
     const r = task.recur;
     const nRow = document.getElementById('fRecurNRow');
-    if (nRow) nRow.style.display = (r === 'custom' || r === 'hourly') ? '' : 'none';
+    if (nRow) nRow.hidden = !(r === 'custom' || r === 'hourly');
     const weekRow = document.getElementById('fRecurWeekRow');
-    if (weekRow) weekRow.style.display = r === 'weeklyDays' ? '' : 'none';
+    if (weekRow) weekRow.hidden = r !== 'weeklyDays';
     const monthRow = document.getElementById('fRecurMonthRow');
-    if (monthRow) monthRow.style.display = r === 'monthlyDays' ? '' : 'none';
+    if (monthRow) monthRow.hidden = r !== 'monthlyDays';
 
     const nLabel = document.querySelector('#fRecurNRow .field-label');
     if (nLabel) {
@@ -912,7 +912,7 @@ export function bindDetailInputs() {
             switchToTab('map');
             if (window.matchMedia('(max-width: 900px)').matches) {
                 const pageEl = document.getElementById('detailPage');
-                if (pageEl) pageEl.style.display = 'none';
+                if (pageEl) pageEl.hidden = true;
                 document.body.style.overflow = '';
             }
             mapHint(i18nT('map.hint.clickForSession'));

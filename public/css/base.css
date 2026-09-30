@@ -383,4 +383,30 @@ html.theme-light {
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer utilities {
     /* کلاس‌های کمکی در آینده اضافه می‌شوند */
+
+    /* ── T1b: جایگزین style="display:none" و displayهای inline ── */
+    .u-cursor-pointer { cursor: pointer; }
+    .u-mb-6 { margin-bottom: 6px; }
+    .u-mb-8 { margin-bottom: 8px; }
+    .u-mt-6 { margin-top: 6px; }
+    .u-mt-8 { margin-top: 8px; }
+    .u-my-10 { margin: 10px 0; }
+    .u-m-0 { margin: 0; }
+    .u-text-muted { color: var(--text-muted); }
+    .u-sticky-top { position: sticky; top: 0; z-index: 2; }
+    .u-flex-wrap { flex-wrap: wrap; }
+    .u-flex-col { flex-direction: column; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   T1b: kill-switch برای hidden — عمداً خارج از @layer تا بر همه بچربد
+   (استایل unlayered با !important بر استایل‌های layered غلبه می‌کند)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[hidden] {
+    display: none !important;
+}
+
+/* T1b (ex T1a): مخفی‌سازی pre-hide زبان — قبلاً <style> inline بود */
+html.i18n-prehide body {
+    visibility: hidden !important;
 }

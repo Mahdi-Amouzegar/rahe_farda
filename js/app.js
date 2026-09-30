@@ -264,7 +264,7 @@ function openAuthModal() {
 
     renderAuthModal();
 
-    modal.style.display = 'flex';
+    modal.hidden = false;
     if (_authTrapCleanup) _authTrapCleanup();
     _authTrapCleanup = trapFocus(modal);
     setTimeout(() => document.getElementById('authModalClose')?.focus(), 60);
@@ -279,7 +279,7 @@ function closeAuthModal() {
         _authTrapCleanup = null;
     }
     const modal = document.getElementById('authModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.hidden = true;
 }
 
 /**
@@ -312,7 +312,7 @@ function renderAuthModal() {
             <p class="auth-note">
                 ${i18nT('auth.login.note')}
             </p>
-            <div class="auth-error" id="authError" style="display:none;" role="alert"></div>
+            <div class="auth-error" id="authError" hidden role="alert"></div>
         `;
 
         const tgBtn = document.getElementById('authTelegramBtn');
@@ -430,7 +430,7 @@ function renderAuthModal() {
                     i18nT('auth.disconnect.step4'),
                     i18nT('auth.disconnect.step5'),
                     i18nT('auth.disconnect.step6'),
-                    `<small style="color:var(--text-muted);">${i18nT('auth.disconnect.note')}</small>`
+                    `<small class="u-text-muted">${i18nT('auth.disconnect.note')}</small>`
                 ],
                 buttonText: i18nT('auth.disconnect.buttonText')
             });
@@ -559,7 +559,7 @@ export function setKind(kind) {
     const isPlan = kind === 'plan';
     const isSeries = kind === 'series';
 
-    document.getElementById('locBtn').style.display = '';
+    document.getElementById('locBtn').hidden = false;
 
     if (!isPlan) {
         state.planDraftStart = null;
@@ -571,19 +571,19 @@ export function setKind(kind) {
         updateDueChips();
     }
     const sc = document.getElementById('smartChip');
-    if (sc && (isSeries && state.seriesType !== 'dates')) sc.style.display = 'none';
-    document.getElementById('planKidsWrap').style.display = isPlan ? '' : 'none';
+    if (sc && (isSeries && state.seriesType !== 'dates')) sc.hidden = true;
+    document.getElementById('planKidsWrap').hidden = !isPlan;
     const md = document.getElementById('moreDetails');
     if (md) {
-        md.style.display = isSeries ? '' : 'none';
+        md.hidden = !isSeries;
         if (!isSeries) md.open = false;
     }
-    document.getElementById('seriesRecurWrap').style.display = isSeries ? '' : 'none';
+    document.getElementById('seriesRecurWrap').hidden = !isSeries;
     const tb = document.getElementById('templateBtn');
-    if (tb) tb.style.display = isPlan ? '' : 'none';
+    if (tb) tb.hidden = !isPlan;
 
     const planDatesWrap = document.getElementById('planDatesWrap');
-    if (planDatesWrap) planDatesWrap.style.display = isPlan ? '' : 'none';
+    if (planDatesWrap) planDatesWrap.hidden = !isPlan;
     if (isPlan) renderPlanDatesForm();
 
     const addB = document.getElementById('addBtn');
@@ -619,7 +619,7 @@ function renderPlanDatesForm() {
         if (state.planDraftStart) parts.push(`${fromLabel} ${fmtDateFa(state.planDraftStart)}`);
         if (state.planDraftEnd) parts.push(`${toLabel} ${fmtDateFa(state.planDraftEnd)}`);
         line.textContent = parts.join(' ');
-        line.style.display = parts.length ? '' : 'none';
+        line.hidden = parts.length === 0;
     }
 }
 
@@ -647,9 +647,9 @@ function fmtDateFa(iso) {
 function updateDueRow() {
     const isDates = state.pendingKind === 'series' && state.seriesType === 'dates';
     const dueB = document.getElementById('dueBtn');
-    if (dueB) dueB.style.display = (state.pendingKind === 'series' && !isDates) ? 'none' : '';
+    if (dueB) dueB.hidden = (state.pendingKind === 'series' && !isDates);
     const sad = document.getElementById('seriesAddDate');
-    if (sad) sad.style.display = isDates ? '' : 'none';
+    if (sad) sad.hidden = !isDates;
 
     if (isDates) {
         const slot = document.getElementById('dueChipsSlot');
@@ -722,9 +722,9 @@ document.querySelectorAll('[data-srecur]').forEach(b => {
         document.getElementById('seriesError').textContent = '';
         state.seriesDays = [];
         document.querySelectorAll('#seriesSubWeek .on, #seriesMonthChips .on').forEach(x => x.classList.remove('on'));
-        document.getElementById('seriesSubHours').style.display = state.seriesType === 'hourlyN' ? '' : 'none';
-        document.getElementById('seriesSubWeek').style.display = state.seriesType === 'weeklyDays' ? '' : 'none';
-        document.getElementById('seriesSubMonth').style.display = state.seriesType === 'monthlyDays' ? '' : 'none';
+        document.getElementById('seriesSubHours').hidden = state.seriesType !== 'hourlyN';
+        document.getElementById('seriesSubWeek').hidden = state.seriesType !== 'weeklyDays';
+        document.getElementById('seriesSubMonth').hidden = state.seriesType !== 'monthlyDays';
         updateDueRow();
         if (state.seriesType !== 'dates' && state.addDraftSessions.length) {
             state.addDraftSessions = [];
@@ -824,7 +824,7 @@ function renderPlanKids() {
     const box = document.getElementById('planKidChips');
     if (!box) return;
     box.innerHTML = state.planDraftKids.map((k, i) => `<span class="due-chip">📝 ${escapeHtml(k)}<button type="button" data-plankid="${i}" aria-label="${t('common.delete')}">✕</button></span>`).join('');
-    box.style.display = state.planDraftKids.length ? 'flex' : 'none';
+    box.hidden = state.planDraftKids.length === 0;
 }
 
 document.getElementById('planKidAdd').addEventListener('click', () => {
@@ -863,20 +863,20 @@ document.getElementById('tplList').addEventListener('click', e => {
     document.getElementById('tplName').value = tpl.title;
     renderTplDates();
     renderTplKids();
-    document.getElementById('tplList').style.display = 'none';
-    document.getElementById('tplConfig').style.display = '';
-    document.getElementById('tplKidAdd').style.display = '';
-    document.getElementById('tplBack').style.display = '';
-    document.getElementById('tplCreate').style.display = '';
+    document.getElementById('tplList').hidden = true;
+    document.getElementById('tplConfig').hidden = false;
+    document.getElementById('tplKidAdd').hidden = false;
+    document.getElementById('tplBack').hidden = false;
+    document.getElementById('tplCreate').hidden = false;
 });
 document.getElementById('tplBack').addEventListener('click', () => {
     setTplDraft(null);
     renderTemplateList();
-    document.getElementById('tplList').style.display = '';
-    document.getElementById('tplConfig').style.display = 'none';
-    document.getElementById('tplKidAdd').style.display = 'none';
-    document.getElementById('tplBack').style.display = 'none';
-    document.getElementById('tplCreate').style.display = 'none';
+    document.getElementById('tplList').hidden = false;
+    document.getElementById('tplConfig').hidden = true;
+    document.getElementById('tplKidAdd').hidden = true;
+    document.getElementById('tplBack').hidden = true;
+    document.getElementById('tplCreate').hidden = true;
 });
 document.getElementById('tplKidAdd').addEventListener('click', () => {
     const inp = document.getElementById('tplKidInput');
@@ -977,7 +977,7 @@ function toggleSettings(force) {
     if (!settingsModal || !settingsBtn) return;
     const open = typeof force === 'boolean' ? force : settingsModal.hidden;
     settingsModal.hidden = !open;
-    settingsModal.style.display = open ? 'flex' : 'none';
+    settingsModal.hidden = !open;
     settingsBtn.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('modal-open', open);
     if (open) {
@@ -1059,7 +1059,7 @@ function openExportModal() {
     document.getElementById('exportIncludeSettings').checked = false;
     updateExportMeta();
 
-    exportModal.style.display = 'flex';
+    exportModal.hidden = false;
     if (_exportTrapCleanup) _exportTrapCleanup();
     _exportTrapCleanup = trapFocus(exportModal);
     setTimeout(() => document.getElementById('exportConfirm')?.focus(), 60);
@@ -1067,7 +1067,7 @@ function openExportModal() {
 
 function closeExportModal() {
     if (_exportTrapCleanup) { _exportTrapCleanup(); _exportTrapCleanup = null; }
-    if (exportModal) exportModal.style.display = 'none';
+    if (exportModal) exportModal.hidden = true;
 }
 
 function updateExportMeta() {
@@ -1119,14 +1119,14 @@ function openImportModal() {
     if (!importModal) return;
     _importFileData = null;
     document.getElementById('importFileName').textContent = t('import.noFileSelected');
-    document.getElementById('importModeWrap').style.display = 'none';
+    document.getElementById('importModeWrap').hidden = true;
     document.getElementById('importMeta').innerHTML = '';
     document.getElementById('importConfirm').disabled = true;
     const mergeRadio = document.querySelector('input[name="importMode"][value="merge"]');
     if (mergeRadio) mergeRadio.checked = true;
     document.getElementById('importSettingsCheck').checked = false;
 
-    importModal.style.display = 'flex';
+    importModal.hidden = false;
     if (_importTrapCleanup) _importTrapCleanup();
     _importTrapCleanup = trapFocus(importModal);
     setTimeout(() => document.getElementById('importFileInput')?.click(), 100);
@@ -1134,7 +1134,7 @@ function openImportModal() {
 
 function closeImportModal() {
     if (_importTrapCleanup) { _importTrapCleanup(); _importTrapCleanup = null; }
-    if (importModal) importModal.style.display = 'none';
+    if (importModal) importModal.hidden = true;
     _importFileData = null;
 }
 
@@ -1183,11 +1183,11 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
             `;
         }
 
-        document.getElementById('importModeWrap').style.display = '';
+        document.getElementById('importModeWrap').hidden = false;
 
         const settingsWrap = document.getElementById('importSettingsWrap');
         const settingsCheck = document.getElementById('importSettingsCheck');
-        if (settingsWrap) settingsWrap.style.display = hasSettings ? '' : 'none';
+        if (settingsWrap) settingsWrap.hidden = !hasSettings;
         if (settingsCheck) settingsCheck.checked = false;
 
         document.getElementById('importConfirm').disabled = false;
@@ -1358,7 +1358,7 @@ if (langBtnEl) {
         updateFooter();
         // ⚠️ بستن weather modal (راه‌حل موقت — ترجمه‌ی کامل در فایل بعدی)
         const wm = document.getElementById('weatherModal');
-        if (wm && wm.style.display === 'flex') wm.style.display = 'none';
+        if (wm && !wm.hidden) wm.hidden = true;
     });
 }
 
@@ -1390,7 +1390,7 @@ if (_welcomeLangGroup) {
         refreshSoundPresetList();
         updateFooter();
         const wm = document.getElementById('weatherModal');
-        if (wm && wm.style.display === 'flex') wm.style.display = 'none';
+        if (wm && !wm.hidden) wm.hidden = true;
     });
 }
 
@@ -1412,6 +1412,12 @@ document.getElementById('mapToggle').addEventListener('click', () => {
 });
 
 /* ---------- Bottom Action Bar ---------- */
+
+// ⚠️ T1b: جایگزین CSP-safe برای onerror inline لوگو (script-src بدون unsafe-inline)
+document.querySelector('.site-logo')?.addEventListener('error', e => {
+    const img = e.target;
+    if (img) img.hidden = true;
+});
 
 document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     const btn = e.target.closest('.bottom-action');
@@ -1665,7 +1671,7 @@ function initSoundSettings() {
 
     const syncVoiceRowVisibility = () => {
         if (!ttsVoiceRow || !ttsCb) return;
-        ttsVoiceRow.style.display = ttsCb.checked ? '' : 'none';
+        ttsVoiceRow.hidden = !ttsCb.checked;
     };
     if (ttsCb) ttsCb.addEventListener('change', syncVoiceRowVisibility);
     syncVoiceRowVisibility();
@@ -1793,18 +1799,18 @@ const installBtn = document.getElementById('installBtn');
 window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    if (installBtn) installBtn.style.display = '';
+    if (installBtn) installBtn.hidden = false;
 });
 if (installBtn) installBtn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
-    installBtn.style.display = 'none';
+    installBtn.hidden = true;
 });
 window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
-    if (installBtn) installBtn.style.display = 'none';
+    if (installBtn) installBtn.hidden = true;
 });
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () => {
@@ -1890,32 +1896,32 @@ document.addEventListener('keydown', e => {
 
     if (settingsModal && !settingsModal.hidden) { toggleSettings(false); return; }
 
-    if (exportModal && exportModal.style.display === 'flex') { closeExportModal(); return; }
-    if (importModal && importModal.style.display === 'flex') { closeImportModal(); return; }
+    if (exportModal && !exportModal.hidden) { closeExportModal(); return; }
+    if (importModal && !importModal.hidden) { closeImportModal(); return; }
 
     const authModal = document.getElementById('authModal');
-    if (authModal && authModal.style.display === 'flex') { closeAuthModal(); return; }
+    if (authModal && !authModal.hidden) { closeAuthModal(); return; }
 
     const stacked = ['confirmModal', 'infoModal', 'namePromptModal', 'nameConflictModal', 'weatherModal'];
     for (const id of stacked) {
         const el = document.getElementById(id);
-        if (el && el.style.display === 'flex') return;
+        if (el && !el.hidden) return;
     }
 
     const saved = document.getElementById('savedLocationsModal');
-    if (saved && saved.style.display === 'flex') return;
+    if (saved && !saved.hidden) return;
 
     const picker = document.getElementById('pickerOverlay');
-    if (picker && picker.style.display === 'flex') { closePicker(); return; }
+    if (picker && !picker.hidden) { closePicker(); return; }
 
     const cal = document.getElementById('calOverlay');
-    if (cal && cal.style.display === 'flex') { closeCal(); return; }
+    if (cal && !cal.hidden) { closeCal(); return; }
 
     const tpl = document.getElementById('templateModal');
-    if (tpl && tpl.style.display === 'flex') { closeTemplateModal(); return; }
+    if (tpl && !tpl.hidden) { closeTemplateModal(); return; }
 
     const trash = document.getElementById('trashPage');
-    if (trash && trash.style.display === 'block') { closeTrash(); return; }
+    if (trash && !trash.hidden) { closeTrash(); return; }
 
     if (state.currentDetailId) { closeDetail(); return; }
 
@@ -2159,11 +2165,11 @@ document.getElementById('archiveDone').addEventListener('click', archiveDone);
 })();
 
 const anyOverlayOpen = () =>
-    document.getElementById('pickerOverlay').style.display === 'flex' ||
-    document.getElementById('calOverlay').style.display === 'flex' ||
-    document.getElementById('trashPage').style.display === 'block' ||
-    document.getElementById('lightbox').style.display === 'flex' ||
-    document.getElementById('weatherModal').style.display === 'flex' ||
+    !document.getElementById('pickerOverlay').hidden ||
+    !document.getElementById('calOverlay').hidden ||
+    !document.getElementById('trashPage').hidden ||
+    !document.getElementById('lightbox').hidden ||
+    !document.getElementById('weatherModal').hidden ||
     Boolean(state.currentDetailId);
 
 document.addEventListener('keydown', e => {
@@ -2231,7 +2237,7 @@ let smartTargetId = null;
 
 const hideSmart = () => {
     const chip = document.getElementById('smartChip');
-    if (chip) chip.style.display = 'none';
+    if (chip) chip.hidden = true;
     smartTargetId = null;
 };
 
@@ -2252,7 +2258,7 @@ function maybeSuggestDue(value, targetId) {
     smartTargetId = targetId;
     const sourceKey = targetId === 'descInput' ? 'tasks.smartSuggest.fromDesc' : 'tasks.smartSuggest.fromTitle';
     document.getElementById('smartChipText').textContent = t(sourceKey, { date: faShort(iso) });
-    document.getElementById('smartChip').style.display = 'flex';
+    document.getElementById('smartChip').hidden = false;
 
     document.getElementById('smartAccept').onclick = () => {
         state.addDraftSessions.push({ id: uid(), at: iso });
@@ -2351,9 +2357,9 @@ initAuth();
 
 setKind(state.prefs.pendingKind || 'task');
 if (!state.prefs.tourSeen) {
-    document.getElementById('welcomeOverlay').style.display = 'flex';
+    document.getElementById('welcomeOverlay').hidden = false;
     document.getElementById('welcomeStart').addEventListener('click', () => {
-        document.getElementById('welcomeOverlay').style.display = 'none';
+        document.getElementById('welcomeOverlay').hidden = true;
         state.prefs.tourSeen = true;
         savePrefs();
         input.focus();

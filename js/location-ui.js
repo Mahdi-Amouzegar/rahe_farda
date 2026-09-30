@@ -213,7 +213,7 @@ function askLocationName(defaultValue) {
         title.textContent = defaultValue
             ? i18nT('location.namePrompt.titleEdit')
             : i18nT('location.namePrompt.title');
-        overlay.style.display = 'flex';
+        overlay.hidden = false;
 
         let trapCleanup = null;
         if (typeof trapFocus === 'function') {
@@ -222,7 +222,7 @@ function askLocationName(defaultValue) {
         setTimeout(() => { input.focus(); input.select(); }, 60);
 
         const cleanup = () => {
-            overlay.style.display = 'none';
+            overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             confirmBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
@@ -291,7 +291,7 @@ function askConflictResolution(name, conflict) {
             text.textContent = i18nT('location.conflict.message', { name, coords: coords(conflict) });
         }
         overlay.classList.add('picker-overlay--stacked');
-        overlay.style.display = 'flex';
+        overlay.hidden = false;
 
         let trapCleanup = null;
         if (typeof trapFocus === 'function') {
@@ -300,7 +300,7 @@ function askConflictResolution(name, conflict) {
         setTimeout(() => replaceBtn.focus(), 60);
 
         const cleanup = () => {
-            overlay.style.display = 'none';
+            overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             replaceBtn.removeEventListener('click', onReplace);
             renameBtn.removeEventListener('click', onRename);
@@ -338,8 +338,8 @@ function renderAdd() {
     const chip = document.getElementById('locChip');
     const text = document.getElementById('locChipText');
     if (!chip || !text) return;
-    if (!state.pendingLoc) { chip.style.display = 'none'; return; }
-    chip.style.display = '';
+    if (!state.pendingLoc) { chip.hidden = true; return; }
+    chip.hidden = false;
     const d = displayFor(state.pendingLoc);
     const html = `<span class="location-display"><span>${d.icon}</span><span class="${d.cls}">${escapeHtml(d.name)}</span></span>`;
     if (text.innerHTML !== html) text.innerHTML = html;
@@ -373,12 +373,12 @@ function renderDetail() {
         const html = `<span class="location-display"><span>📍</span><span>${i18nT('location.noLocation')}</span></span>`;
         if (line.innerHTML !== html) line.innerHTML = html;
 
-        if (showBtn) showBtn.style.display = 'none';
-        if (routeBtn) routeBtn.style.display = 'none';
-        if (removeBtn) removeBtn.style.display = 'none';
+        if (showBtn) showBtn.hidden = true;
+        if (routeBtn) routeBtn.hidden = true;
+        if (removeBtn) removeBtn.hidden = true;
         if (changeBtn) {
             changeBtn.textContent = i18nT('detail.sections.location.add');
-            changeBtn.style.display = '';
+            changeBtn.hidden = false;
         }
         return;
     }
@@ -388,12 +388,12 @@ function renderDetail() {
     const html = `<span class="location-display"><span>${d.icon}</span><span class="${d.cls}">${escapeHtml(d.name)}</span></span>`;
     if (line.innerHTML !== html) line.innerHTML = html;
 
-    if (showBtn) showBtn.style.display = '';
-    if (routeBtn) routeBtn.style.display = '';
-    if (removeBtn) removeBtn.style.display = '';
+    if (showBtn) showBtn.hidden = false;
+    if (routeBtn) routeBtn.hidden = false;
+    if (removeBtn) removeBtn.hidden = false;
     if (changeBtn) {
         changeBtn.textContent = i18nT('detail.sections.location.change');
-        changeBtn.style.display = '';
+        changeBtn.hidden = false;
     }
 
     const save = document.createElement('button');
@@ -477,7 +477,7 @@ function openManageModal() {
         _savedLocTrapCleanup = null;
     }
 
-    modal.style.display = 'flex';
+    modal.hidden = false;
 
     try {
         _savedLocTrapCleanup = trapFocus(modal);
@@ -495,7 +495,7 @@ function closeManageModal() {
         _savedLocTrapCleanup = null;
     }
     const modal = document.getElementById('savedLocationsModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.hidden = true;
 }
 
 /**
@@ -719,13 +719,13 @@ export function showMobileBanner(text) {
     if (!banner) return;
     if (textEl && text) textEl.textContent = text;
     document.body.classList.add('detail-picking-location');
-    banner.style.display = 'flex';
+    banner.hidden = false;
     clearTimeout(mobileBannerTimer);
 }
 
 export function hideMobileBanner() {
     const banner = document.getElementById('mobilePickBanner');
-    if (banner) banner.style.display = 'none';
+    if (banner) banner.hidden = true;
     document.body.classList.remove('detail-picking-location');
     clearTimeout(mobileBannerTimer);
 }
@@ -950,7 +950,7 @@ function bind() {
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
         const modal = document.getElementById('savedLocationsModal');
-        if (modal && modal.style.display === 'flex') {
+        if (modal && !modal.hidden) {
             e.preventDefault();
             e.stopPropagation();
             closeManageModal();

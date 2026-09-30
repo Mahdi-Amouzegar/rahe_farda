@@ -268,8 +268,12 @@ export function renderStats(total, done) {
             } catch { /* نادیده */ }
             const h = Math.max(3, Math.round((counts[i] / max) * 100));
             const tooltip = i18nT('tasks.insight.barTooltip', { n: formatNumber(counts[i]) });
-            return `<div class="bar-col" title="${tooltip}"><div class="bar${counts[i] === 0 ? ' empty' : ''}" style="height: ${h}%;"></div><span>${wd}</span></div>`;
+            return `<div class="bar-col" title="${tooltip}"><div class="bar${counts[i] === 0 ? ' empty' : ''}" data-h="${h}"></div><span>${wd}</span></div>`;
         }).join('') + `</div>`;
+    // ⚠️ T1b: ارتفاع میله‌ها با CSSOM ست می‌شود (style attribute زیر CSP ممنوع است)
+    box.querySelectorAll('.bar[data-h]').forEach(b => {
+        b.style.height = b.dataset.h + '%';
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -314,13 +318,13 @@ export function setTplDraft(d) { tplDraft = d; }
 export function openTemplateModal() {
     tplDraft = null;
     renderTemplateList();
-    document.getElementById('tplList').style.display = '';
-    document.getElementById('tplConfig').style.display = 'none';
-    document.getElementById('tplKidAdd').style.display = 'none';
-    document.getElementById('tplBack').style.display = 'none';
-    document.getElementById('tplCreate').style.display = 'none';
+    document.getElementById('tplList').hidden = false;
+    document.getElementById('tplConfig').hidden = true;
+    document.getElementById('tplKidAdd').hidden = true;
+    document.getElementById('tplBack').hidden = true;
+    document.getElementById('tplCreate').hidden = true;
     const modal = document.getElementById('templateModal');
-    modal.style.display = 'flex';
+    modal.hidden = false;
     if (_tplTrapCleanup) _tplTrapCleanup();
     _tplTrapCleanup = trapFocus(modal);
     const first = modal.querySelector('.tpl-opt, button');
@@ -330,10 +334,10 @@ export function openTemplateModal() {
 export function closeTemplateModal() {
     if (_tplTrapCleanup) { _tplTrapCleanup(); _tplTrapCleanup = null; }
     tplDraft = null;
-    document.getElementById('tplKidAdd').style.display = 'none';
-    document.getElementById('tplBack').style.display = 'none';
-    document.getElementById('tplCreate').style.display = 'none';
-    document.getElementById('templateModal').style.display = 'none';
+    document.getElementById('tplKidAdd').hidden = true;
+    document.getElementById('tplBack').hidden = true;
+    document.getElementById('tplCreate').hidden = true;
+    document.getElementById('templateModal').hidden = true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -365,7 +369,7 @@ export function renderTrash() {
 export function openTrash() {
     renderTrash();
     const page = document.getElementById('trashPage');
-    page.style.display = 'block';
+    page.hidden = false;
     document.body.style.overflow = 'hidden';
     if (_trashTrapCleanup) _trashTrapCleanup();
     _trashTrapCleanup = trapFocus(page);
@@ -375,7 +379,7 @@ export function openTrash() {
 
 export function closeTrash() {
     if (_trashTrapCleanup) { _trashTrapCleanup(); _trashTrapCleanup = null; }
-    document.getElementById('trashPage').style.display = 'none';
+    document.getElementById('trashPage').hidden = true;
     document.body.style.overflow = '';
     render();
 }
@@ -571,7 +575,7 @@ export function openCal() {
 
     renderCalendar();
     const overlay = document.getElementById('calOverlay');
-    overlay.style.display = 'flex';
+    overlay.hidden = false;
     if (_calTrapCleanup) _calTrapCleanup();
     _calTrapCleanup = trapFocus(overlay);
     const close = document.getElementById('calClose');
@@ -580,7 +584,7 @@ export function openCal() {
 
 export function closeCal() {
     if (_calTrapCleanup) { _calTrapCleanup(); _calTrapCleanup = null; }
-    document.getElementById('calOverlay').style.display = 'none';
+    document.getElementById('calOverlay').hidden = true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -706,13 +710,13 @@ function planHtml(task) {
             ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
             ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${hasLoc ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
-            <div class="mini-progress"><div class="mini-progress-fill" style="width: ${pct}%;"></div></div>
+            <div class="mini-progress"><div class="mini-progress-fill" data-w="${pct}"></div></div>
             ${st.total > 0 && st.done < st.total ? `<button class="mini-link" data-action="check-all" aria-label="${i18nT('taskItem.operations.checkAll')}">✓ ${i18nT('taskItem.operations.checkAll')}</button>` : ''}
         </div>
         ${(task.sessions && task.sessions.length) ? `<div class="plan-session-row">${sessionSummaryHtml(task)}</div>` : ''}
         ${open ? `<div class="plan-body">
             ${kids.length ? kids.map(c => childHtml(c)).join('') : `<div class="session-empty">${i18nT('taskItem.plan.noChildren')}</div>`}
-            ${drafts.length ? `<div class="due-chips" style="display: flex; margin: 0;">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="${i18nT('common.delete')}">✕</button></span>`).join('')}</div>` : ''}
+            ${drafts.length ? `<div class="due-chips u-m-0">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="${i18nT('common.delete')}">✕</button></span>`).join('')}</div>` : ''}
             <div class="child-add">
                 <input type="text" class="child-input" placeholder="${i18nT('tasks.plan.newChildPlaceholder')}" maxlength="${MAX_LENGTH}" aria-label="${i18nT('tasks.plan.newChildAria')}">
                 <select class="child-prio" aria-label="${i18nT('tasks.details.priorityAria')}">
@@ -872,6 +876,11 @@ function renderFull(filtered, total, done) {
         return taskItemHtml(task);
     }).join('');
 
+    // ⚠️ T1b: عرض progress-barها با CSSOM ست می‌شود (style attribute زیر CSP ممنوع است)
+    taskList.querySelectorAll('.mini-progress-fill[data-w]').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+    });
+
     hydrateWeatherIcons(taskList);
     updateTaskListStatus(i18nT('tasks.status.showingCount', { n: formatNumber(filtered.length) }));
     state.justAddedId = null;
@@ -975,9 +984,9 @@ export function render() {
     if (chip) {
         if (state.selectedDay) {
             const [gy, gm, gd] = state.selectedDay.split('-').map(Number);
-            chip.style.display = '';
+            chip.hidden = false;
             chip.innerHTML = `📅 ${formatDate(new Date(gy, gm - 1, gd), { day: 'numeric', month: 'long' })} <b>✕</b>`;
-        } else chip.style.display = 'none';
+        } else chip.hidden = true;
     }
 
     let archivedCount = 0;
@@ -1016,7 +1025,7 @@ export function render() {
     if (progressBar) progressBar.setAttribute('aria-valuenow', pct);
 
     const doneActionsEl = document.getElementById('doneActions');
-    if (doneActionsEl) doneActionsEl.style.display = done > 0 ? 'flex' : 'none';
+    if (doneActionsEl) doneActionsEl.hidden = done <= 0;
 
     // ─── تصمیم renderFull vs renderDiff ───
     const visibleIds = filtered.map(t => String(t.id));

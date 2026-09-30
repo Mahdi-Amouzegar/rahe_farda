@@ -102,13 +102,13 @@ export function openPicker(mode, onConfirm) {
     document.getElementById('pickerHour').value = String(base.getHours()).padStart(2, '0');
     document.getElementById('pickerMinute').value = String(Math.floor(base.getMinutes() / 5) * 5).padStart(2, '0');
     document.getElementById('pickerError').textContent = '';
-    document.getElementById('pickerRemove').style.display = mode === 'add' ? '' : 'none';
+    document.getElementById('pickerRemove').hidden = mode !== 'add';
     renderPicker();
-    document.getElementById('pickerOverlay').style.display = 'flex';
+    document.getElementById('pickerOverlay').hidden = false;
 }
 
 export function closePicker() {
-    document.getElementById('pickerOverlay').style.display = 'none';
+    document.getElementById('pickerOverlay').hidden = true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

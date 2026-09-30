@@ -161,7 +161,7 @@ function clearMapRoute() {
     summaryHidden = false;
     removeSummary();
     const btn = document.getElementById('routeClearBtn');
-    if (btn) btn.style.display = 'none';
+    if (btn) btn.hidden = true;
 }
 
 // فقط پنل را پنهان می‌کند، مسیر روی نقشه باقی می‌ماند
@@ -201,9 +201,13 @@ function renderSummary() {
         const active = activeKey === profile.key && available;
         const distance = available ? fmtDist(route.distance) : 'محاسبه نشد';
         const duration = available ? fmtDur(route.duration) : '';
-        return `<button type="button" class="route-option${active ? ' is-active' : ''}${available ? '' : ' is-disabled'}" data-route-mode="${profile.key}" ${available ? '' : 'disabled'} style="--route-color:${profile.color}" aria-pressed="${active ? 'true' : 'false'}"><span class="route-option-main"><span class="route-option-icon">${profile.icon}</span><span class="route-option-name">${profile.label}</span></span><span class="route-option-info"><span>${distance}</span>${duration ? `<span>•</span><span>${duration}</span>` : ''}</span></button>`;
+        return `<button type="button" class="route-option${active ? ' is-active' : ''}${available ? '' : ' is-disabled'}" data-route-mode="${profile.key}" ${available ? '' : 'disabled'} data-route-color="${profile.color}" aria-pressed="${active ? 'true' : 'false'}"><span class="route-option-main"><span class="route-option-icon">${profile.icon}</span><span class="route-option-name">${profile.label}</span></span><span class="route-option-info"><span>${distance}</span>${duration ? `<span>•</span><span>${duration}</span>` : ''}</span></button>`;
     }).join('');
     el.innerHTML = `<div class="route-summary-title"><button type="button" class="route-summary-close" data-route-close aria-label="بستن" title="بستن">×</button><span class="route-summary-title-text">${title}</span></div><div class="route-options">${rows}</div>`;
+    // ⚠️ T1b: custom property رنگ با CSSOM ست می‌شود (style attribute زیر CSP ممنوع است)
+    el.querySelectorAll('[data-route-color]').forEach(b => {
+        b.style.setProperty('--route-color', b.dataset.routeColor);
+    });
     bindRouteSummary();
 }
 
@@ -271,7 +275,7 @@ async function showRouteTo(taskId) {
         if (!activeRoutes[activeKey]) throw new Error('no-route');
         drawRoute(activeKey);
         const btn = document.getElementById('routeClearBtn');
-        if (btn) btn.style.display = '';
+        if (btn) btn.hidden = false;
         clearTimer = setTimeout(() => clearMapRoute(), AUTO_CLEAR_MS);
         mapHint(i18nT('map.hint.routeSelectMode'), 5000);
     } catch (err) {

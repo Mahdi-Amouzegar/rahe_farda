@@ -240,7 +240,7 @@ export function downloadJSON(data, filename) {
         const a = document.createElement('a');
         a.href = url;
         a.download = filename || `backup-${Date.now()}.json`;
-        a.style.display = 'none';
+        a.hidden = true;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => {
@@ -383,7 +383,7 @@ export function showConfirmModal(options) {
         let trapCleanup = null;
 
         const cleanup = () => {
-            overlay.style.display = 'none';
+            overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
@@ -414,7 +414,7 @@ export function showConfirmModal(options) {
         document.addEventListener('keydown', onKey);
 
         overlay.classList.add('picker-overlay--stacked');
-        overlay.style.display = 'flex';
+        overlay.hidden = false;
         trapCleanup = trapFocus(overlay);
 
         setTimeout(() => {
@@ -454,7 +454,7 @@ export function showInfoModal(options) {
         let trapCleanup = null;
 
         const cleanup = () => {
-            overlay.style.display = 'none';
+            overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             okBtn.removeEventListener('click', onOk);
             overlay.removeEventListener('click', onOverlay);
@@ -482,7 +482,7 @@ export function showInfoModal(options) {
         document.addEventListener('keydown', onKey);
 
         overlay.classList.add('picker-overlay--stacked');
-        overlay.style.display = 'flex';
+        overlay.hidden = false;
         trapCleanup = trapFocus(overlay);
 
         setTimeout(() => okBtn.focus(), 60);
