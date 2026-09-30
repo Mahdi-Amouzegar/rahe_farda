@@ -1,0 +1,144 @@
+/* © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است */
+/* navigation.css — App Shell: Drawer + Workspace stubs (Phase 8 — T3) */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Drawer
+   ⚠️ جهت بازشدن با logical properties: fa (rtl) از راست، en (ltr) از چپ
+   ═══════════════════════════════════════════════════════════════════════════ */
+.drawer-root {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+}
+
+.drawer-root[hidden] {
+    display: none;
+}
+
+.drawer-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 20, 0.6);
+}
+
+.drawer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    inset-inline-start: 0;
+    width: min(320px, 85vw);
+    overflow-y: auto;
+    background: var(--bg-2);
+    border-inline-end: 1px solid var(--border-medium);
+    padding: 16px 12px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.drawer-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text-title);
+    padding: 4px 8px 12px;
+}
+
+.drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.drawer-item:hover {
+    background: var(--bg-4);
+}
+
+.drawer-item.active {
+    background: var(--bg-4);
+    font-weight: 700;
+}
+
+.drawer-item-label {
+    flex: 1;
+}
+
+.drawer-badge {
+    min-width: 22px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 6px;
+    background: var(--accent-purple);
+    color: #fff;
+}
+
+.drawer-badge[hidden] {
+    display: none;
+}
+
+.drawer-sep {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 10px 4px;
+}
+
+.drawer-section {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 10px 12px 2px;
+}
+
+.drawer-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 2px 12px;
+}
+
+.drawer-login {
+    font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Workspace stubs (T3 — نمای موقت تا 8-2/8-3)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.workspace-root[hidden] {
+    display: none;
+}
+
+.ws-stub {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-2);
+    padding: 28px 20px;
+    margin: 12px 0;
+    text-align: center;
+}
+
+.ws-stub h2 {
+    margin: 0 0 8px;
+    color: var(--text-title);
+    font-size: 1.1rem;
+}
+
+.ws-stub p {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Hamburger trigger (T3 — چیدمان کامل هدر در T4)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.drawer-trigger {
+    font-size: 1.2rem;
+    line-height: 1;
+}

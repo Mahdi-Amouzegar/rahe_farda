@@ -40,6 +40,33 @@
     "ariaSelect": "انتخاب نما"
   },
 
+  "nav": {
+    "drawerTitle": "منوی راه فردا",
+    "search": "🔎 جستجو در راه فردا",
+    "tasks": "📋 وظایف من",
+    "messages": "💬 پیام‌ها",
+    "groups": "👥 گروه‌ها",
+    "notifications": "🔔 اعلان‌ها",
+    "recentGroups": "گروه‌های اخیر",
+    "settings": "⚙ تنظیمات",
+    "account": "👤 حساب من",
+    "login": "🔐 ورود / ساخت حساب",
+    "loginHint": "برای پیام‌ها و گروه‌ها وارد شوید",
+    "hamburger": "باز کردن منو",
+    "close": "بستن منو"
+  },
+
+  "workspace": {
+    "messagesTitle": "💬 پیام‌ها",
+    "messagesEmpty": "هنوز گفتگویی نیست.",
+    "groupsTitle": "👥 گروه‌ها",
+    "groupsEmpty": "هنوز عضو گروهی نیستی.",
+    "searchTitle": "🔎 جستجو",
+    "searchEmpty": "نام کاربر یا گروه را بنویس.",
+    "notificationsTitle": "🔔 اعلان‌ها",
+    "notificationsEmpty": "اعلان تازه‌ای نیست."
+  },
+
   "auth": {
     "defaultUserName": "کاربر",
     "modalTitle": "👤 حساب من",

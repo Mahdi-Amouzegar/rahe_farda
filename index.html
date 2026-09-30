@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/css/detail.css">
 <link rel="stylesheet" href="/css/map.css">
 <link rel="stylesheet" href="/css/status.css">
+<link rel="stylesheet" href="/css/navigation.css">
 <link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body>
@@ -49,6 +50,7 @@
                                 </button>
                             </p>
                             <div class="header-actions">
+                                <button class="drawer-trigger" id="drawerBtn" type="button" data-i18n-aria-label="nav.hamburger" aria-label="باز کردن منو"><span aria-hidden="true">☰</span></button>
                                 <button class="settings-trigger" id="settingsBtn" type="button" aria-controls="settingsModal" aria-expanded="false" data-i18n-aria-label="header.settings" data-i18n-title="header.settings" aria-label="تنظیمات" title="تنظیمات"><span aria-hidden="true">⚙</span></button>
                             </div>
                         </div>
@@ -314,6 +316,31 @@
                                 </div>
                             </section>
                         </div>
+                    </div>
+
+                    <!-- ⚠️ T3: ریشه‌ی دراور + فضاهای ارتباطی (استاب تا 8-2/8-3) -->
+                    <div class="drawer-root" id="drawerRoot" hidden>
+                        <div class="drawer-scrim" id="drawerScrim"></div>
+                        <aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
+                    </div>
+
+                    <div class="workspace-root" id="workspaceRoot" hidden>
+                        <section class="ws-stub" id="ws-messages" hidden>
+                            <h2 data-i18n="workspace.messagesTitle">💬 پیام‌ها</h2>
+                            <p data-i18n="workspace.messagesEmpty">هنوز گفتگویی نیست.</p>
+                        </section>
+                        <section class="ws-stub" id="ws-groups" hidden>
+                            <h2 data-i18n="workspace.groupsTitle">👥 گروه‌ها</h2>
+                            <p data-i18n="workspace.groupsEmpty">هنوز عضو گروهی نیستی.</p>
+                        </section>
+                        <section class="ws-stub" id="ws-search" hidden>
+                            <h2 data-i18n="workspace.searchTitle">🔎 جستجو</h2>
+                            <p data-i18n="workspace.searchEmpty">نام کاربر یا گروه را بنویس.</p>
+                        </section>
+                        <section class="ws-stub" id="ws-notifications" hidden>
+                            <h2 data-i18n="workspace.notificationsTitle">🔔 اعلان‌ها</h2>
+                            <p data-i18n="workspace.notificationsEmpty">اعلان تازه‌ای نیست.</p>
+                        </section>
                     </div>
 
                     <footer class="app-footer">

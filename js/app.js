@@ -154,6 +154,10 @@ import { initMapSearch } from './map-search.js';
 import { bindWeatherModal } from './weather-modal.js';
 import { events, EV } from './events.js';
 
+// ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
+import { initWorkspace, switchWorkspace } from './navigation/workspace.js';
+import { initSidebar, openDrawer } from './navigation/sidebar.js';
+
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
 import { initSyncQueue, getQueueSize as getSyncQueueSize } from './sync-queue.js';
@@ -2387,6 +2391,19 @@ initI18n().then(async () => {
     updateAccountStatusText();
     updateFooter();
     initSettings();
+
+    // ⚠️ فاز ۸ (T3): راه‌اندازی Shell — Workspace + Drawer + گیت ورود
+    initWorkspace();
+    initSidebar({
+        onNavigate: (ws) => switchWorkspace(ws),
+        onLogin: () => openAuthModal(),
+        onOpenSettings: () => toggleSettings(true),
+        onOpenAccount: () => openAuthModal(),
+    });
+    document.getElementById('drawerBtn')?.addEventListener('click', (e) => {
+        openDrawer(e.currentTarget);
+    });
+    events.on(EV.AUTH_REQUIRED, () => openAuthModal());
 
     // ⚠️ بعد از i18n، taskها را لود کن
     await loadTasks();

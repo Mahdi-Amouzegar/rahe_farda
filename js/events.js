@@ -248,6 +248,8 @@ export const EV = {
     UI_HIDE_SNACKBAR: 'ui:hide-snackbar',
     UI_OPEN_DETAIL: 'ui:open-detail',
     UI_SWITCH_TAB: 'ui:switch-tab',
+    WORKSPACE_CHANGED: 'workspace:changed',
+    AUTH_REQUIRED: 'auth:required',
 
     // ─── Modals ───
     MODAL_CONFIRM: 'modal:confirm',

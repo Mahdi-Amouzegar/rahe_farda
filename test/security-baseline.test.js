@@ -61,6 +61,8 @@ const BASELINE = new Set([
   'map-search.js:resultsEl.innerHTML = `<div class="map-search-empty">${escapeHtml(msg)}</div>`;',
   'map-search.js:resultsEl.innerHTML = results.map((r, i) => {',
   'map.js:if (el) el.innerHTML = \'<div class="map-fallback">برای نمایش نقشه به اینترنت نیاز است.<br>برنامه بدون نقشه هم کامل کار می‌کند.</div>\';',
+  'navigation/sidebar.js://   - هیچ innerHTML — فقط DOM API و textContent',
+  'navigation/workspace.js:// ⚠️ بدون innerHTML — این ماژول فقط hidden را جابه‌جا می‌کند.',
   'picker.js:container.innerHTML = keys.map(k =>',
   'picker.js:document.getElementById(\'pickerDays\').innerHTML = html;',
   'route-ui.js:el.innerHTML = `<div class="route-summary-title"><button type="button" class="route-summary-close" data-route-close aria-label="بستن" title="بستن">×</button><span class="route-summary-title-text">${title}</span></div><div class="route-options">${rows}</div>`;',
