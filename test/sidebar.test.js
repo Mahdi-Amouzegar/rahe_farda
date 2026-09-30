@@ -103,6 +103,13 @@ describe('sidebar — logged in', () => {
         expect(isDrawerOpen()).toBe(false);
     });
 
+    it('باز شدن فوکوس را داخل دراور می‌برد و Escape برمی‌گرداند', () => {
+        const opener = document.getElementById('opener');
+        opener.focus();
+        openDrawer(opener);
+        expect(document.activeElement.closest('#drawer')).not.toBeNull();
+    });
+
     it('رندر تازه در هر بازشدن (بج جدید دیده می‌شود)', () => {
         openDrawer();
         closeDrawer();
