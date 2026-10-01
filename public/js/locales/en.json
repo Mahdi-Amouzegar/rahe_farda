@@ -133,7 +133,27 @@
     "roleOwner": "Owner",
     "roleAdmin": "Admin",
     "roleMember": "Member",
-    "offline": "You are offline — connect to see groups."
+    "offline": "You are offline — connect to see groups.",
+    "myInvitations": "My invitations",
+    "invite": "Invite member",
+    "transfer": "Transfer ownership",
+    "transferConfirm": "Transfer ownership to this member?",
+    "close": "Close group",
+    "closeConfirm": "The group will be closed and its tasks deleted. Continue?",
+    "delete": "Delete group",
+    "deleteConfirm": "Delete this group forever?",
+    "removeMember": "Remove",
+    "removeConfirm": "Remove this member from the group?"
+  },
+
+  "gtask": {
+    "title": "Group tasks",
+    "placeholder": "New task…",
+    "create": "Add",
+    "empty": "No tasks.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "deleteConfirm": "Delete this task?"
   },
 
   "auth": {

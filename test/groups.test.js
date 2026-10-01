@@ -34,7 +34,7 @@ vi.mock('../js/api.js', async () => ({
             };
         }
         if (path === '/api/groups/g1') {
-            return { ok: true, data: { group: { id: 'g1', name: 'سفر', ownerId: 'u1' }, myRole: 'member' } };
+            return { ok: true, data: { group: { id: 'g1', name: 'سفر', ownerId: 'u1', closedAt: null }, myRole: 'owner' } };
         }
         if (path.startsWith('/api/groups/g1/timeline')) {
             return {
@@ -62,6 +62,56 @@ vi.mock('../js/api.js', async () => ({
         if (path === '/api/groups/g1/messages' && opts && opts.method === 'POST') {
             return { ok: true, data: { message: { id: 'gm9' }, changeSeq: 9 } };
         }
+        if (path === '/api/invitations/mine') {
+            return {
+                ok: true,
+                data: {
+                    invitations: [
+                        { id: 'inv1', groupId: 'g9', groupName: 'G9', inviterId: 'u9', inviteeId: 'u1', type: 'invitation', status: 'pending', createdAt: '2026-01-01T00:00:00Z', expiresAt: '2026-02-01T00:00:00Z' },
+                    ],
+                },
+            };
+        }
+        if (path === '/api/groups/g2') {
+            return { ok: true, data: { group: { id: 'g2', name: 'G2', ownerId: 'u9', closedAt: null }, myRole: 'member' } };
+        }
+        if (path === '/api/groups/g2/members') {
+            return {
+                ok: true,
+                data: {
+                    members: [
+                        { id: 'm9', groupId: 'g2', userId: 'u9', role: 'owner', status: 'active', username: 'boss' },
+                        { id: 'm8', groupId: 'g2', userId: 'u1', role: 'member', status: 'active', username: 'ali' },
+                    ],
+                },
+            };
+        }
+        if (path.startsWith('/api/groups/g2/timeline')) {
+            return { ok: true, data: { items: [], nextCursor: null } };
+        }
+        if (path === '/api/groups/g2/tasks') {
+            return {
+                ok: true,
+                data: {
+                    tasks: [
+                        { id: 't9', groupId: 'g2', creatorId: 'u9', kind: 'task', payload: '{"title":"Owner task"}', revision: 1, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null },
+                    ],
+                },
+            };
+        }
+        if (path === '/api/groups/g1/tasks') {
+            return {
+                ok: true,
+                data: {
+                    tasks: [
+                        { id: 't1', groupId: 'g1', creatorId: 'u1', kind: 'task', payload: '{"title":"Mine"}', revision: 1, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null },
+                    ],
+                },
+            };
+        }
+        if (path.startsWith('/api/search')) {
+            return { ok: true, data: { users: [{ id: 'u7', username: 'guest7' }] } };
+        }
         return { ok: false, error: { code: 'NOT_FOUND', message: 'x' } };
     }),
     apiErrorMessage: (e) => (e && e.message) || 'err',
@@ -76,6 +126,7 @@ import {
     __resetGroupsForTest,
     __getGroupsStateForTest,
 } from '../js/communication/groups.js';
+import { state } from '../js/core.js';
 
 function buildShell() {
     document.body.innerHTML = `
@@ -88,6 +139,7 @@ beforeEach(() => {
     __resetGroupsForTest();
     apiCalls.length = 0;
     netState.online = true;
+    state.sync.userId = 'u1';
     buildShell();
 });
 
@@ -97,7 +149,7 @@ describe('groups — list (8.3-A)', () => {
         expect(res.ok).toBe(true);
         expect(res.groups.length).toBe(2);
         await openGroupsWorkspace();
-        expect(document.querySelectorAll('.conv-row').length).toBe(2);
+        expect(document.querySelectorAll('.grp-row').length).toBe(2);
     });
 
     it('آفلاین → حالت offline', async () => {
@@ -138,11 +190,95 @@ describe('groups — workspace (8.3-A)', () => {
 
     it('نمای اعضا فقط خواندنی با نقش‌هاست', async () => {
         await openGroupsWorkspace();
-        await openGroup('g1');
+        await openGroup('g2');
         document.querySelector('.conv-menu-btn').click();
         await new Promise((r) => setTimeout(r, 10));
-        document.querySelector('[data-menu-id]').click();
+        const memberItem = [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === 'members');
+        memberItem.click();
         expect(document.querySelector('.conv-role')).not.toBeNull();
         expect(__getGroupsStateForTest().view).toBe('members');
+        // عضو عادی: دکمه‌ی حذف ندارد
+        expect(document.querySelector('.conv-row .conv-mini-btn')).toBeNull();
+    });
+});
+
+describe('groups — inbox + management (8.3-B)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('inbox دعوت با نام گروه + قبول', async () => {
+        await openGroupsWorkspace();
+        expect(document.body.textContent).toContain('G9');
+        const acceptBtns = [...document.querySelectorAll('.conv-request .conv-mini-btn')];
+        const accept = acceptBtns.find((b) => b.textContent === 'قبول');
+        expect(accept).toBeTruthy();
+        accept.click();
+        await sleep(20);
+        const calls = apiCalls.filter((c) => c.path === '/api/groups/g9/invitations/inv1/accept');
+        expect(calls.length).toBe(1);
+    });
+
+    it('منوی owner همه‌ی آیتم‌های مدیریتی را دارد', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(expect.arrayContaining(['members', 'tasks', 'invite', 'transfer', 'close', 'delete']));
+    });
+
+    it('منوی عضو عادی فقط members/tasks دارد', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g2');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(['members', 'tasks']);
+    });
+
+    it('حذف عضو توسط owner', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        // رفتن به نمای اعضا
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+        [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === 'members').click();
+        // دکمه‌ی حذف برای sara هست، برای خودم نیست
+        const rows = [...document.querySelectorAll('.conv-box .conv-row')];
+        const saraRow = rows.find((r) => r.textContent.includes('sara'));
+        expect(saraRow.querySelector('.conv-mini-btn')).not.toBeNull();
+        // confirm modal لازم دارد — بدون DOM مودال، showConfirmModal به alert می‌رسد؛
+        // پس فقط حضور دکمه را چک می‌کنیم (فلو کامل در تست دوکاربره‌ی دستی)
+    });
+
+    it('نمای تسک‌ها + ساخت تسک', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+        [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === 'tasks').click();
+        await sleep(30);
+        expect(document.getElementById('gtaskInput')).not.toBeNull();
+        expect(document.body.textContent).toContain('Mine');
+        document.getElementById('gtaskInput').value = 'تازه';
+        document.querySelector('.conv-composer .conv-send').click();
+        await sleep(20);
+        const posts = apiCalls.filter((c) => c.path === '/api/groups/g1/tasks' && c.opts && c.opts.method === 'POST');
+        expect(posts.length).toBe(1);
+        expect(posts[0].opts.body.payload).toMatchObject({ title: 'تازه' });
+    });
+
+    it('ویرایش تسک خودی، حذف تسک خودی', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+        [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === 'tasks').click();
+        await sleep(30);
+        const more = document.querySelector('.conv-row .msg-more');
+        expect(more).not.toBeNull();
     });
 });

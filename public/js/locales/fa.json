@@ -133,7 +133,27 @@
     "roleOwner": "مالک",
     "roleAdmin": "مدیر",
     "roleMember": "عضو",
-    "offline": "آفلاین هستی — برای دیدن گروه‌ها وصل شو."
+    "offline": "آفلاین هستی — برای دیدن گروه‌ها وصل شو.",
+    "myInvitations": "دعوت‌های من",
+    "invite": "دعوت عضو",
+    "transfer": "انتقال مالکیت",
+    "transferConfirm": "مالکیت به این عضو منتقل شود؟",
+    "close": "بستن گروه",
+    "closeConfirm": "گروه بسته و تسک‌هایش حذف می‌شوند. ادامه؟",
+    "delete": "حذف گروه",
+    "deleteConfirm": "گروه برای همیشه حذف شود؟",
+    "removeMember": "حذف",
+    "removeConfirm": "این عضو از گروه حذف شود؟"
+  },
+
+  "gtask": {
+    "title": "تسک‌های گروه",
+    "placeholder": "تسک تازه…",
+    "create": "افزودن",
+    "empty": "تسکی نیست.",
+    "save": "ذخیره",
+    "cancel": "انصراف",
+    "deleteConfirm": "این تسک حذف شود؟"
   },
 
   "auth": {

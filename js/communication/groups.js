@@ -13,14 +13,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
+import { state } from '../core.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
+import { showInfoModal, showConfirmModal } from '../core.js';
 import {
     messageBodyNode,
     displayNameOf,
     initLocationPreviews,
 } from './conversations.js';
+import { searchUsers } from './connections.js';
 
 const PAGE_LIMIT = 30;
 
@@ -34,6 +37,7 @@ let _cursor = null;
 let _hasMore = false;
 let _loading = false;
 let _view = 'timeline';
+let _tasksCache = [];
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -84,7 +88,7 @@ async function fetchMembers(groupId) {
 // View — list
 // ═══════════════════════════════════════════════════════════════════════════
 
-function renderGroupsHome(state) {
+async function renderGroupsHome(state) {
     const sec = groupsSection();
     if (!sec) return;
     sec.replaceChildren();
@@ -98,6 +102,7 @@ function renderGroupsHome(state) {
         sec.appendChild(el('p', null, tr('errors.serverError', 'خطا')));
         return;
     }
+    await renderInbox(sec);
     if (_groups.length === 0) {
         sec.appendChild(el('p', null, tr('workspace.groupsEmpty', '')));
         return;
@@ -106,7 +111,7 @@ function renderGroupsHome(state) {
     const list = el('div', 'conv-list');
     list.setAttribute('role', 'list');
     for (const g of _groups) {
-        const row = el('button', 'conv-row');
+        const row = el('button', 'conv-row grp-row');
         row.type = 'button';
         row.setAttribute('role', 'listitem');
         const avatar = el('span', 'conv-avatar', (g.name || '?').trim().charAt(0) || '?');
@@ -129,15 +134,15 @@ export async function openGroupsWorkspace() {
         sec.appendChild(el('p', null, '…'));
     }
     if (!isOnline()) {
-        renderGroupsHome('offline');
+        await renderGroupsHome('offline');
         return;
     }
     const res = await listGroups();
     if (!res.ok) {
-        renderGroupsHome('error');
+        await renderGroupsHome('error');
         return;
     }
-    renderGroupsHome('list');
+    await renderGroupsHome('list');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -164,14 +169,32 @@ function renderGroupView() {
     menu.type = 'button';
     menu.setAttribute('aria-label', tr('msg.moreAria', 'گزینه‌ها'));
     menu.addEventListener('click', () => {
-        // ⚠️ 8.3-A: فقط اعضا (مدیریت در 8.3-B)
+        // ⚠️ آیتم‌ها بر اساس نقش (UI فقط منعکس می‌کند؛ backend مرجع نهایی است)
+        const items = [
+            { id: 'members', label: tr('grp.members', 'اعضا') },
+            { id: 'tasks', label: tr('gtask.title', 'تسک‌ها') },
+        ];
+        if (isManager()) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
+        if (isOwner()) {
+            items.push({ id: 'transfer', label: tr('grp.transfer', 'انتقال مالکیت') });
+            items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
+            items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
+        }
         openMenu({
             anchor: menu,
-            items: [{ id: 'members', label: tr('grp.members', 'اعضا') }],
+            items,
             onSelect: (id) => {
-                if (id === 'members') {
+                if (id === 'members' || id === 'invite') {
                     _view = 'members';
                     renderGroupView();
+                } else if (id === 'tasks') {
+                    openTasksView();
+                } else if (id === 'transfer') {
+                    openTransferPicker();
+                } else if (id === 'close') {
+                    confirmGroupClose();
+                } else if (id === 'delete') {
+                    confirmGroupDelete();
                 }
             },
         });
@@ -181,6 +204,11 @@ function renderGroupView() {
 
     if (_view === 'members') {
         renderMembersView(sec);
+        return;
+    }
+
+    if (_view === 'tasks') {
+        renderGroupTasksView(sec);
         return;
     }
 
@@ -270,6 +298,50 @@ function groupTaskNode(item) {
 
 function renderMembersView(sec) {
     const box = el('div', 'conv-box');
+    // ─── فرم دعوت (فقط owner/admin) ───
+    if (isManager() && _group && _group.closedAt === null) {
+        const invBox = el('div', 'conv-new');
+        const searchInput = el('input', 'conv-input');
+        searchInput.setAttribute('placeholder', tr('conn.searchPlaceholder', '…'));
+        searchInput.setAttribute('maxlength', '50');
+        searchInput.setAttribute('autocomplete', 'off');
+        const results = el('div', 'conv-search-results');
+        invBox.appendChild(searchInput);
+        invBox.appendChild(results);
+        let timer = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(async () => {
+                const q = searchInput.value.trim();
+                results.replaceChildren();
+                if (q.length < 3) return;
+                const res = await apiFetch(
+                    '/api/search?q=' + encodeURIComponent(q) + '&type=user'
+                );
+                if (!res.ok) return;
+                for (const u of (res.data && res.data.users) || []) {
+                    const row = el('div', 'conv-row');
+                    row.appendChild(el('span', 'conv-name', displayNameOf(u)));
+                    const inv = el('button', 'conv-mini-btn', tr('conn.request', 'درخواست'));
+                    inv.type = 'button';
+                    inv.addEventListener('click', async () => {
+                        const r = await apiFetch(
+                            '/api/groups/' + encodeURIComponent(_openGroupId) + '/invitations',
+                            { method: 'POST', body: { inviteeId: u.id, type: 'invitation' } }
+                        );
+                        inv.disabled = true;
+                        inv.textContent = r.ok
+                            ? tr('conn.requestSent', 'فرستاده شد')
+                            : apiErrorMessage(r.error);
+                    });
+                    row.appendChild(inv);
+                    results.appendChild(row);
+                }
+            }, 350);
+        });
+        box.appendChild(invBox);
+    }
+    const me = myUserId();
     for (const m of _members) {
         const row = el('div', 'conv-row');
         const avatar = el('span', 'conv-avatar', ((m.username || '?').trim().charAt(0) || '?'));
@@ -277,6 +349,27 @@ function renderMembersView(sec) {
         row.appendChild(avatar);
         row.appendChild(el('span', 'conv-name', m.username || String(m.userId || '').slice(0, 8)));
         row.appendChild(el('span', 'conv-role', roleLabel(m.role)));
+        // ─── حذف عضو: فقط owner، نه خودش، نه مالک ───
+        if (isOwner() && m.userId !== me && m.userId !== (_group && _group.ownerId)) {
+            const rm = el('button', 'conv-mini-btn', tr('grp.removeMember', 'حذف'));
+            rm.type = 'button';
+            rm.addEventListener('click', async () => {
+                const ok = await showConfirmModal({
+                    title: tr('grp.removeMember', 'حذف'),
+                    message: tr('grp.removeConfirm', 'این عضو حذف شود؟'),
+                    confirmText: tr('conn.reject', 'رد'),
+                    danger: true,
+                });
+                if (!ok) return;
+                await apiFetch(
+                    '/api/groups/' + encodeURIComponent(_openGroupId) +
+                    '/members/' + encodeURIComponent(m.userId),
+                    { method: 'DELETE' }
+                );
+                await openGroup(_openGroupId);
+            });
+            row.appendChild(rm);
+        }
         box.appendChild(row);
     }
     if (_members.length === 0) {
@@ -290,6 +383,220 @@ function renderMembersView(sec) {
         renderGroupView();
     });
     sec.appendChild(back);
+}
+
+async function openTransferPicker() {
+    if (!_group) return;
+    const candidates = _members.filter(
+        (m) => m.status === 'active' && m.userId !== _group.ownerId
+    );
+    if (candidates.length === 0) return;
+    openMenu({
+        items: candidates.map((m) => ({
+            id: m.userId,
+            label: m.username || String(m.userId).slice(0, 8),
+        })),
+        onSelect: async (newOwnerId) => {
+            const ok = await showConfirmModal({
+                title: tr('grp.transfer', 'انتقال مالکیت'),
+                message: tr('grp.transferConfirm', 'مالکیت منتقل شود؟'),
+                danger: true,
+            });
+            if (!ok) return;
+            await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/transfer', {
+                method: 'POST',
+                body: { newOwnerId },
+            });
+            await openGroup(_openGroupId);
+        },
+    });
+}
+
+async function confirmGroupClose() {
+    if (!_group) return;
+    const ok = await showConfirmModal({
+        title: tr('grp.close', 'بستن گروه'),
+        message: tr('grp.closeConfirm', 'گروه بسته و تسک‌هایش حذف می‌شوند. ادامه؟'),
+        danger: true,
+    });
+    if (!ok) return;
+    await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/close', { method: 'POST' });
+    _openGroupId = null;
+    await openGroupsWorkspace();
+}
+
+async function confirmGroupDelete() {
+    if (!_group) return;
+    const ok = await showConfirmModal({
+        title: tr('grp.delete', 'حذف گروه'),
+        message: tr('grp.deleteConfirm', 'گروه برای همیشه حذف شود؟'),
+        danger: true,
+    });
+    if (!ok) return;
+    await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId), { method: 'DELETE' });
+    _openGroupId = null;
+    await openGroupsWorkspace();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8.3-B: تسک‌های گروه (CRUD کامل با Permission Matrix بخش ۱۰)
+//   - مشاهده/ایجاد: همه‌ی اعضا | ویرایش: فقط creator | حذف: creator یا owner
+// ═══════════════════════════════════════════════════════════════════════════
+
+function groupTaskTitle(t) {
+    try {
+        const p = typeof t.payload === 'string' ? JSON.parse(t.payload) : t.payload;
+        return String((p && (p.text || p.title)) || '').slice(0, 200) || '…';
+    } catch {
+        return '…';
+    }
+}
+
+async function loadGroupTasks() {
+    const res = await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks');
+    return res.ok ? (res.data.tasks || []) : null;
+}
+
+function renderGroupTasksView(sec) {
+    const box = el('div', 'conv-box');
+    box.appendChild(el('div', 'conv-section', tr('gtask.title', 'تسک‌ها')));
+
+    // ─── فرم ساخت (همه‌ی اعضا، گروه باز) ───
+    if (_group && !_group.closedAt) {
+        const form = el('div', 'conv-composer');
+        const input = el('input', 'conv-input');
+        input.id = 'gtaskInput';
+        input.setAttribute('placeholder', tr('gtask.placeholder', 'تسک تازه…'));
+        input.setAttribute('maxlength', '500');
+        input.setAttribute('autocomplete', 'off');
+        const add = el('button', 'conv-send', tr('gtask.create', 'افزودن'));
+        add.type = 'button';
+        add.addEventListener('click', async () => {
+            const text = input.value.trim();
+            if (!text) return;
+            add.disabled = true;
+            const res = await apiFetch(
+                '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks',
+                { method: 'POST', body: { kind: 'task', payload: { title: text } } }
+            );
+            add.disabled = false;
+            if (!res.ok) {
+                input.title = apiErrorMessage(res.error);
+                return;
+            }
+            input.value = '';
+            await refreshTasksView();
+        });
+        form.appendChild(input);
+        form.appendChild(add);
+        box.appendChild(form);
+    }
+
+    const tasks = _tasksCache || [];
+    if (tasks.length === 0) {
+        box.appendChild(el('p', null, tr('gtask.empty', 'تسکی نیست.')));
+    }
+    const me = myUserId();
+    for (const t of tasks) {
+        const row = el('div', 'conv-row');
+        row.appendChild(el('span', 'conv-name', groupTaskTitle(t)));
+        const canEdit = t.creatorId === me;
+        const canDelete = t.creatorId === me || isOwner();
+        if (canEdit || canDelete) {
+            const more = el('button', 'msg-more', '⋯');
+            more.type = 'button';
+            more.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const items = [];
+                if (canEdit) items.push({ id: 'edit', label: tr('msg.edit', 'ویرایش') });
+                if (canDelete) items.push({ id: 'delete', label: tr('msg.delete', 'حذف'), danger: true });
+                openMenu({
+                    anchor: more,
+                    items,
+                    onSelect: (id) => {
+                        if (id === 'edit') startGroupTaskEdit(t);
+                        else if (id === 'delete') deleteGroupTask(t.id);
+                    },
+                });
+            });
+            row.appendChild(more);
+        }
+        box.appendChild(row);
+    }
+    sec.appendChild(box);
+
+    const back = el('button', 'conv-more', tr('grp.backToTimeline', 'بازگشت به تایم‌لاین'));
+    back.type = 'button';
+    back.addEventListener('click', () => {
+        _view = 'timeline';
+        renderGroupView();
+    });
+    sec.appendChild(back);
+}
+
+async function refreshTasksView() {
+    const tasks = await loadGroupTasks();
+    if (tasks === null || _view !== 'tasks') return;
+    _tasksCache = tasks;
+    renderGroupView();
+}
+
+async function openTasksView() {
+    _view = 'tasks';
+    _tasksCache = [];
+    renderGroupView();
+    await refreshTasksView();
+}
+
+async function startGroupTaskEdit(t) {
+    const sec = groupsSection();
+    if (!sec) return;
+    // ویرایش inline ساده: ورودی + ذخیره/انصراف
+    const rows = [...sec.querySelectorAll('.conv-row')];
+    const row = rows.find((r) => r.textContent.includes(groupTaskTitle(t)));
+    if (!row) return;
+    row.replaceChildren();
+    const input = el('input', 'conv-input');
+    input.value = groupTaskTitle(t) === '…' ? '' : groupTaskTitle(t);
+    input.setAttribute('maxlength', '500');
+    const save = el('button', 'conv-mini-btn', tr('gtask.save', 'ذخیره'));
+    save.type = 'button';
+    save.addEventListener('click', async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        save.disabled = true;
+        const res = await apiFetch(
+            '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks/' + encodeURIComponent(t.id),
+            { method: 'PATCH', body: { payload: { title: text } } }
+        );
+        if (!res.ok) {
+            save.disabled = false;
+            input.title = apiErrorMessage(res.error);
+            return;
+        }
+        await refreshTasksView();
+    });
+    const cancel = el('button', 'conv-mini-btn', tr('gtask.cancel', 'انصراف'));
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => renderGroupView());
+    row.appendChild(input);
+    row.appendChild(save);
+    row.appendChild(cancel);
+    input.focus();
+}
+
+async function deleteGroupTask(taskId) {
+    const ok = await showConfirmModal({
+        title: tr('msg.delete', 'حذف'),
+        message: tr('gtask.deleteConfirm', 'این تسک حذف شود؟'),
+        danger: true,
+    });
+    if (!ok) return;
+    await apiFetch(
+        '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks/' + encodeURIComponent(taskId),
+        { method: 'DELETE' }
+    );
+    await refreshTasksView();
 }
 
 function roleLabel(role) {
@@ -365,6 +672,71 @@ export async function sendGroupText() {
     await openGroup(_openGroupId);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 8.3-B: inbox دعوت‌ها + مدیریت + نقش‌ها (+ تسک گروهی در ادامه‌ی همین فایل)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function myUserId() {
+    try {
+        return (state.sync && state.sync.userId) || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * inbox دعوت‌های خودم (بالای لیست گروه‌ها).
+ */
+async function renderInbox(sec) {
+    let mine = [];
+    try {
+        const res = await apiFetch('/api/invitations/mine');
+        if (res.ok) mine = (res.data && res.data.invitations) || [];
+    } catch {
+        mine = [];
+    }
+    if (mine.length === 0) return;
+    sec.appendChild(el('div', 'conv-section', tr('grp.myInvitations', 'دعوت‌های من')));
+    for (const inv of mine) {
+        const row = el('div', 'conv-row conv-request');
+        row.appendChild(el('span', 'conv-avatar', '👥'));
+        const mid = el('span', 'conv-main');
+        mid.appendChild(el('span', 'conv-name', inv.groupName || '…'));
+        row.appendChild(mid);
+        const okBtn = el('button', 'conv-mini-btn', tr('conn.accept', 'قبول'));
+        okBtn.type = 'button';
+        okBtn.addEventListener('click', async () => {
+            await apiFetch(
+                '/api/groups/' + encodeURIComponent(inv.groupId) +
+                '/invitations/' + encodeURIComponent(inv.id) + '/accept',
+                { method: 'POST' }
+            );
+            await openGroupsWorkspace();
+        });
+        const noBtn = el('button', 'conv-mini-btn', tr('conn.reject', 'رد'));
+        noBtn.type = 'button';
+        noBtn.addEventListener('click', async () => {
+            await apiFetch(
+                '/api/groups/' + encodeURIComponent(inv.groupId) +
+                '/invitations/' + encodeURIComponent(inv.id) + '/reject',
+                { method: 'POST' }
+            );
+            await openGroupsWorkspace();
+        });
+        row.appendChild(okBtn);
+        row.appendChild(noBtn);
+        sec.appendChild(row);
+    }
+}
+
+function isManager() {
+    return _myRole === 'owner' || _myRole === 'admin';
+}
+
+function isOwner() {
+    return _myRole === 'owner';
+}
+
 // ⚠️ فقط برای تست
 export function __resetGroupsForTest() {
     _groups = [];
@@ -377,6 +749,7 @@ export function __resetGroupsForTest() {
     _hasMore = false;
     _loading = false;
     _view = 'timeline';
+    _tasksCache = [];
 }
 export function __getGroupsStateForTest() {
     return { groups: _groups, openGroupId: _openGroupId, items: _items, members: _members, view: _view };
