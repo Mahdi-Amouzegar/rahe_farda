@@ -36,9 +36,14 @@ vi.mock('../js/api.js', async () => ({
                             otherUser: { id: 'u2', username: 'sara', displayName: 'سارا' },
                         },
                         {
-                            id: 'c2', status: 'pending',
+                            id: 'c2', status: 'pending', requestedBy: 'u1',
                             otherUserId: 'u3',
                             otherUser: { id: 'u3', username: 'pending-user' },
+                        },
+                        {
+                            id: 'c3', status: 'pending', requestedBy: 'u4',
+                            otherUserId: 'u4',
+                            otherUser: { id: 'u4', username: 'reza', displayName: 'رضا' },
                         },
                     ],
                 },
@@ -61,6 +66,16 @@ vi.mock('../js/api.js', async () => ({
             return { ok: true, data: { message: { id: 'm9', ...opts.body } } };
         }
         if (path.endsWith('/read')) return { ok: true, data: { readAt: 'now' } };
+        if (path.endsWith('/accept')) return { ok: true, data: { connection: { id: 'c3' } } };
+        if (path.endsWith('/reject')) return { ok: true, data: { rejected: true } };
+        if (path === '/api/blocks' && opts && opts.method === 'POST') {
+            return { ok: true, data: { block: { id: 'b1' }, connectionClosed: true } };
+        }
+        if (path === '/api/blocks') return { ok: true, data: { blocks: [] } };
+        if (path.startsWith('/api/search')) {
+            return { ok: true, data: { users: [{ id: 'u9', username: 'newguy', displayName: null }] } };
+        }
+        if (path === '/api/connections/request') return { ok: true, data: { connection: { id: 'c9' } } };
         if (opts && opts.method === 'DELETE') return { ok: true, data: { deleted: true } };
         if (opts && opts.method === 'PATCH') return { ok: true, data: { message: { id: 'm1' } } };
         return { ok: false, error: { code: 'NOT_FOUND', message: 'x' } };
@@ -170,4 +185,66 @@ describe('conversations — badges', () => {
         const total = await refreshConversationBadges();
         expect(total).toBe(1);
     });
+});
+
+describe('conversations — requests (8.2-B)', () => {
+    it('درخواست ورودی نمایش داده می‌شود (خروجی نه)', async () => {
+        await openMessagesWorkspace();
+        const section = document.querySelector('.conv-request');
+        expect(section).not.toBeNull();
+        expect(section.textContent).toContain('رضا');
+        expect(section.textContent).not.toContain('pending-user');
+    });
+
+    it('قبول درخواست POST می‌زند', async () => {
+        await openMessagesWorkspace();
+        const before = apiCalls.length;
+        const acceptBtn = [...document.querySelectorAll('.conv-request .conv-mini-btn')]
+            .find((b) => b.textContent === 'قبول');
+        acceptBtn.click();
+        await new Promise((r) => setTimeout(r, 20));
+        const calls = apiCalls.slice(before).filter((c) => c.path === '/api/connections/c3/accept');
+        expect(calls.length).toBe(1);
+    });
+});
+
+describe('conversations — thread menu + search (8.2-B)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('منوی ⋯ گفتگو پروفایل/بلاک/بستن دارد', async () => {
+        await openMessagesWorkspace();
+        await openConversation('u2');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(20);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(['profile', 'block', 'close']);
+    });
+
+    it('بلاک از منو POST می‌زند', async () => {
+        await openMessagesWorkspace();
+        await openConversation('u2');
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(20);
+        document.querySelector('[data-menu-id="block"]').click();
+        await sleep(20);
+        const calls = apiCalls.filter((c) => c.path === '/api/blocks' && c.opts && c.opts.method === 'POST');
+        expect(calls.length).toBe(1);
+        expect(calls[0].opts.body).toMatchObject({ targetUserId: 'u2' });
+    });
+
+    it('جستجو و درخواست گفتگوی تازه', async () => {
+        await openMessagesWorkspace();
+        document.querySelector('.conv-new > .conv-mini-btn').click();
+        const input = document.querySelector('.conv-search input');
+        input.value = 'new';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(450);
+        const reqBtn = [...document.querySelectorAll('.conv-search-results .conv-mini-btn')]
+            .find((b) => b.textContent === 'درخواست');
+        expect(reqBtn).toBeTruthy();
+        reqBtn.click();
+        await sleep(20);
+        const calls = apiCalls.filter((c) => c.path === '/api/connections/request');
+        expect(calls.length).toBe(1);
+    }, 10000);
 });

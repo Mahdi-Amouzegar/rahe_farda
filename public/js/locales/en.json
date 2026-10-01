@@ -89,6 +89,20 @@
     "offline": "You are offline — connect to see messages."
   },
 
+  "conn": {
+    "incoming": "Incoming requests",
+    "accept": "Accept",
+    "reject": "Decline",
+    "newConversation": "＋ New conversation",
+    "searchPlaceholder": "Username… (min 3 chars)",
+    "request": "Request",
+    "requestSent": "Sent",
+    "block": "Block",
+    "unblock": "Unblock",
+    "closeChat": "Close conversation",
+    "profile": "Profile"
+  },
+
   "auth": {
     "defaultUserName": "User",
     "modalTitle": "👤 My Account",

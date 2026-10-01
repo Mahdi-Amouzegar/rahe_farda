@@ -13,16 +13,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
-import { state } from '../core.js';
+import { state, escapeHtml } from '../core.js';
+import { showInfoModal } from '../core.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
 import { setBadge } from '../ui/badge.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
+import {
+    getIncomingRequests,
+    requestConnection,
+    acceptConnection,
+    rejectConnection,
+    closeConnection,
+    findActiveConnectionWith,
+    blockUser,
+    unblockUser,
+    findBlockForUserId,
+    searchUsers,
+} from './connections.js';
 
 const PAGE_LIMIT = 30;
 
 let _conversations = [];
+let _incoming = [];
 let _openWith = null;
 let _messages = [];
 let _cursor = null;
@@ -163,10 +177,81 @@ function renderListState(state) {
         sec.appendChild(el('p', null, tr('errors.serverError', 'خطا')));
         return;
     }
-    if (_conversations.length === 0) {
+    if (_conversations.length === 0 && _incoming.length === 0) {
         sec.appendChild(el('p', null, tr('workspace.messagesEmpty', '')));
-        return;
     }
+
+    if (_incoming.length > 0) {
+        sec.appendChild(el('div', 'conv-section', tr('conn.incoming', 'درخواست‌های ورودی')));
+        for (const r of _incoming) {
+            const other = r.otherUser || { id: r.otherUserId };
+            const row = el('div', 'conv-row conv-request');
+            row.appendChild(el('span', 'conv-avatar', (displayNameOf(other) || '?').trim().charAt(0) || '?'));
+            row.appendChild(el('span', 'conv-name', displayNameOf(other)));
+            const okBtn = el('button', 'conv-mini-btn', tr('conn.accept', 'قبول'));
+            okBtn.type = 'button';
+            okBtn.addEventListener('click', async () => {
+                await acceptConnection(r.id);
+                await reloadMessagesHome();
+            });
+            const noBtn = el('button', 'conv-mini-btn', tr('conn.reject', 'رد'));
+            noBtn.type = 'button';
+            noBtn.addEventListener('click', async () => {
+                await rejectConnection(r.id);
+                await reloadMessagesHome();
+            });
+            row.appendChild(okBtn);
+            row.appendChild(noBtn);
+            sec.appendChild(row);
+        }
+    }
+
+    // ─── شروع گفتگوی تازه (جستجو + درخواست) ───
+    const newBox = el('div', 'conv-new');
+    const newBtn = el('button', 'conv-mini-btn', tr('conn.newConversation', '＋ گفتگوی تازه'));
+    newBtn.type = 'button';
+    const searchWrap = el('div', 'conv-search');
+    searchWrap.hidden = true;
+    const searchInput = el('input', 'conv-input');
+    searchInput.setAttribute('placeholder', tr('conn.searchPlaceholder', '…'));
+    searchInput.setAttribute('maxlength', '50');
+    searchInput.setAttribute('autocomplete', 'off');
+    const results = el('div', 'conv-search-results');
+    searchWrap.appendChild(searchInput);
+    searchWrap.appendChild(results);
+    let searchTimer = null;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            const q = searchInput.value.trim();
+            results.replaceChildren();
+            if (q.length < 3) return;
+            const res = await searchUsers(q);
+            if (!res.ok) return;
+            for (const u of res.users) {
+                const row = el('div', 'conv-row');
+                row.appendChild(el('span', 'conv-name', displayNameOf(u)));
+                const req = el('button', 'conv-mini-btn', tr('conn.request', 'درخواست'));
+                req.type = 'button';
+                req.addEventListener('click', async () => {
+                    const r = await requestConnection(u.id);
+                    req.disabled = true;
+                    req.textContent = r.ok
+                        ? tr('conn.requestSent', 'فرستاده شد')
+                        : apiErrorMessage(r.error);
+                });
+                row.appendChild(req);
+                results.appendChild(row);
+            }
+        }, 350);
+    });
+    newBtn.addEventListener('click', () => {
+        searchWrap.hidden = !searchWrap.hidden;
+        if (!searchWrap.hidden) searchInput.focus();
+    });
+    newBox.appendChild(newBtn);
+    newBox.appendChild(searchWrap);
+    sec.appendChild(newBox);
 
     const list = el('div', 'conv-list');
     list.setAttribute('role', 'list');
@@ -190,7 +275,7 @@ function renderListState(state) {
 }
 
 /**
- * ورود به فضای پیام‌ها (رندر لیست + بج).
+ * ورود به فضای پیام‌ها (رندر لیست + درخواست‌ها + بج).
  */
 export async function openMessagesWorkspace() {
     _openWith = null;
@@ -201,19 +286,83 @@ export async function openMessagesWorkspace() {
         renderListState('offline');
         return;
     }
-    const res = await listConversations();
-    if (!res.ok) {
+    await reloadMessagesHome();
+}
+
+/**
+ * بارگذاری دوباره‌ی خانه‌ی پیام‌ها (لیست + درخواست‌های ورودی + بج).
+ */
+export async function reloadMessagesHome() {
+    const [convRes, incRes] = await Promise.all([listConversations(), getIncomingRequests()]);
+    if (!convRes.ok) {
         renderListState('error');
         return;
     }
+    _incoming = incRes.ok ? incRes.requests : [];
     renderListState('list');
-    const total = res.conversations.reduce((s, c) => s + (c.unread || 0), 0);
+    const total = convRes.conversations.reduce((s, c) => s + (c.unread || 0), 0);
     updateDrawerBadges({ messages: total });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // View — thread
 // ═══════════════════════════════════════════════════════════════════════════
+
+function userIdOfThread() {
+    return _openWith;
+}
+
+/**
+ * منوی ⋯ گفتگو: پروفایل / بلاک-رفع‌بلاک / بستن گفتگو.
+ */
+async function openConversationMenu(otherUserId, anchor) {
+    if (!otherUserId) return;
+    const blockRes = await findBlockForUserId(otherUserId);
+    const blocked = blockRes.ok && !!blockRes.block;
+    const items = [
+        { id: 'profile', label: tr('conn.profile', 'پروفایل') },
+        blocked
+            ? { id: 'unblock', label: tr('conn.unblock', 'رفع بلاک') }
+            : { id: 'block', label: tr('conn.block', 'بلاک'), danger: true },
+        { id: 'close', label: tr('conn.closeChat', 'بستن گفتگو'), danger: true },
+    ];
+    openMenu({
+        anchor,
+        items,
+        onSelect: async (id) => {
+            if (id === 'profile') showUserProfile(otherUserId);
+            else if (id === 'block') {
+                await blockUser(otherUserId);
+                _openWith = null;
+                await reloadMessagesHome();
+            } else if (id === 'unblock' && blocked) {
+                await unblockUser(blockRes.block.id);
+            } else if (id === 'close') {
+                const connRes = await findActiveConnectionWith(otherUserId);
+                if (connRes.ok && connRes.connection) {
+                    await closeConnection(connRes.connection.id);
+                }
+                _openWith = null;
+                await reloadMessagesHome();
+            }
+        },
+    });
+}
+
+/**
+ * پروفایل کاربر (فقط خواندنی، escapeشده).
+ */
+function showUserProfile(otherUserId) {
+    const conv = _conversations.find((c) => c.user.id === otherUserId);
+    const user = conv ? conv.user : { id: otherUserId };
+    showInfoModal({
+        title: tr('conn.profile', 'پروفایل'),
+        paragraphs: [
+            escapeHtml(displayNameOf(user)),
+            user.username ? escapeHtml('@' + user.username) : null,
+        ].filter(Boolean),
+    });
+}
 
 function renderThread() {
     const sec = messagesSection();
@@ -231,6 +380,11 @@ function renderThread() {
     });
     head.appendChild(back);
     head.appendChild(el('span', 'conv-title', name));
+    const convoMenu = el('button', 'conv-menu-btn', '⋯');
+    convoMenu.type = 'button';
+    convoMenu.setAttribute('aria-label', tr('msg.moreAria', 'گزینه‌ها'));
+    convoMenu.addEventListener('click', () => openConversationMenu(userIdOfThread(), convoMenu));
+    head.appendChild(convoMenu);
     sec.appendChild(head);
 
     const box = el('div', 'conv-box');
@@ -407,6 +561,7 @@ export async function submitEdit(messageId, body) {
 // ⚠️ فقط برای تست
 export function __resetConversationsForTest() {
     _conversations = [];
+    _incoming = [];
     _openWith = null;
     _messages = [];
     _cursor = null;

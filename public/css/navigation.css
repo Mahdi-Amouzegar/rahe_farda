@@ -547,6 +547,61 @@ html[dir="ltr"] .drawer {
     opacity: 0.5;
 }
 
+/* ─── 8.2-B: درخواست‌ها، جستجو، منوی گفتگو ─── */
+.conv-section {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-top: 10px;
+}
+
+.conv-request {
+    cursor: default;
+}
+
+.conv-mini-btn {
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.conv-mini-btn:disabled {
+    opacity: 0.5;
+}
+
+.conv-new {
+    margin-top: 12px;
+}
+
+.conv-search {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.conv-search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.conv-menu-btn {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-inline-start: auto;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Action Sheet (T4)
    ═══════════════════════════════════════════════════════════════════════════ */

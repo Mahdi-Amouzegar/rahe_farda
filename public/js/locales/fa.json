@@ -89,6 +89,20 @@
     "offline": "آفلاین هستی — برای دیدن پیام‌ها وصل شو."
   },
 
+  "conn": {
+    "incoming": "درخواست‌های ورودی",
+    "accept": "قبول",
+    "reject": "رد",
+    "newConversation": "＋ گفتگوی تازه",
+    "searchPlaceholder": "نام کاربری… (حداقل ۳ حرف)",
+    "request": "درخواست",
+    "requestSent": "فرستاده شد",
+    "block": "بلاک",
+    "unblock": "رفع بلاک",
+    "closeChat": "بستن گفتگو",
+    "profile": "پروفایل"
+  },
+
   "auth": {
     "defaultUserName": "کاربر",
     "modalTitle": "👤 حساب من",
