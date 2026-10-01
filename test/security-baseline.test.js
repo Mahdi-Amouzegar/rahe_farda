@@ -62,6 +62,7 @@ const BASELINE = new Set([
   'map-search.js:resultsEl.innerHTML = results.map((r, i) => {',
   'map.js:if (el) el.innerHTML = \'<div class="map-fallback">برای نمایش نقشه به اینترنت نیاز است.<br>برنامه بدون نقشه هم کامل کار می‌کند.</div>\';',
   'communication/conversations.js:// ⚠️ بدون innerHTML — فقط DOM API و textContent.',
+  'communication/shares.js:// ⚠️ همه‌ی requestها فقط از js/api.js. بدون innerHTML.',
   'navigation/sidebar.js://   - هیچ innerHTML — فقط DOM API و textContent',
   'navigation/workspace.js:// ⚠️ بدون innerHTML — این ماژول فقط hidden را جابه‌جا می‌کند.',
   'picker.js:container.innerHTML = keys.map(k =>',

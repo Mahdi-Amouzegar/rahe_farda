@@ -16,6 +16,11 @@ vi.mock('../js/i18n.js', async (importOriginal) => {
 });
 
 const netState = { online: true };
+const mockThreadMessages = { current: null };
+vi.mock('../js/store.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return { ...actual, saveTask: vi.fn(async () => {}) };
+});
 vi.mock('../js/net.js', async (importOriginal) => {
     const actual = await importOriginal();
     return { ...actual, isOnline: () => netState.online };
@@ -50,6 +55,7 @@ vi.mock('../js/api.js', async () => ({
             };
         }
         if (path.startsWith('/api/messages?with=u2')) {
+            if (mockThreadMessages.current) return { ok: true, data: mockThreadMessages.current };
             return {
                 ok: true,
                 data: {
@@ -184,6 +190,92 @@ describe('conversations — badges', () => {
     it('refreshConversationBadges مجموع را به دراور می‌دهد', async () => {
         const total = await refreshConversationBadges();
         expect(total).toBe(1);
+    });
+});
+
+describe('conversations — task/location cards (8.2-C)', () => {
+    const taskThread = {
+        messages: [
+            {
+                id: 'mt1', senderId: 'u2', recipientId: 'u1', kind: 'task', body: 'یک تسک',
+                metadata: JSON.stringify({
+                    snapshot: JSON.stringify({ text: 'خرید نان' }),
+                    source_task_id: 't1',
+                }),
+                createdAt: '2026-01-03T00:00:00Z', readAt: null,
+            },
+        ],
+        nextCursor: null,
+        hasMore: false,
+    };
+    const locThread = {
+        messages: [
+            {
+                id: 'ml1', senderId: 'u2', recipientId: 'u1', kind: 'location',
+                body: '35.70000,51.40000',
+                metadata: JSON.stringify({ lat: 35.7, lng: 51.4, name: 'تهران' }),
+                createdAt: '2026-01-04T00:00:00Z', readAt: null,
+            },
+        ],
+        nextCursor: null,
+        hasMore: false,
+    };
+
+    it('کارت تسک با دکمه‌ی افزودن رندر می‌شود و saveTask صدا می‌زند', async () => {
+        mockThreadMessages.current = taskThread;
+        try {
+            await openMessagesWorkspace();
+            await openConversation('u2');
+            const card = document.querySelector('.msg-task-card');
+            expect(card).not.toBeNull();
+            expect(card.textContent).toContain('خرید نان');
+            const { saveTask } = await import('../js/store.js');
+            card.querySelector('.msg-task-add').click();
+            await new Promise((r) => setTimeout(r, 20));
+            expect(saveTask).toHaveBeenCalled();
+            const saved = saveTask.mock.calls[0][0];
+            expect(saved.text).toBe('خرید نان');
+        } finally {
+            mockThreadMessages.current = null;
+        }
+    });
+
+    it('کارت مکان با preview و دکمه‌ی مسیر رندر می‌شود (بدون Leaflet)', async () => {
+        expect(window.L).toBeUndefined();
+        mockThreadMessages.current = locThread;
+        try {
+            await openMessagesWorkspace();
+            await openConversation('u2');
+            const card = document.querySelector('.msg-loc-card');
+            expect(card).not.toBeNull();
+            expect(card.textContent).toContain('تهران');
+            const pv = card.querySelector('.loc-preview');
+            expect(pv.dataset.lat).toBe('35.7');
+            card.querySelector('.msg-loc-route').click();
+            expect(document.getElementById('locModalOverlay')).not.toBeNull();
+            document.querySelector('#locModalOverlay .btn-clear').click();
+            expect(document.getElementById('locModalOverlay')).toBeNull();
+        } finally {
+            mockThreadMessages.current = null;
+        }
+    });
+
+    it('metadata خراب، پیام را نمی‌شکند', async () => {
+        mockThreadMessages.current = {
+            messages: [{
+                id: 'mx', senderId: 'u2', recipientId: 'u1', kind: 'task',
+                body: 'متن جایگزین', metadata: 'not-json{{{',
+                createdAt: '2026-01-05T00:00:00Z', readAt: null,
+            }],
+            nextCursor: null, hasMore: false,
+        };
+        try {
+            await openMessagesWorkspace();
+            await openConversation('u2');
+            expect(document.querySelector('.msg-task-card')).not.toBeNull();
+        } finally {
+            mockThreadMessages.current = null;
+        }
     });
 });
 

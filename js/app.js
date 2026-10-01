@@ -160,6 +160,7 @@ import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
+import { openSharePicker } from './communication/shares.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
@@ -2019,6 +2020,7 @@ taskList.addEventListener('click', e => {
     }
     else if (action === 'edit-cancel') cancelEdit();
     else if (action === 'detail') openDetail(id);
+    else if (action === 'share') openSharePicker(actionEl, id);
     else if (action === 'locate') { ensureMapVisible(); flyToTask(id); }
     else if (action === 'route') {
         const found = findTask(id);

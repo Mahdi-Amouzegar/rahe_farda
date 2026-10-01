@@ -13,8 +13,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
-import { state, escapeHtml } from '../core.js';
+import { state, escapeHtml, uid } from '../core.js';
 import { showInfoModal } from '../core.js';
+import { sanitizeTask, saveTask } from '../store.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
@@ -408,10 +409,15 @@ function renderThread() {
     input.setAttribute('placeholder', tr('msg.placeholder', '…'));
     input.setAttribute('maxlength', '2000');
     input.setAttribute('autocomplete', 'off');
+    const locBtn = el('button', 'conv-loc', '📍');
+    locBtn.type = 'button';
+    locBtn.setAttribute('aria-label', tr('loc.sendCurrent', 'ارسال موقعیت فعلی'));
+    locBtn.title = tr('loc.sendCurrent', 'ارسال موقعیت فعلی');
     const send = el('button', 'conv-send', tr('msg.send', '➤'));
     send.type = 'button';
     const doSend = () => sendCurrentText();
     send.addEventListener('click', doSend);
+    locBtn.addEventListener('click', () => sendCurrentLocation(locBtn));
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -421,19 +427,27 @@ function renderThread() {
     if (!isOnline()) {
         input.disabled = true;
         send.disabled = true;
+        locBtn.disabled = true;
     }
     composer.appendChild(input);
+    composer.appendChild(locBtn);
     composer.appendChild(send);
     sec.appendChild(composer);
 
     box.scrollTop = box.scrollHeight;
+    initLocationPreviews(box);
 }
 
 function messageNode(m) {
     const mine = !!m.mine;
     const wrap = el('div', 'msg' + (mine ? ' msg-mine' : ''));
-    const body = el('div', 'msg-body', m.body || '');
-    wrap.appendChild(body);
+    if (m.kind === 'task') {
+        wrap.appendChild(taskCardNode(m));
+    } else if (m.kind === 'location') {
+        wrap.appendChild(locationCardNode(m));
+    } else {
+        wrap.appendChild(el('div', 'msg-body', m.body || ''));
+    }
     const meta = el('div', 'msg-meta');
     try {
         meta.textContent = formatDateTime(m.createdAt) + (m.editedAt ? ' • ' + tr('msg.edited', 'ویرایش‌شده') : '');
@@ -462,6 +476,231 @@ function messageNode(m) {
         wrap.appendChild(more);
     }
     return wrap;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8.2-C: پیام تسک (mini-card + افزودن به برنامه)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function parseTaskMeta(m) {
+    try {
+        const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+        if (!meta || typeof meta !== 'object') return null;
+        const snap = typeof meta.snapshot === 'string' ? JSON.parse(meta.snapshot) : meta.snapshot;
+        if (!snap || typeof snap !== 'object') return null;
+        return { snapshot: snap, sourceTaskId: meta.source_task_id || null };
+    } catch {
+        return null;
+    }
+}
+
+function taskCardNode(m) {
+    const card = el('div', 'msg-task-card');
+    const parsed = parseTaskMeta(m);
+    if (!parsed) {
+        card.appendChild(el('div', 'msg-body', m.body || ''));
+        card.appendChild(el('div', 'msg-meta', tr('plan.invalidSnapshot', 'این تسک قابل افزودن نیست.')));
+        return card;
+    }
+    const snap = parsed.snapshot;
+    const title = String(snap.text || snap.title || m.body || '').slice(0, 200) || '…';
+    card.appendChild(el('div', 'msg-task-title', '📋 ' + title));
+    if (snap.dueAt || snap.at) {
+        try {
+            card.appendChild(el('div', 'msg-task-sub', formatDateTime(snap.dueAt || snap.at)));
+        } catch { /* silent */ }
+    }
+    const add = el('button', 'msg-task-add', tr('plan.add', 'افزودن به برنامه'));
+    add.type = 'button';
+    add.addEventListener('click', () => addSharedTaskToPlan(parsed.snapshot, add));
+    card.appendChild(add);
+    return card;
+}
+
+async function addSharedTaskToPlan(snapshot, btn) {
+    try {
+        const clean = sanitizeTask({
+            id: uid(),
+            text: String((snapshot && (snapshot.text || snapshot.title)) || '').slice(0, 200),
+            kind: 'task',
+            completed: false,
+            dueAt: snapshot && typeof snapshot.dueAt === 'string' ? snapshot.dueAt : null,
+        });
+        if (!clean.text || clean.text.trim() === '') {
+            showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.invalidSnapshot', 'x')] });
+            return;
+        }
+        await saveTask(clean);
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = tr('plan.added', 'به برنامه اضافه شد.');
+        }
+        showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.added', 'ok')] });
+    } catch {
+        showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.invalidSnapshot', 'x')] });
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8.2-C: پیام مکان (preview + مودال)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _previewMaps = [];
+
+function cleanupPreviewMaps() {
+    for (const mm of _previewMaps) {
+        try {
+            if (mm && typeof mm.remove === 'function') mm.remove();
+        } catch { /* silent */ }
+    }
+    _previewMaps = [];
+}
+
+function parseLocationMeta(m) {
+    try {
+        const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+        if (!meta || typeof meta !== 'object') return null;
+        const lat = Number(meta.lat);
+        const lng = Number(meta.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+        return { lat, lng, name: typeof meta.name === 'string' ? meta.name : '' };
+    } catch {
+        return null;
+    }
+}
+
+function locationCardNode(m) {
+    const card = el('div', 'msg-loc-card');
+    const loc = parseLocationMeta(m);
+    const label = (loc && loc.name) || m.body || '';
+    if (label) card.appendChild(el('div', 'msg-loc-name', '📍 ' + label));
+    if (loc) {
+        const preview = el('div', 'loc-preview');
+        preview.dataset.lat = String(loc.lat);
+        preview.dataset.lng = String(loc.lng);
+        card.appendChild(preview);
+        const route = el('button', 'msg-loc-route', tr('loc.route', 'نمایش مسیر'));
+        route.type = 'button';
+        route.addEventListener('click', () => openMapModal(loc));
+        card.appendChild(route);
+    } else {
+        card.appendChild(el('div', 'msg-body', m.body || ''));
+    }
+    return card;
+}
+
+/**
+ * ساخت previewهای نقشه بعد از رندر (بدون L → فقط placeholder می‌ماند).
+ */
+function initLocationPreviews(box) {
+    cleanupPreviewMaps();
+    if (typeof window === 'undefined' || typeof window.L === 'undefined') return;
+    const L = window.L;
+    for (const pv of box.querySelectorAll('.loc-preview')) {
+        const lat = Number(pv.dataset.lat);
+        const lng = Number(pv.dataset.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        try {
+            const mm = L.map(pv, {
+                zoomControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                attributionControl: false,
+            }).setView([lat, lng], 14);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mm);
+            L.marker([lat, lng]).addTo(mm);
+            _previewMaps.push(mm);
+        } catch { /* silent */ }
+    }
+}
+
+/**
+ * مودال نقشه‌ی تعاملی برای یک مکان.
+ */
+export function openMapModal(loc) {
+    closeMapModal();
+    const overlay = el('div', 'picker-overlay loc-modal-overlay');
+    overlay.id = 'locModalOverlay';
+    const box = el('div', 'picker loc-modal-box');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.appendChild(el('div', 'picker-title', tr('loc.mapTitle', 'نقشه')));
+    const mapDiv = el('div', 'loc-modal-map');
+    box.appendChild(mapDiv);
+    const close = el('button', 'btn-clear', tr('msg.back', '‹ بازگشت'));
+    close.type = 'button';
+    close.addEventListener('click', () => closeMapModal());
+    box.appendChild(close);
+    overlay.appendChild(box);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeMapModal();
+    });
+    document.body.appendChild(overlay);
+    if (typeof window !== 'undefined' && typeof window.L !== 'undefined' && loc) {
+        try {
+            const mm = window.L.map(mapDiv).setView([loc.lat, loc.lng], 15);
+            window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mm);
+            window.L.marker([loc.lat, loc.lng]).addTo(mm);
+            _previewMaps.push(mm);
+            setTimeout(() => {
+                try { mm.invalidateSize(); } catch { /* silent */ }
+            }, 60);
+        } catch { /* silent */ }
+    }
+}
+
+export function closeMapModal() {
+    const old = document.getElementById('locModalOverlay');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+}
+
+/**
+ * ارسال موقعیت فعلی (geolocation) به‌عنوان پیام مکان.
+ */
+export async function sendCurrentLocation(btn) {
+    if (!navigator.geolocation) {
+        if (btn) btn.title = tr('loc.unavailable', 'موقعیت در دسترس نیست.');
+        return;
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.title = tr('loc.locating', 'در حال مکان‌یابی…');
+    }
+    const pos = await new Promise((resolve) => {
+        try {
+            navigator.geolocation.getCurrentPosition(
+                (p) => resolve(p),
+                () => resolve(null),
+                { timeout: 10000, maximumAge: 60000 }
+            );
+        } catch {
+            resolve(null);
+        }
+    });
+    if (btn) {
+        btn.disabled = false;
+        btn.title = tr('loc.sendCurrent', 'ارسال موقعیت فعلی');
+    }
+    if (!pos || !pos.coords) return;
+    const { latitude, longitude } = pos.coords;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    _loading = true;
+    const res = await apiFetch('/api/messages', {
+        method: 'POST',
+        body: {
+            recipientId: _openWith,
+            body: latitude.toFixed(5) + ',' + longitude.toFixed(5),
+            kind: 'location',
+            metadata: { lat: latitude, lng: longitude },
+        },
+    });
+    _loading = false;
+    if (!res.ok) return;
+    await openConversation(_openWith);
 }
 
 export async function openConversation(userId) {

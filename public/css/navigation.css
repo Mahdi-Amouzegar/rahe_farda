@@ -602,6 +602,100 @@ html[dir="ltr"] .drawer {
     margin-inline-start: auto;
 }
 
+/* ─── 8.2-C: کارت تسک و مکان (تخت، سلسله‌مراتب واضح) ─── */
+.msg-task-card {
+    background: var(--bg-4);
+    border: 1px solid var(--border-medium);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.msg-task-title {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.msg-task-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.msg-task-add {
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--accent-purple);
+    color: #fff;
+    font: inherit;
+    padding: 8px 12px;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.msg-task-add:disabled {
+    opacity: 0.55;
+}
+
+.msg-loc-card {
+    background: var(--bg-4);
+    border: 1px solid var(--border-medium);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.msg-loc-name {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.loc-preview {
+    height: 170px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-1);
+}
+
+.msg-loc-route {
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    padding: 8px 12px;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.loc-modal-box {
+    width: min(560px, 92vw);
+}
+
+.loc-modal-map {
+    height: 60vh;
+    min-height: 280px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.conv-loc {
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    padding: 0 12px;
+    cursor: pointer;
+}
+
+.conv-loc:disabled {
+    opacity: 0.5;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Action Sheet (T4)
    ═══════════════════════════════════════════════════════════════════════════ */

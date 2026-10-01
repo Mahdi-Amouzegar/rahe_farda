@@ -764,6 +764,7 @@ function taskItemHtml(task) {
             { action: 'pin', label: task.pinned ? i18nT('taskItem.operations.unpin') : i18nT('taskItem.operations.pin'), icon: '📌' },
             ...(hasAnyLocation(task) ? [{ action: 'route', label: i18nT('taskItem.operations.route'), icon: '🧭' }] : []),
             { action: 'detail', label: i18nT('taskItem.operations.detail'), icon: '📋' },
+            { action: 'share', label: i18nT('taskItem.operations.share'), icon: '📤' },
             { action: 'edit-btn', label: i18nT('taskItem.operations.edit'), icon: '✎' },
             { action: 'archive', label: i18nT('taskItem.operations.archive'), icon: '📦' },
             { action: 'delete', label: i18nT('taskItem.operations.delete'), icon: '✕', className: 'danger' }

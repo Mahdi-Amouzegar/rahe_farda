@@ -103,6 +103,28 @@
     "profile": "Profile"
   },
 
+  "share": {
+    "title": "Share task",
+    "menuItem": "Share",
+    "pickRecipient": "Send to…",
+    "noContacts": "No contacts yet — create a connection first.",
+    "sent": "Task sent."
+  },
+
+  "plan": {
+    "add": "Add to plan",
+    "added": "Added to your plan.",
+    "invalidSnapshot": "This task cannot be added."
+  },
+
+  "loc": {
+    "route": "Show route",
+    "mapTitle": "Map",
+    "sendCurrent": "Send current location",
+    "locating": "Locating…",
+    "unavailable": "Location unavailable."
+  },
+
   "auth": {
     "defaultUserName": "User",
     "modalTitle": "👤 My Account",
@@ -395,6 +417,7 @@
       "pickLoc": "Set location on map",
       "showLoc": "Show location on map",
       "route": "Show route",
+      "share": "Share",
       "detail": "Details and more info",
       "detailChild": "Child task details",
       "detailPlan": "Plan details",
