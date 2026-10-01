@@ -77,6 +77,18 @@
     "notificationsEmpty": "اعلان تازه‌ای نیست."
   },
 
+  "msg": {
+    "back": "‹ بازگشت",
+    "send": "➤",
+    "placeholder": "پیام بنویس…",
+    "loadMore": "پیام‌های قدیمی‌تر",
+    "edit": "ویرایش",
+    "delete": "حذف",
+    "edited": "ویرایش‌شده",
+    "moreAria": "گزینه‌های پیام",
+    "offline": "آفلاین هستی — برای دیدن پیام‌ها وصل شو."
+  },
+
   "auth": {
     "defaultUserName": "کاربر",
     "modalTitle": "👤 حساب من",

@@ -77,6 +77,18 @@
     "notificationsEmpty": "No new notifications."
   },
 
+  "msg": {
+    "back": "‹ Back",
+    "send": "➤",
+    "placeholder": "Write a message…",
+    "loadMore": "Older messages",
+    "edit": "Edit",
+    "delete": "Delete",
+    "edited": "edited",
+    "moreAria": "Message options",
+    "offline": "You are offline — connect to see messages."
+  },
+
   "auth": {
     "defaultUserName": "User",
     "modalTitle": "👤 My Account",

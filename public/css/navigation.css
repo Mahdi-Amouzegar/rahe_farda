@@ -380,6 +380,174 @@ html[dir="ltr"] .drawer {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Messages workspace (8.2-A — تخت و کم‌قاب، طبق قرارداد بصری)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.conv-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+}
+
+.conv-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 8px;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.conv-row:hover {
+    background: var(--bg-4);
+}
+
+.conv-avatar {
+    width: 38px;
+    height: 38px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-4);
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.conv-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.conv-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conv-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 8px;
+}
+
+.conv-back {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.conv-title {
+    font-weight: 700;
+    color: var(--text-title);
+}
+
+.conv-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+
+.msg {
+    max-width: 85%;
+    align-self: flex-start;
+}
+
+.msg-mine {
+    align-self: flex-end;
+}
+
+.msg-body {
+    background: var(--bg-4);
+    border-radius: 12px;
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+}
+
+.msg-mine .msg-body {
+    background: var(--accent-purple-soft);
+}
+
+.msg-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    padding: 0 4px;
+}
+
+.msg-more {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.9rem;
+}
+
+.conv-more {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    cursor: pointer;
+    padding: 8px;
+}
+
+.conv-composer {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.conv-input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-primary);
+    font: inherit;
+    padding: 10px 12px;
+}
+
+.conv-input:disabled {
+    opacity: 0.5;
+}
+
+.conv-send {
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--accent-purple);
+    color: #fff;
+    font: inherit;
+    padding: 0 16px;
+    cursor: pointer;
+}
+
+.conv-send:disabled {
+    opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Quick Action Sheet (T4)
    ═══════════════════════════════════════════════════════════════════════════ */
 .sheet-root {

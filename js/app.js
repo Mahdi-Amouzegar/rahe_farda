@@ -159,6 +159,7 @@ import { initWorkspace, switchWorkspace } from './navigation/workspace.js';
 import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
+import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
@@ -2420,7 +2421,11 @@ initI18n().then(async () => {
     // ⚠️ فاز ۸ (T3/T4): راه‌اندازی Shell — Workspace + Drawer + Header + گیت ورود
     initWorkspace();
     initSidebar({
-        onNavigate: (ws) => switchWorkspace(ws),
+        onNavigate: (ws) => {
+            if (!switchWorkspace(ws)) return;
+            // ⚠️ فاز ۸ (8.2-A): ورود به فضای پیام‌ها = لود لیست + بج
+            if (ws === 'messages') openMessagesWorkspace();
+        },
         onLogin: () => openAuthModal(),
         onOpenSettings: () => toggleSettings(true),
         onOpenAccount: () => openAuthModal(),
@@ -2474,6 +2479,13 @@ initI18n().then(async () => {
     updateBadge({ immediate: true });
     updateHeaderStatus({ immediate: true });
     updateAccountStatusText();
+
+    // ⚠️ فاز ۸ (8.2-A): بج پیام‌های نخوانده (best-effort؛ مهمان = صفر)
+    try {
+        await refreshConversationBadges();
+    } catch (err) {
+        console.warn('[app] refreshConversationBadges failed:', err);
+    }
 }).catch(err => {
     console.error('[app] initI18n failed:', err);
     applyDisplaySettings();
