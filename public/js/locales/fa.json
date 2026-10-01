@@ -125,6 +125,17 @@
     "unavailable": "موقعیت در دسترس نیست."
   },
 
+  "grp": {
+    "back": "‹ گروه‌ها",
+    "members": "اعضا",
+    "loadMore": "قدیمی‌تر",
+    "backToTimeline": "بازگشت به تایم‌لاین",
+    "roleOwner": "مالک",
+    "roleAdmin": "مدیر",
+    "roleMember": "عضو",
+    "offline": "آفلاین هستی — برای دیدن گروه‌ها وصل شو."
+  },
+
   "auth": {
     "defaultUserName": "کاربر",
     "modalTitle": "👤 حساب من",

@@ -696,6 +696,16 @@ html[dir="ltr"] .drawer {
     opacity: 0.5;
 }
 
+/* ─── 8.3-A: گروه (reuse الگوی گفتگو) ─── */
+.conv-role {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border-medium);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Action Sheet (T4)
    ═══════════════════════════════════════════════════════════════════════════ */

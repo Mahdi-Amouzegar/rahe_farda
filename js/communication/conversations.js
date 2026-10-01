@@ -56,7 +56,7 @@ function tr(key, fallback) {
     return v !== key ? v : fallback;
 }
 
-function displayNameOf(user) {
+export function displayNameOf(user) {
     if (!user) return '…';
     return user.displayName || user.username || String(user.id || '').slice(0, 8);
 }
@@ -441,13 +441,7 @@ function renderThread() {
 function messageNode(m) {
     const mine = !!m.mine;
     const wrap = el('div', 'msg' + (mine ? ' msg-mine' : ''));
-    if (m.kind === 'task') {
-        wrap.appendChild(taskCardNode(m));
-    } else if (m.kind === 'location') {
-        wrap.appendChild(locationCardNode(m));
-    } else {
-        wrap.appendChild(el('div', 'msg-body', m.body || ''));
-    }
+    wrap.appendChild(messageBodyNode(m));
     const meta = el('div', 'msg-meta');
     try {
         meta.textContent = formatDateTime(m.createdAt) + (m.editedAt ? ' • ' + tr('msg.edited', 'ویرایش‌شده') : '');
@@ -478,9 +472,15 @@ function messageNode(m) {
     return wrap;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// 8.2-C: پیام تسک (mini-card + افزودن به برنامه)
-// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * بدنه‌ی پیام (حباب متن / کارت تسک / کارت مکان) — بدون اکشن.
+ * ⚠️ برای reuse در تایم‌لاین گروه export شده (8.3-A).
+ */
+export function messageBodyNode(m) {
+    if (m.kind === 'task') return taskCardNode(m);
+    if (m.kind === 'location') return locationCardNode(m);
+    return el('div', 'msg-body', (m && m.body) || '');
+}
 
 function parseTaskMeta(m) {
     try {
@@ -593,7 +593,7 @@ function locationCardNode(m) {
 /**
  * ساخت previewهای نقشه بعد از رندر (بدون L → فقط placeholder می‌ماند).
  */
-function initLocationPreviews(box) {
+export function initLocationPreviews(box) {
     cleanupPreviewMaps();
     if (typeof window === 'undefined' || typeof window.L === 'undefined') return;
     const L = window.L;

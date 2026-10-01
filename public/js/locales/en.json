@@ -125,6 +125,17 @@
     "unavailable": "Location unavailable."
   },
 
+  "grp": {
+    "back": "‹ Groups",
+    "members": "Members",
+    "loadMore": "Older",
+    "backToTimeline": "Back to timeline",
+    "roleOwner": "Owner",
+    "roleAdmin": "Admin",
+    "roleMember": "Member",
+    "offline": "You are offline — connect to see groups."
+  },
+
   "auth": {
     "defaultUserName": "User",
     "modalTitle": "👤 My Account",

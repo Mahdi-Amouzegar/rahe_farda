@@ -160,6 +160,7 @@ import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
+import { openGroupsWorkspace } from './communication/groups.js';
 import { openSharePicker } from './communication/shares.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
@@ -2427,6 +2428,8 @@ initI18n().then(async () => {
             if (!switchWorkspace(ws)) return;
             // ⚠️ فاز ۸ (8.2-A): ورود به فضای پیام‌ها = لود لیست + بج
             if (ws === 'messages') openMessagesWorkspace();
+            // ⚠️ فاز ۸ (8.3-A): ورود به فضای گروه‌ها = لود لیست
+            if (ws === 'groups') openGroupsWorkspace();
         },
         onLogin: () => openAuthModal(),
         onOpenSettings: () => toggleSettings(true),
