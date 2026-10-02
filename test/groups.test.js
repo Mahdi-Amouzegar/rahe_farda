@@ -112,6 +112,15 @@ vi.mock('../js/api.js', async () => ({
         if (path.startsWith('/api/search')) {
             return { ok: true, data: { users: [{ id: 'u7', username: 'guest7' }] } };
         }
+        if (path === '/api/invitations/mine') {
+            return { ok: true, data: { invitations: [] } };
+        }
+        if (path.endsWith('/unread')) {
+            return { ok: true, data: { unread: { messages: 2, tasks: 1 } } };
+        }
+        if (path.endsWith('/read') && opts && opts.method === 'POST') {
+            return { ok: true, data: { readAt: 'now' } };
+        }
         if (path.endsWith('/sync') && opts && opts.method === 'POST') {
             const ops = (opts.body && opts.body.ops) || [];
             return {
@@ -295,5 +304,27 @@ describe('groups — inbox + management (8.3-B)', () => {
         await sleep(30);
         const more = document.querySelector('.conv-row .msg-more');
         expect(more).not.toBeNull();
+    });
+});
+
+describe('groups — unread badges (تصمیم ۳)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('بج نخوانده روی ردیف گروه', async () => {
+        await openGroupsWorkspace();
+        await sleep(30);
+        const badge = document.querySelector('[data-group-unread]');
+        expect(badge).not.toBeNull();
+        expect(badge.hidden).toBe(false);
+        expect(badge.textContent).toBeTruthy();
+    });
+
+    it('باز کردن گروه، خواندن را ثبت می‌کند', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        await sleep(30);
+        const reads = apiCalls.filter((c) => c.path === '/api/groups/g1/read');
+        expect(reads.length).toBeGreaterThan(0);
+        expect(reads[0].opts.body).toMatchObject({ type: 'messages' });
     });
 });

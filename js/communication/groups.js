@@ -17,6 +17,8 @@ import { state, uid } from '../core.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
+import { setBadge } from '../ui/badge.js';
+import { updateDrawerBadges } from '../navigation/sidebar.js';
 import { showInfoModal, showConfirmModal } from '../core.js';
 import {
     messageBodyNode,
@@ -119,10 +121,15 @@ async function renderGroupsHome(state) {
         avatar.setAttribute('aria-hidden', 'true');
         row.appendChild(avatar);
         row.appendChild(el('span', 'conv-name', g.name || '…'));
+        const badge = el('span', 'drawer-badge');
+        badge.hidden = true;
+        badge.dataset.groupUnread = g.id;
+        row.appendChild(badge);
         row.addEventListener('click', () => openGroup(g.id));
         list.appendChild(row);
     }
     sec.appendChild(list);
+    refreshGroupBadges();
 }
 
 export async function openGroupsWorkspace() {
@@ -144,6 +151,8 @@ export async function openGroupsWorkspace() {
         return;
     }
     await renderGroupsHome('list');
+    // بج‌های نخوانده + دعوت‌ها (best-effort)
+    refreshGroupBadges().catch(() => {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -557,6 +566,8 @@ async function openTasksView() {
         await flushGroup(_openGroupId);
     } catch { /* best-effort */ }
     await refreshTasksView();
+    // ثبت خواندن تسک‌ها + تازه‌سازی بج‌ها (best-effort)
+    markCurrentGroupRead('tasks').then(() => refreshGroupBadges()).catch(() => {});
 }
 
 async function startGroupTaskEdit(t) {
@@ -637,6 +648,8 @@ export async function openGroup(groupId) {
     }
     if (memRes.ok) _members = memRes.data.members || [];
     renderGroupView();
+    // ثبت خواندن پیام‌ها + تازه‌سازی بج‌ها (best-effort)
+    markCurrentGroupRead('messages').then(() => refreshGroupBadges()).catch(() => {});
 }
 
 function renderGroupSkeleton() {
@@ -741,6 +754,47 @@ function isManager() {
 
 function isOwner() {
     return _myRole === 'owner';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8.3-C (تصمیم ۳): بج‌های نخوانده + ثبت خواندن
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * تازه‌سازی بج نخوانده‌ی همه‌ی گروه‌های لیست + بج دعوت‌های دراور.
+ */
+export async function refreshGroupBadges() {
+    try {
+        const [mineRes] = await Promise.all([
+            apiFetch('/api/invitations/mine').catch(() => null),
+        ]);
+        if (mineRes && mineRes.ok) {
+            updateDrawerBadges({ groups: ((mineRes.data && mineRes.data.invitations) || []).length });
+        }
+    } catch { /* best-effort */ }
+    for (const g of _groups) {
+        try {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(g.id) + '/unread');
+            if (!res.ok) continue;
+            const u = (res.data && res.data.unread) || { messages: 0, tasks: 0 };
+            const total = (Number(u.messages) || 0) + (Number(u.tasks) || 0);
+            const badge = document.querySelector('[data-group-unread="' + String(g.id).replace(/"/g, '') + '"]');
+            if (badge) setBadge(badge, total);
+        } catch { /* best-effort per group */ }
+    }
+}
+
+/**
+ * ثبت خواندن (messages/tasks) برای گروه باز.
+ */
+async function markCurrentGroupRead(type) {
+    if (!_openGroupId) return;
+    try {
+        await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/read', {
+            method: 'POST',
+            body: { type: type || 'all' },
+        });
+    } catch { /* best-effort */ }
 }
 
 // ⚠️ فقط برای تست
