@@ -88,6 +88,7 @@ const BASELINE = new Set([
   'ui/menu.js://   - هیچ innerHTML — فقط DOM API و textContent (محتوای کاربر هرگز HTML نمی‌شود)',
   'ui/sheet.js://    بدون innerHTML — فقط DOM API و textContent.',
   'weather-modal.js:if (content) content.innerHTML = html;',
+  'welcome-wizard.js:// ⚠️ بدون innerHTML — فقط DOM API و textContent (به‌جز رشته‌های استاتیک لوکال',
 ]);
 
 function collectInnerHtml() {

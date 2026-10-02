@@ -779,3 +779,69 @@ html[dir="ltr"] .drawer {
 .sheet-action-icon {
     font-size: 1.2rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Welcome wizard (8B)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wizard-close {
+    align-self: flex-end;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.wizard-dots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+.wizard-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-medium);
+}
+
+.wizard-dot.active {
+    background: var(--accent-purple);
+}
+
+.wizard-dot.done {
+    background: var(--accent-cyan);
+}
+
+.wizard-nav {
+    margin-top: 4px;
+}
+
+.wizard-spacer {
+    flex: 1;
+}
+
+.wizard-text,
+.wizard-hint {
+    margin: 0;
+}
+
+.wizard-text {
+    color: var(--text-primary);
+}
+
+.wizard-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.welcome-opt.selected {
+    border-color: var(--accent-cyan);
+}

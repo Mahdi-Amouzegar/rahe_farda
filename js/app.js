@@ -162,6 +162,7 @@ import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
 import { openGroupsWorkspace } from './communication/groups.js';
 import { initGroupQueue } from './communication/group-queue.js';
+import { initWelcomeWizard } from './welcome-wizard.js';
 import { openSharePicker } from './communication/shares.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
@@ -1334,7 +1335,7 @@ function updateWelcomeOpts() {
  * ⚠️ فاز ۴C: فقط تم را اعمال می‌کند.
  *    dir/lang/data-lang به i18n واگذار شد.
  */
-function applyDisplaySettings() {
+export function applyDisplaySettings() {
     applyTheme(state.prefs.theme);
     updateThemeBtn();
     updateLangBtn();
@@ -1368,39 +1369,6 @@ if (langBtnEl) {
         refreshSoundPresetList();
         updateFooter();
         // ⚠️ بستن weather modal (راه‌حل موقت — ترجمه‌ی کامل در فایل بعدی)
-        const wm = document.getElementById('weatherModal');
-        if (wm && !wm.hidden) wm.hidden = true;
-    });
-}
-
-const _welcomeThemeGroup = document.getElementById('welcomeThemeGroup');
-if (_welcomeThemeGroup) {
-    _welcomeThemeGroup.addEventListener('click', e => {
-        const btn = e.target.closest('[data-theme]');
-        if (!btn) return;
-        state.prefs.theme = btn.dataset.theme;
-        savePrefs();
-        applyDisplaySettings();
-    });
-}
-
-const _welcomeLangGroup = document.getElementById('welcomeLangGroup');
-if (_welcomeLangGroup) {
-    _welcomeLangGroup.addEventListener('click', async e => {
-        const btn = e.target.closest('[data-lang]');
-        if (!btn) return;
-        await setLang(btn.dataset.lang);
-        applyToDOM();
-        refreshHeaderContext();
-        applyDisplaySettings();
-        resetRenderSignature();
-        render();
-        renderSeriesMonth();      // ⚠️ فاز ۴D.4c-fix
-        renderSeriesHours();      // ⚠️ فاز ۴D.4c-fix
-        refreshTimeSelects();     // ⚠️ فاز ۴D.4c-fix
-        updateAccountStatusText();
-        refreshSoundPresetList();
-        updateFooter();
         const wm = document.getElementById('weatherModal');
         if (wm && !wm.hidden) wm.hidden = true;
     });
@@ -2392,14 +2360,9 @@ initPWA();
 initAuth();
 
 setKind(state.prefs.pendingKind || 'task');
+// ⚠️ فاز ۸ (8B): ویزارد خوش‌آمد چندمرحله‌ای (جایگزین دیالوگ تک‌مرحله‌ای قبلی)
 if (!state.prefs.tourSeen) {
-    document.getElementById('welcomeOverlay').hidden = false;
-    document.getElementById('welcomeStart').addEventListener('click', () => {
-        document.getElementById('welcomeOverlay').hidden = true;
-        state.prefs.tourSeen = true;
-        savePrefs();
-        input.focus();
-    }, { once: true });
+    initWelcomeWizard({ onOpenAuth: () => openAuthModal(), applyDisplay: () => applyDisplaySettings() });
 }
 if (window.matchMedia('(min-width: 901px)').matches && !state.prefs.tourSeen) {
     setTimeout(() => {

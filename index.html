@@ -526,28 +526,9 @@
     <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" data-i18n-aria-label="detail.sections.photos.viewAlt" aria-label="نمایش تصویر" tabindex="-1"><img id="lightboxImg" data-i18n-aria-label="detail.sections.photos.viewAlt" alt="تصویر وظیفه"></div>
 
     <div class="picker-overlay" id="welcomeOverlay" hidden>
-        <div class="picker" role="dialog" aria-modal="true" data-i18n-aria-label="welcome.title" aria-label="خوش آمدید">
-            <div class="picker-title" data-i18n="welcome.title">👋 خوش آمدید</div>
-            <p class="welcome-text" data-i18n-html="welcome.text">این دستیار وظایف شماست — کاملاً آفلاین و خصوصی.<br>• عنوان را بنویسید و Enter بزنید<br>• با 📅 تاریخ، با 📍 محل اضافه کنید<br>• با «+ افزودن» کار، برنامه یا دوره بسازید</p>
-  <p class="storage-guidance" data-i18n="welcome.storageGuidance">اطلاعات شما روی همین دستگاه و مرورگر ذخیره می‌شود. اگر مرورگر برای حذف خودکار داده‌های سایت تنظیم شده باشد، ممکن است اطلاعات برنامه‌ها و وظایف از بین برود.</p>
-            <div class="welcome-settings">
-                <div class="welcome-settings-row">
-                    <span class="welcome-settings-label" data-i18n="welcome.themeLabel">حالت نمایش:</span>
-                    <div class="welcome-settings-buttons" id="welcomeThemeGroup">
-                        <button type="button" class="welcome-opt" data-theme="auto" data-i18n="theme.auto">🖥 خودکار</button>
-                        <button type="button" class="welcome-opt" data-theme="light" data-i18n="theme.light">☀️ روشن</button>
-                        <button type="button" class="welcome-opt" data-theme="dark" data-i18n="theme.dark">🌙 تاریک</button>
-                    </div>
-                </div>
-                <div class="welcome-settings-row">
-                    <span class="welcome-settings-label" data-i18n="welcome.languageLabel">زبان:</span>
-                    <div class="welcome-settings-buttons" id="welcomeLangGroup">
-                        <button type="button" class="welcome-opt" data-lang="fa">🇮🇷 فارسی</button>
-                        <button type="button" class="welcome-opt" data-lang="en">🇬🇧 English</button>
-                    </div>
-                </div>
-            </div>
-            <div class="picker-actions"><button class="btn-add picker-confirm" id="welcomeStart" data-i18n="welcome.start">شروع</button></div>
+        <div class="picker wizard" role="dialog" aria-modal="true" data-i18n-aria-label="welcome.title" aria-label="خوش آمدید">
+            <!-- ⚠️ 8B: محتوای ویزارد با JS ساخته می‌شود (js/welcome-wizard.js) -->
+            <div id="wizardRoot"></div>
         </div>
     </div>
 

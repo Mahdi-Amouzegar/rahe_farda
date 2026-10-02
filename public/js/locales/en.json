@@ -40,6 +40,33 @@
     "ariaSelect": "Select view"
   },
 
+  "wiz": {
+    "back": "‹ Back",
+    "next": "Next",
+    "skip": "Skip",
+    "close": "Close",
+    "finish": "Start",
+    "langTitle": "Language",
+    "langBrowserHint": "Browser suggested language",
+    "themeTitle": "Appearance",
+    "usernameTitle": "Username",
+    "usernameFromTelegram": "Username comes from Telegram.",
+    "usernameLocked": "Your username will appear here after you sign in.",
+    "proTitle": "Workspace mode",
+    "proSimple": "Simple",
+    "proPro": "Advanced",
+    "permTitle": "Permissions",
+    "permDesc": "Browser notifications are needed for reminders. The app fully works without them.",
+    "permEnable": "Enable notifications",
+    "permUnsupported": "This browser does not support notifications.",
+    "permGranted": "Notifications are enabled.",
+    "accountTitle": "Online account",
+    "accountLoggedIn": "You are signed in — sync is active.",
+    "accountDesc": "With an online account, multi-device sync, messages and groups are enabled. All core features work without it too.",
+    "accountTelegram": "Sign in with Telegram",
+    "accountCode": "Sign in with code"
+  },
+
   "nav": {
     "drawerTitle": "Rahe Farda menu",
     "search": "🔎 Search Rahe Farda",
