@@ -860,6 +860,22 @@ export async function loadMoreTimeline() {
     renderGroupView();
 }
 
+/**
+ * دریافت کل تایم‌لاین یک گروه (برای بکاپ — حداکثر ۲۰ صفحه).
+ */
+export async function fetchFullTimeline(groupId) {
+    const all = [];
+    let cursor = null;
+    for (let page = 0; page < 20; page++) {
+        const res = await fetchTimeline(groupId, cursor);
+        if (!res.ok) return { ok: false, error: res.error };
+        all.push(...((res.data && res.data.items) || []));
+        cursor = (res.data && res.data.nextCursor) || null;
+        if (!cursor) break;
+    }
+    return { ok: true, items: all };
+}
+
 export async function sendGroupText() {
     const input = document.getElementById('grpInput');
     if (!input || _loading || !_openGroupId) return;

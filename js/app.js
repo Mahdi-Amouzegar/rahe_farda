@@ -64,8 +64,6 @@ import {
     clearCompleted,
     archiveDone,
     setMapHelpers,
-    exportTasks,
-    importTasks,
     getPendingChanges
 } from './store.js';
 import {
@@ -168,6 +166,7 @@ import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
 import { initWelcomeWizard } from './welcome-wizard.js';
 import { openSharePicker } from './communication/shares.js';
+import { exportBackupV2, importBackupV2, normalizeBackup } from './backup-v2.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
@@ -1119,7 +1118,7 @@ document.getElementById('exportConfirm')?.addEventListener('click', async () => 
         const includePhotos = document.getElementById('exportIncludePhotos')?.checked || false;
         const includeSettings = document.getElementById('exportIncludeSettings')?.checked || false;
 
-        const backup = await exportTasks({ includePhotos, includeSettings });
+        const backup = await exportBackupV2({ includePhotos, includeSettings });
         const filename = buildBackupFilename();
         const ok = downloadJSON(backup, filename);
         if (ok) {
@@ -1174,30 +1173,35 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
         const data = await readJSONFile(file);
         _importFileData = data;
 
-        if (!data || !data.data || !Array.isArray(data.data.tasks)) {
+        const norm = normalizeBackup(data);
+        if (!norm.ok) {
             if (metaEl) metaEl.innerHTML = `<div class="import-error">${t('import.invalidStructure')}</div>`;
             document.getElementById('importConfirm').disabled = true;
             return;
         }
 
-        const schemaVersion = data.schemaVersion || t('import.unknown');
-        const taskCount = data.data.tasks.length;
-        const trashCount = Array.isArray(data.data.trash) ? data.data.trash.length : 0;
+        const schemaVersion = norm.schemaVersion || t('import.unknown');
+        const taskCount = norm.personal.tasks.length;
+        const trashCount = Array.isArray(norm.personal.trash) ? norm.personal.trash.length : 0;
         const exportedAt = data.exportedAt
             ? new Date(data.exportedAt).toLocaleDateString(
                 getLang() === 'en' ? 'en-US' : 'fa-IR',
                 { day: 'numeric', month: 'long', year: 'numeric' }
             )
             : t('import.unknown');
-        const hasSettings = Boolean(data.settings);
+        const hasSettings = Boolean(norm.settings);
         const hasPhotos = (data.options && data.options.includePhotos);
 
         if (metaEl) {
+            const serverNote = norm.serverSummary
+                ? `<div class="import-meta-row"><span>${t('import.metaServer')}</span> <strong>${formatNumber(norm.serverSummary.groupMessagesSent + norm.serverSummary.groupTasksSent + norm.serverSummary.dmMessages)}</strong></div>`
+                : '';
             metaEl.innerHTML = `
                 <div class="import-meta-row"><span>${t('import.metaVersion')}</span> <strong>${escapeHtml(schemaVersion)}</strong></div>
                 <div class="import-meta-row"><span>${t('import.metaExportedAt')}</span> <strong>${escapeHtml(exportedAt)}</strong></div>
                 <div class="import-meta-row"><span>${t('import.metaTasks')}</span> <strong>${formatNumber(taskCount)}</strong></div>
                 <div class="import-meta-row"><span>${t('import.metaTrash')}</span> <strong>${formatNumber(trashCount)}</strong></div>
+                ${serverNote}
                 ${hasPhotos ? `<div class="import-meta-warn">${t('import.hasPhotosWarning')}</div>` : ''}
             `;
         }
@@ -1237,7 +1241,7 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
     }
 
     try {
-        const result = await importTasks(_importFileData, { mode, importSettings });
+        const result = await importBackupV2(_importFileData, { mode, importSettings });
         closeImportModal();
 
         if (result.ok) {
@@ -1251,7 +1255,8 @@ document.getElementById('importConfirm')?.addEventListener('click', async () => 
             }
             const parts = [t('import.success', { n: formatNumber(result.imported) })];
             if (result.skipped > 0) parts.push(t('import.successSkipped', { n: formatNumber(result.skipped) }));
-            if (result.warning) parts.push(result.warning);
+            if (result.checksumWarning) parts.push(result.checksumWarning);
+            if (result.serverSummary) parts.push(t('import.serverSkipped'));
             events.emit(EV.UI_SNACKBAR, [], parts.join(' — '));
         } else {
             alert(result.error || t('import.errorImport'));

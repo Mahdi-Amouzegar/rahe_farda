@@ -771,6 +771,22 @@ export async function loadMoreConversation() {
     renderThread();
 }
 
+/**
+ * دریافت کل thread یک گفتگو (برای بکاپ — حداکثر ۲۰ صفحه).
+ */
+export async function fetchFullThread(otherUserId) {
+    const all = [];
+    let cursor = null;
+    for (let page = 0; page < 20; page++) {
+        const res = await fetchPage(otherUserId, cursor);
+        if (!res.ok) return { ok: false, error: res.error };
+        all.push(...((res.data && res.data.messages) || []));
+        cursor = (res.data && res.data.nextCursor) || null;
+        if (!res.data || !res.data.hasMore || !cursor) break;
+    }
+    return { ok: true, messages: all };
+}
+
 export async function sendCurrentText() {
     const input = document.getElementById('convInput');
     if (!input || _loading || !_openWith) return;
