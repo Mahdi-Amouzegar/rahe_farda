@@ -136,6 +136,15 @@ vi.mock('../js/api.js', async () => ({
                 },
             };
         }
+        if (path.endsWith('/invitations/link') && opts && opts.method === 'POST') {
+            return { ok: true, data: { linkId: 'l1', token: 'tok-abc', expiresAt: 'x', maxUses: 1 } };
+        }
+        if (path === '/api/invitations/link/consume' && opts && opts.method === 'POST') {
+            return { ok: true, data: { joined: true, groupId: 'g1', changeSeq: 3 } };
+        }
+        if (path.endsWith('/leave') && opts && opts.method === 'POST') {
+            return { ok: true, data: { left: true, changeSeq: 4 } };
+        }
         return { ok: false, error: { code: 'NOT_FOUND', message: 'x' } };
     }),
     apiErrorMessage: (e) => (e && e.message) || 'err',
@@ -156,6 +165,21 @@ function buildShell() {
     document.body.innerHTML = `
         <div class="workspace-root" id="workspaceRoot">
             <section id="ws-groups"></section>
+        </div>
+        <div class="picker-overlay" id="confirmModal" hidden>
+            <div class="picker" role="dialog" aria-modal="true">
+                <div class="picker-title" id="confirmModalTitle"></div>
+                <div id="confirmModalMessage"></div>
+                <button id="confirmModalOk"></button>
+                <button id="confirmModalCancel"></button>
+            </div>
+        </div>
+        <div class="picker-overlay" id="infoModal" hidden>
+            <div class="picker" role="dialog" aria-modal="true">
+                <div class="picker-title" id="infoModalTitle"></div>
+                <div id="infoModalBody"></div>
+                <button id="infoModalOk"></button>
+            </div>
         </div>`;
 }
 
@@ -251,13 +275,13 @@ describe('groups — inbox + management (8.3-B)', () => {
         expect(ids).toEqual(expect.arrayContaining(['members', 'tasks', 'invite', 'transfer', 'close', 'delete']));
     });
 
-    it('منوی عضو عادی فقط members/tasks دارد', async () => {
+     it('منوی عضو عادی: members/tasks/leave بدون مدیریت', async () => {
         await openGroupsWorkspace();
         await openGroup('g2');
         document.querySelector('.conv-menu-btn').click();
         await sleep(10);
         const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
-        expect(ids).toEqual(['members', 'tasks']);
+        expect(ids).toEqual(['members', 'tasks', 'leave']);
     });
 
     it('حذف عضو توسط owner', async () => {
@@ -349,5 +373,65 @@ describe('groups — unread badges (تصمیم ۳)', () => {
         const reads = apiCalls.filter((c) => c.path === '/api/groups/g1/read');
         expect(reads.length).toBeGreaterThan(0);
         expect(reads[0].opts.body).toMatchObject({ type: 'messages' });
+    });
+});
+
+describe('groups — leave + invite link (تصمیم کاربر)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function openMenuFor(groupId) {
+        await openGroupsWorkspace();
+        await openGroup(groupId);
+        document.querySelector('.conv-menu-btn').click();
+        await sleep(10);
+    }
+
+    async function clickMenuItem(id) {
+        [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === id).click();
+        await sleep(10);
+    }
+
+    it('عضو عادی آیتم ترک را می‌بیند، مالک نه', async () => {
+        await openMenuFor('g2');
+        let ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toContain('leave');
+        expect(ids).not.toContain('transfer');
+    });
+
+    it('ترک گروه: تأیید → POST leave → بازگشت به لیست', async () => {
+        await openMenuFor('g2');
+        await clickMenuItem('leave');
+        document.getElementById('confirmModalOk').click();
+        await sleep(30);
+        const leaves = apiCalls.filter((c) => c.path === '/api/groups/g2/leave');
+        expect(leaves.length).toBe(1);
+    });
+
+    it('ساخت لینک دعوت برای فرد خاص از نمای اعضا', async () => {
+        await openMenuFor('g1');
+        await clickMenuItem('members');
+        const searchInput = document.querySelector('.conv-box .conv-input');
+        searchInput.value = 'gue';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(450);
+        const linkBtns = [...document.querySelectorAll('.conv-box .conv-mini-btn')]
+            .filter((b) => b.textContent === 'لینک' || b.textContent === 'Link');
+        expect(linkBtns.length).toBeGreaterThan(0);
+        linkBtns[0].click();
+        await sleep(30);
+        const links = apiCalls.filter((c) => c.path === '/api/groups/g1/invitations/link');
+        expect(links.length).toBe(1);
+        expect(document.getElementById('infoModalBody').textContent).toContain('#/join/');
+    });
+
+    it('مهمان توکن deep-link را نگه می‌دارد (مصرف نمی‌کند)', async () => {
+        const { takePendingJoinToken, processPendingJoin } = await import('../js/communication/groups.js');
+        window.location.hash = '#/join/tok-123';
+        expect(takePendingJoinToken()).toBe('tok-123');
+        // مهمان (session نیست) → false و توکن حفظ می‌شود
+        expect(await processPendingJoin()).toBe(false);
+        expect(takePendingJoinToken()).toBe('tok-123');
+        window.location.hash = '';
     });
 });

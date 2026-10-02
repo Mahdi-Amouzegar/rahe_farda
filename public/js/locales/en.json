@@ -195,7 +195,12 @@
     "deleteConfirm": "Delete this group forever?",
     "removeMember": "Remove",
     "removeConfirm": "Remove this member from the group?",
-    "avatar": "Group avatar"
+    "avatar": "Group avatar",
+    "leave": "Leave group",
+    "leaveConfirm": "Leave this group?",
+    "inviteLink": "Invite link",
+    "inviteLinkShort": "Link",
+    "linkCopied": "Copied"
   },
 
   "gtask": {

@@ -14,6 +14,7 @@
 
 import { apiFetch, apiErrorMessage } from '../api.js';
 import { state, uid } from '../core.js';
+import { isLoggedIn } from '../auth.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
@@ -27,6 +28,7 @@ import {
     initLocationPreviews,
 } from './conversations.js';
 import { searchUsers } from './connections.js';
+import { switchWorkspace } from '../navigation/workspace.js';
 import { enqueueGroupOp, flushGroup, getPendingCount } from './group-queue.js';
 import { changeGroupAvatar } from '../ui/avatar-settings.js';
 
@@ -254,6 +256,10 @@ function renderGroupView() {
             items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
             items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
         }
+        // ترک گروه: همه به‌جز مالک (مالک باید اول منتقل کند)
+        if (_group && !isOwner()) {
+            items.push({ id: 'leave', label: tr('grp.leave', 'ترک گروه'), danger: true });
+        }
         openMenu({
             anchor: menu,
             items,
@@ -266,6 +272,8 @@ function renderGroupView() {
                 } else if (id === 'avatar') {
                     await changeGroupAvatar(_openGroupId);
                     await openGroup(_openGroupId);
+                } else if (id === 'leave') {
+                    await confirmGroupLeave();
                 } else if (id === 'transfer') {
                     openTransferPicker();
                 } else if (id === 'close') {
@@ -399,19 +407,23 @@ function renderMembersView(sec) {
                 for (const u of (res.data && res.data.users) || []) {
                     const row = el('div', 'conv-row');
                     row.appendChild(el('span', 'conv-name', displayNameOf(u)));
-                    const inv = el('button', 'conv-mini-btn', tr('conn.request', 'درخواست'));
-                    inv.type = 'button';
-                    inv.addEventListener('click', async () => {
+                    const req = el('button', 'conv-mini-btn', tr('conn.request', 'درخواست'));
+                    req.type = 'button';
+                    req.addEventListener('click', async () => {
                         const r = await apiFetch(
                             '/api/groups/' + encodeURIComponent(_openGroupId) + '/invitations',
                             { method: 'POST', body: { inviteeId: u.id, type: 'invitation' } }
                         );
-                        inv.disabled = true;
-                        inv.textContent = r.ok
+                        req.disabled = true;
+                        req.textContent = r.ok
                             ? tr('conn.requestSent', 'فرستاده شد')
                             : apiErrorMessage(r.error);
                     });
-                    row.appendChild(inv);
+                    const linkBtn = el('button', 'conv-mini-btn', tr('grp.inviteLinkShort', 'لینک'));
+                    linkBtn.type = 'button';
+                    linkBtn.addEventListener('click', () => createInviteLinkFor(u.id, linkBtn));
+                    row.appendChild(req);
+                    row.appendChild(linkBtn);
                     results.appendChild(row);
                 }
             }, 350);
@@ -498,6 +510,118 @@ async function confirmGroupClose() {
     await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/close', { method: 'POST' });
     _openGroupId = null;
     await openGroupsWorkspace();
+}
+
+async function confirmGroupLeave() {
+    if (!_group) return;
+    const ok = await showConfirmModal({
+        title: tr('grp.leave', 'ترک گروه'),
+        message: tr('grp.leaveConfirm', 'از این گروه خارج می‌شوی؟'),
+        danger: true,
+    });
+    if (!ok) return;
+    const res = await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/leave', {
+        method: 'POST',
+    });
+    if (!res.ok) {
+        showInfoModal({ title: tr('grp.leave', 'ترک گروه'), paragraphs: [apiErrorMessage(res.error)] });
+        return;
+    }
+    _openGroupId = null;
+    await openGroupsWorkspace();
+}
+
+function buildInviteLink(token) {
+    try {
+        const base = location.origin + location.pathname;
+        return base + '#/join/' + token;
+    } catch {
+        return '#/join/' + token;
+    }
+}
+
+async function createInviteLinkFor(inviteeId, btn) {
+    const res = await apiFetch(
+        '/api/groups/' + encodeURIComponent(_openGroupId) + '/invitations/link',
+        { method: 'POST', body: { inviteeId } }
+    );
+    if (!res.ok || !res.data || !res.data.token) {
+        showInfoModal({ title: tr('grp.inviteLink', 'لینک دعوت'), paragraphs: [apiErrorMessage(res.error)] });
+        return;
+    }
+    const url = buildInviteLink(res.data.token);
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+        }
+    } catch { /* کپی خودکار نشد — کاربر دستی کپی می‌کند */ }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = tr('grp.linkCopied', 'کپی شد');
+    }
+    showInfoModal({ title: tr('grp.inviteLink', 'لینک دعوت'), paragraphs: [url] });
+}
+
+/**
+ * مصرف لینک دعوت از deep-link بوت (‎#/join/<token>).
+ */
+export async function consumeInviteLinkToken(token) {
+    if (!token) return { ok: false };
+    const res = await apiFetch('/api/invitations/link/consume', {
+        method: 'POST',
+        body: { token },
+    });
+    return res;
+}
+
+let _pendingJoinToken = null;
+
+/**
+ * خواندن توکن join از hash (بدون پاک‌سازی — تا بعد از ورود حفظ می‌شود).
+ */
+export function takePendingJoinToken() {
+    if (_pendingJoinToken) return _pendingJoinToken;
+    try {
+        const h = location.hash || '';
+        const m = h.match(/^#\/join\/([A-Za-z0-9-]+)\/?$/);
+        if (m && m[1]) _pendingJoinToken = m[1];
+    } catch { /* silent */ }
+    return _pendingJoinToken;
+}
+
+function clearJoinHash() {
+    try {
+        if ((location.hash || '').startsWith('#/join/')) {
+            history.replaceState(null, '', location.pathname + location.search);
+        }
+    } catch { /* silent */ }
+}
+
+/**
+ * پردازش لینک معلق — فقط وقتی وارد شده؛ مهمان توکن را نگه می‌دارد.
+ */
+export async function processPendingJoin() {
+    if (!_pendingJoinToken) return false;
+    if (!isLoggedIn()) return false;
+    const token = _pendingJoinToken;
+    _pendingJoinToken = null;
+    clearJoinHash();
+    const res = await consumeInviteLinkToken(token);
+    if (!res.ok) {
+        showInfoModal({
+            title: tr('grp.inviteLink', 'لینک دعوت'),
+            paragraphs: [apiErrorMessage(res.error)],
+        });
+        return true;
+    }
+    if (res.data && res.data.groupId) {
+        if (switchWorkspace('groups')) {
+            await openGroup(res.data.groupId);
+            return true;
+        }
+    }
+    await openGroupsWorkspace();
+    return true;
 }
 
 async function confirmGroupDelete() {
@@ -875,6 +999,7 @@ export function __resetGroupsForTest() {
     _loading = false;
     _view = 'timeline';
     _tasksCache = [];
+    _pendingJoinToken = null;
 }
 export function __getGroupsStateForTest() {
     return { groups: _groups, openGroupId: _openGroupId, items: _items, members: _members, view: _view };

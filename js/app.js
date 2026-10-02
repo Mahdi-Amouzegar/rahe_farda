@@ -163,6 +163,7 @@ import { openMessagesWorkspace, refreshConversationBadges } from './communicatio
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
 import { openGroupsWorkspace } from './communication/groups.js';
+import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
 import { initWelcomeWizard } from './welcome-wizard.js';
@@ -2454,6 +2455,14 @@ initI18n().then(async () => {
         }
     } catch (err) {
         console.warn('[auth] restoreSession failed:', err);
+    }
+
+    // ⚠️ لینک دعوت گروه (‎#/join/<token>) — بعد از ورود پردازش می‌شود
+    try {
+        takePendingJoinToken();
+        await processPendingJoin();
+    } catch (err) {
+        console.warn('[app] pending join failed:', err);
     }
 
     updateBadge({ immediate: true });

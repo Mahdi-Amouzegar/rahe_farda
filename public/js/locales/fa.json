@@ -195,7 +195,12 @@
     "deleteConfirm": "گروه برای همیشه حذف شود؟",
     "removeMember": "حذف",
     "removeConfirm": "این عضو از گروه حذف شود؟",
-    "avatar": "آواتار گروه"
+    "avatar": "آواتار گروه",
+    "leave": "ترک گروه",
+    "leaveConfirm": "از این گروه خارج می‌شوی؟",
+    "inviteLink": "لینک دعوت",
+    "inviteLinkShort": "لینک",
+    "linkCopied": "کپی شد"
   },
 
   "gtask": {
