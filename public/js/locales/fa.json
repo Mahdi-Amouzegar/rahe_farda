@@ -160,8 +160,24 @@
     "loginRequired": "برای آواتار وارد شوید."
   },
 
+  "search": {
+    "placeholder": "نام کاربر یا گروه… (حداقل ۳ حرف)",
+    "users": "کاربران",
+    "groups": "گروه‌ها",
+    "noResults": "نتیجه‌ای نیست.",
+    "inviteOnly": "عضویت در گروه فقط با دعوت ممکن است.",
+    "typeAll": "همه",
+    "typeUser": "کاربر",
+    "typeGroup": "گروه"
+  },
+
   "grp": {
     "back": "‹ گروه‌ها",
+    "create": "＋ گروه تازه",
+    "createPlaceholder": "نام گروه…",
+    "visibilityPublic": "عمومی",
+    "visibilityPrivate": "خصوصی",
+    "createGo": "ساخت",
     "members": "اعضا",
     "loadMore": "قدیمی‌تر",
     "backToTimeline": "بازگشت به تایم‌لاین",

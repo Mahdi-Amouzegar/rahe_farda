@@ -33,6 +33,9 @@ vi.mock('../js/api.js', async () => ({
                 },
             };
         }
+        if (path === '/api/groups' && opts && opts.method === 'POST') {
+            return { ok: true, data: { group: { id: 'g9', name: 'گروه تازه', ownerId: 'u1', closedAt: null }, changeSeq: 1 } };
+        }
         if (path === '/api/groups/g1') {
             return { ok: true, data: { group: { id: 'g1', name: 'سفر', ownerId: 'u1', closedAt: null }, myRole: 'owner' } };
         }
@@ -304,6 +307,26 @@ describe('groups — inbox + management (8.3-B)', () => {
         await sleep(30);
         const more = document.querySelector('.conv-row .msg-more');
         expect(more).not.toBeNull();
+    });
+});
+
+describe('groups — create (8.3-D)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('فرم ساخت گروه POST می‌زند', async () => {
+        await openGroupsWorkspace();
+        const toggle = [...document.querySelectorAll('.conv-new > .conv-mini-btn')]
+            .find((b) => b.textContent.length > 0);
+        expect(toggle).toBeTruthy();
+        toggle.click();
+        const input = document.querySelector('.conv-new .conv-input');
+        expect(input).not.toBeNull();
+        input.value = 'گروه تازه';
+        document.querySelector('.conv-new .conv-send').click();
+        await sleep(20);
+        const posts = apiCalls.filter((c) => c.path === '/api/groups' && c.opts && c.opts.method === 'POST');
+        expect(posts.length).toBe(1);
+        expect(posts[0].opts.body).toMatchObject({ name: 'گروه تازه', visibility: 'private' });
     });
 });
 

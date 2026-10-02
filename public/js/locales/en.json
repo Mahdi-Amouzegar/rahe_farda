@@ -160,8 +160,24 @@
     "loginRequired": "Sign in for avatar."
   },
 
+  "search": {
+    "placeholder": "Username or group… (min 3 chars)",
+    "users": "Users",
+    "groups": "Groups",
+    "noResults": "No results.",
+    "inviteOnly": "Joining a group is by invitation only.",
+    "typeAll": "All",
+    "typeUser": "User",
+    "typeGroup": "Group"
+  },
+
   "grp": {
     "back": "‹ Groups",
+    "create": "＋ New group",
+    "createPlaceholder": "Group name…",
+    "visibilityPublic": "Public",
+    "visibilityPrivate": "Private",
+    "createGo": "Create",
     "members": "Members",
     "loadMore": "Older",
     "backToTimeline": "Back to timeline",

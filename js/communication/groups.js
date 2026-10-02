@@ -93,6 +93,67 @@ async function fetchMembers(groupId) {
 // View — list
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * فرم ساخت گروه تازه (فقط واردشده‌ها — فضا خودش گیت دارد).
+ */
+function renderCreateForm() {
+    const box = el('div', 'conv-new');
+    const toggle = el('button', 'conv-mini-btn', tr('grp.create', '＋ گروه تازه'));
+    toggle.type = 'button';
+    const form = el('div', 'conv-search');
+    form.hidden = true;
+    const input = el('input', 'conv-input');
+    input.setAttribute('placeholder', tr('grp.createPlaceholder', 'نام گروه…'));
+    input.setAttribute('maxlength', '100');
+    input.setAttribute('autocomplete', 'off');
+    const visRow = el('div', 'conv-vis-row');
+    const pubLabel = el('label', 'conv-vis-option');
+    const pubRadio = el('input', null);
+    pubRadio.type = 'radio';
+    pubRadio.name = 'grp-visibility';
+    pubRadio.value = 'public';
+    pubLabel.appendChild(pubRadio);
+    pubLabel.appendChild(document.createTextNode(tr('grp.visibilityPublic', 'عمومی')));
+    const privLabel = el('label', 'conv-vis-option');
+    const privRadio = el('input', null);
+    privRadio.type = 'radio';
+    privRadio.name = 'grp-visibility';
+    privRadio.value = 'private';
+    privRadio.checked = true;
+    privLabel.appendChild(privRadio);
+    privLabel.appendChild(document.createTextNode(tr('grp.visibilityPrivate', 'خصوصی')));
+    visRow.appendChild(pubLabel);
+    visRow.appendChild(privLabel);
+    const create = el('button', 'conv-send', tr('grp.createGo', 'ساخت'));
+    create.type = 'button';
+    create.addEventListener('click', async () => {
+        const name = input.value.trim();
+        if (!name) return;
+        const visibility = form.querySelector('input[name="grp-visibility"]:checked')?.value || 'private';
+        create.disabled = true;
+        const res = await apiFetch('/api/groups', {
+            method: 'POST',
+            body: { name, visibility },
+        });
+        create.disabled = false;
+        if (!res.ok || !res.data || !res.data.group) {
+            input.title = apiErrorMessage(res.error);
+            return;
+        }
+        await openGroup(res.data.group.id);
+    });
+    form.appendChild(input);
+    form.appendChild(visRow);
+    form.appendChild(create);
+    toggle.addEventListener('click', () => {
+        form.hidden = !form.hidden;
+        if (!form.hidden) input.focus();
+    });
+    box.appendChild(toggle);
+    box.appendChild(form);
+    return box;
+}
+
 async function renderGroupsHome(state) {
     const sec = groupsSection();
     if (!sec) return;
@@ -108,6 +169,7 @@ async function renderGroupsHome(state) {
         return;
     }
     await renderInbox(sec);
+    sec.appendChild(renderCreateForm());
     if (_groups.length === 0) {
         sec.appendChild(el('p', null, tr('workspace.groupsEmpty', '')));
         return;
@@ -119,9 +181,7 @@ async function renderGroupsHome(state) {
         const row = el('button', 'conv-row grp-row');
         row.type = 'button';
         row.setAttribute('role', 'listitem');
-        const avatar = el('span', 'conv-avatar', (g.name || '?').trim().charAt(0) || '?');
-        avatar.setAttribute('aria-hidden', 'true');
-        row.appendChild(avatar);
+        row.appendChild(avatarNode(g.avatarUrl, g.name || '?'));
         row.appendChild(el('span', 'conv-name', g.name || '…'));
         const badge = el('span', 'drawer-badge');
         badge.hidden = true;

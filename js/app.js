@@ -163,6 +163,7 @@ import { openMessagesWorkspace, refreshConversationBadges } from './communicatio
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
 import { openGroupsWorkspace } from './communication/groups.js';
+import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
 import { initWelcomeWizard } from './welcome-wizard.js';
 import { openSharePicker } from './communication/shares.js';
@@ -2402,6 +2403,8 @@ initI18n().then(async () => {
             if (ws === 'messages') openMessagesWorkspace();
             // ⚠️ فاز ۸ (8.3-A): ورود به فضای گروه‌ها = لود لیست
             if (ws === 'groups') openGroupsWorkspace();
+            // ⚠️ 8.3-D: ورود به فضای جستجو
+            if (ws === 'search') openSearchWorkspace();
         },
         onLogin: () => openAuthModal(),
         onOpenSettings: () => toggleSettings(true),

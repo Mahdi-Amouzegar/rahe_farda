@@ -734,6 +734,29 @@ html[dir="ltr"] .drawer {
     white-space: nowrap;
 }
 
+/* ─── 8.3-D: فرم ساخت گروه + جستجو ─── */
+.conv-vis-row {
+    display: flex;
+    gap: 12px;
+}
+
+.conv-vis-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.conv-type-select {
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-primary);
+    font: inherit;
+    padding: 10px 8px;
+}
+
 /* ─── 8.3-C: نشانگر pending صف گروه ─── */
 .conv-pending {
     font-size: 0.8rem;
