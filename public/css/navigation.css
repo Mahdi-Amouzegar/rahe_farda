@@ -706,6 +706,16 @@ html[dir="ltr"] .drawer {
     white-space: nowrap;
 }
 
+/* ─── 8.3-C: نشانگر pending صف گروه ─── */
+.conv-pending {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 2px 4px;
+}
+.conv-pending[hidden] {
+    display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Action Sheet (T4)
    ═══════════════════════════════════════════════════════════════════════════ */

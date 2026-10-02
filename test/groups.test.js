@@ -112,6 +112,18 @@ vi.mock('../js/api.js', async () => ({
         if (path.startsWith('/api/search')) {
             return { ok: true, data: { users: [{ id: 'u7', username: 'guest7' }] } };
         }
+        if (path.endsWith('/sync') && opts && opts.method === 'POST') {
+            const ops = (opts.body && opts.body.ops) || [];
+            return {
+                ok: true,
+                data: {
+                    accepted: ops.map((o, i) => ({ opId: o.id, changeSeq: 10 + i })),
+                    rejected: [],
+                    changes: [],
+                    newChangeSeq: 20,
+                },
+            };
+        }
         return { ok: false, error: { code: 'NOT_FOUND', message: 'x' } };
     }),
     apiErrorMessage: (e) => (e && e.message) || 'err',
@@ -252,7 +264,7 @@ describe('groups — inbox + management (8.3-B)', () => {
         // پس فقط حضور دکمه را چک می‌کنیم (فلو کامل در تست دوکاربره‌ی دستی)
     });
 
-    it('نمای تسک‌ها + ساخت تسک', async () => {
+    it('نمای تسک‌ها + ساخت تسک (از مسیر صف sync)', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
         document.querySelector('.conv-menu-btn').click();
@@ -264,10 +276,13 @@ describe('groups — inbox + management (8.3-B)', () => {
         expect(document.body.textContent).toContain('Mine');
         document.getElementById('gtaskInput').value = 'تازه';
         document.querySelector('.conv-composer .conv-send').click();
-        await sleep(20);
-        const posts = apiCalls.filter((c) => c.path === '/api/groups/g1/tasks' && c.opts && c.opts.method === 'POST');
-        expect(posts.length).toBe(1);
-        expect(posts[0].opts.body.payload).toMatchObject({ title: 'تازه' });
+        await sleep(30);
+        const syncs = apiCalls.filter((c) => c.path === '/api/groups/g1/sync');
+        expect(syncs.length).toBeGreaterThan(0);
+        const saveOp = syncs.flatMap((c) => (c.opts.body && c.opts.body.ops) || [])
+            .find((o) => o.type === 'save');
+        expect(saveOp).toBeTruthy();
+        expect(saveOp.data.payload).toMatchObject({ title: 'تازه' });
     });
 
     it('ویرایش تسک خودی، حذف تسک خودی', async () => {

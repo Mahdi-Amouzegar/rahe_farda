@@ -300,6 +300,7 @@ export const EV = {
     SYNC_FLUSHED: 'sync:flushed',
     SYNC_ERROR: 'sync:error',
     SYNC_AUTH_EXPIRED: 'sync:auth-expired',
+    GROUP_QUEUE_CHANGED: 'group-queue:changed',
 
     // ═══════════════════════════════════════════════════════════════════════
     // ⚠️ فاز ۵ گام ۴: رویدادهای PWA

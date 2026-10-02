@@ -161,6 +161,7 @@ import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
 import { openGroupsWorkspace } from './communication/groups.js';
+import { initGroupQueue } from './communication/group-queue.js';
 import { openSharePicker } from './communication/shares.js';
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
@@ -2382,6 +2383,8 @@ startNetworkMonitor();
 initSyncQueue().catch(err => {
     console.error('[app] initSyncQueue failed:', err);
 });
+// ⚠️ فاز ۸ (8.3-C): صف آفلاین تسک‌های گروه
+initGroupQueue();
 initHeaderStatus();
 initPWA();
 

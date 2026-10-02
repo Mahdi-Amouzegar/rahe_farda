@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
-import { state } from '../core.js';
+import { state, uid } from '../core.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
@@ -24,6 +24,7 @@ import {
     initLocationPreviews,
 } from './conversations.js';
 import { searchUsers } from './connections.js';
+import { enqueueGroupOp, flushGroup, getPendingCount } from './group-queue.js';
 
 const PAGE_LIMIT = 30;
 
@@ -461,6 +462,18 @@ function renderGroupTasksView(sec) {
     const box = el('div', 'conv-box');
     box.appendChild(el('div', 'conv-section', tr('gtask.title', 'تسک‌ها')));
 
+    // ─── نشانگر pending (8.3-C) ───
+    const pendingRow = el('div', 'conv-pending');
+    pendingRow.id = 'gtaskPending';
+    pendingRow.hidden = true;
+    box.appendChild(pendingRow);
+    getPendingCount(_openGroupId).then((n) => {
+        const badge = document.getElementById('gtaskPending');
+        if (!badge || n <= 0) return;
+        badge.hidden = false;
+        badge.textContent = '⏳ ' + n;
+    });
+
     // ─── فرم ساخت (همه‌ی اعضا، گروه باز) ───
     if (_group && !_group.closedAt) {
         const form = el('div', 'conv-composer');
@@ -475,15 +488,10 @@ function renderGroupTasksView(sec) {
             const text = input.value.trim();
             if (!text) return;
             add.disabled = true;
-            const res = await apiFetch(
-                '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks',
-                { method: 'POST', body: { kind: 'task', payload: { title: text } } }
-            );
+            // ⚠️ 8.3-C: از طریق صف (آنلاین = flush فوری، آفلاین = pending)
+            await enqueueGroupOp(_openGroupId, 'save', uid(), { kind: 'task', payload: { title: text } });
+            await flushGroup(_openGroupId);
             add.disabled = false;
-            if (!res.ok) {
-                input.title = apiErrorMessage(res.error);
-                return;
-            }
             input.value = '';
             await refreshTasksView();
         });
@@ -545,6 +553,9 @@ async function openTasksView() {
     _view = 'tasks';
     _tasksCache = [];
     renderGroupView();
+    try {
+        await flushGroup(_openGroupId);
+    } catch { /* best-effort */ }
     await refreshTasksView();
 }
 
@@ -565,15 +576,8 @@ async function startGroupTaskEdit(t) {
         const text = input.value.trim();
         if (!text) return;
         save.disabled = true;
-        const res = await apiFetch(
-            '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks/' + encodeURIComponent(t.id),
-            { method: 'PATCH', body: { payload: { title: text } } }
-        );
-        if (!res.ok) {
-            save.disabled = false;
-            input.title = apiErrorMessage(res.error);
-            return;
-        }
+        await enqueueGroupOp(_openGroupId, 'save', t.id, { kind: t.kind || 'task', payload: { title: text } });
+        await flushGroup(_openGroupId);
         await refreshTasksView();
     });
     const cancel = el('button', 'conv-mini-btn', tr('gtask.cancel', 'انصراف'));
@@ -592,10 +596,8 @@ async function deleteGroupTask(taskId) {
         danger: true,
     });
     if (!ok) return;
-    await apiFetch(
-        '/api/groups/' + encodeURIComponent(_openGroupId) + '/tasks/' + encodeURIComponent(taskId),
-        { method: 'DELETE' }
-    );
+    await enqueueGroupOp(_openGroupId, 'delete', taskId, null);
+    await flushGroup(_openGroupId);
     await refreshTasksView();
 }
 
@@ -615,6 +617,10 @@ export async function openGroup(groupId) {
     renderGroupSkeleton();
     if (!isOnline()) return;
     _loading = true;
+    // ⚠️ 8.3-C: اول flush صف pending همین گروه (pull بعدی شامل آن‌ها می‌شود)
+    try {
+        await flushGroup(groupId);
+    } catch { /* best-effort */ }
     const [detailRes, tlRes, memRes] = await Promise.all([
         apiFetch('/api/groups/' + encodeURIComponent(groupId)),
         fetchTimeline(groupId, null),
