@@ -84,14 +84,16 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - **Group sync** — per-group change sequences with offline task push, delta pull, and full snapshots (`POST /api/groups/:id/sync`)
 
 ### Groups & Communication
-- Groups with members, roles (owner/admin/member), and invitations (7-day TTL, direct-add or invite)
-- Group tasks with creator-only edit and owner moderation
-- Group messages (text/task/location) with cursor pagination and a merged timeline
-- Direct connections, blocks, messages, task shares, and notifications
-- Global search over usernames and public groups
+- Groups with members, roles (owner/admin/member), and invitations (7-day TTL, direct-add, invite, or single-use link)
+- Leaving groups (members) and ownership transfer; owner close/delete
+- Group tasks with creator-only edit and owner moderation + offline queue
+- Group messages (text/task/location) with cursor pagination, merged timeline, and per-group unread counts
+- Direct connections, blocks (with block list in settings), messages, task shares, and notifications
+- Global search over usernames and public groups + group creation from UI
+- User avatars (Telegram default, changeable) and group avatars
 
 ### Media (Photos)
-- Automatic WebP conversion with JPEG fallback
+- Automatic AVIF conversion (when supported) with WebP/JPEG fallback
 - Private media storage with backend-authorized uploads
 - EXIF stripped on the client
 - Max 5MB input, max 8 photos per task
@@ -119,21 +121,21 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - PWA install (browser + Android TWA)
 - Telegram login with session/device management
 - Multi-device sync with transactional outbox
-- Groups (create, members, invitations) with role-based access
-- Group messages, tasks, and timeline
-- Group sync engine with per-group change sequences
+- Groups (create, members, invitations, invite links, leave) with role-based access
+- Group messages, tasks, and timeline + per-group unread counts
+- Group sync engine with per-group change sequences + offline queue
 - Global search (users + public groups)
+- User and group avatars
+- 7-step welcome wizard + backup v2 (with sent-items archive)
 - Bilingual interface (Persian + English)
 
 ### ⏳ In Progress / Next
 
-- **Phase 8** — Communication & group UI (sidebar navigation, group timeline, invitations and member management, direct messages)
+- **Phase 9** — Account deletion (anonymize model), rate limiting, media cleanup, and final audit
+  (Requires ARCH §16 decision: real-delete DMs, anonymize group content, immediate media hard-delete)
 
 ### 🗓️ Planned
 
-- Sidebar navigation with unified search
-- Welcome wizard
-- Backup & Restore v2
 - Account lifecycle (deletion, transfer, anonymization)
 - Rate limiting and final security audit
 
@@ -234,17 +236,17 @@ Status	Milestone
 ✅	Core offline-first planner
 ✅	Authentication & device linking
 ✅	Multi-device sync infrastructure
-✅	Media storage (WebP + ParsPack)
+✅	Media storage (AVIF/WebP + ParsPack)
 ✅	English interface
 ✅	Number & unit localization
 ✅	Communication (connections, blocks, messages, shares, notifications)
-✅	Groups API (create, members, invitations)
-✅	Group messages, tasks & timeline
+✅	Groups API (create, members, invitations, links, leave)
+✅	Group messages, tasks & timeline + avatars
 ✅	Search (users + public groups)
-✅	Group synchronization
-⏳	Communication & group UI
-🗓️	Backup / restore v2
-🗓️	Account lifecycle & security hardening
+✅	Group synchronization + offline queue
+✅	Communication & group UI
+✅	Welcome wizard + Backup / restore v2
+⏳	Account lifecycle & security hardening
 🗓️	Final security audit
 9. Privacy
 Rahe Farda is designed for personal, offline-first use:
