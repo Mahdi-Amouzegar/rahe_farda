@@ -152,6 +152,14 @@
     "unavailable": "موقعیت در دسترس نیست."
   },
 
+  "avatar": {
+    "title": "آواتار",
+    "change": "تغییر آواتار",
+    "remove": "حذف",
+    "uploadFailed": "آپلود ناموفق بود.",
+    "loginRequired": "برای آواتار وارد شوید."
+  },
+
   "grp": {
     "back": "‹ گروه‌ها",
     "members": "اعضا",
@@ -170,7 +178,8 @@
     "delete": "حذف گروه",
     "deleteConfirm": "گروه برای همیشه حذف شود؟",
     "removeMember": "حذف",
-    "removeConfirm": "این عضو از گروه حذف شود؟"
+    "removeConfirm": "این عضو از گروه حذف شود؟",
+    "avatar": "آواتار گروه"
   },
 
   "gtask": {

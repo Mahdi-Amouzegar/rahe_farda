@@ -18,6 +18,7 @@ import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
 import { setBadge } from '../ui/badge.js';
+import { avatarNode } from '../ui/avatar.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
 import { showInfoModal, showConfirmModal } from '../core.js';
 import {
@@ -27,6 +28,7 @@ import {
 } from './conversations.js';
 import { searchUsers } from './connections.js';
 import { enqueueGroupOp, flushGroup, getPendingCount } from './group-queue.js';
+import { changeGroupAvatar } from '../ui/avatar-settings.js';
 
 const PAGE_LIMIT = 30;
 
@@ -172,6 +174,7 @@ function renderGroupView() {
         openGroupsWorkspace();
     });
     head.appendChild(back);
+    head.appendChild(avatarNode(_group.avatarUrl, _group.name));
     const titleWrap = el('span', 'conv-title');
     titleWrap.appendChild(el('span', null, _group.name || '…'));
     head.appendChild(titleWrap);
@@ -186,6 +189,7 @@ function renderGroupView() {
         ];
         if (isManager()) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
         if (isOwner()) {
+            items.push({ id: 'avatar', label: tr('grp.avatar', 'آواتار گروه') });
             items.push({ id: 'transfer', label: tr('grp.transfer', 'انتقال مالکیت') });
             items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
             items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
@@ -193,12 +197,15 @@ function renderGroupView() {
         openMenu({
             anchor: menu,
             items,
-            onSelect: (id) => {
+            onSelect: async (id) => {
                 if (id === 'members' || id === 'invite') {
                     _view = 'members';
                     renderGroupView();
                 } else if (id === 'tasks') {
                     openTasksView();
+                } else if (id === 'avatar') {
+                    await changeGroupAvatar(_openGroupId);
+                    await openGroup(_openGroupId);
                 } else if (id === 'transfer') {
                     openTransferPicker();
                 } else if (id === 'close') {
@@ -354,9 +361,7 @@ function renderMembersView(sec) {
     const me = myUserId();
     for (const m of _members) {
         const row = el('div', 'conv-row');
-        const avatar = el('span', 'conv-avatar', ((m.username || '?').trim().charAt(0) || '?'));
-        avatar.setAttribute('aria-hidden', 'true');
-        row.appendChild(avatar);
+        row.appendChild(avatarNode(m.avatarUrl, m.username));
         row.appendChild(el('span', 'conv-name', m.username || String(m.userId || '').slice(0, 8)));
         row.appendChild(el('span', 'conv-role', roleLabel(m.role)));
         // ─── حذف عضو: فقط owner، نه خودش، نه مالک ───

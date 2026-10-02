@@ -14,6 +14,7 @@ import { trapFocus } from '../core.js';
 import { t as i18nT } from '../i18n.js';
 import { isLoggedIn } from '../auth.js';
 import { setBadge } from '../ui/badge.js';
+import { avatarNode } from '../ui/avatar.js';
 import { getActiveWorkspace, switchWorkspace } from './workspace.js';
 
 let _opts = null;
@@ -133,7 +134,8 @@ function renderDrawer() {
             for (const g of _recentGroups.slice(0, 3)) {
                 const b = el('button', 'drawer-item drawer-recent');
                 b.type = 'button';
-                b.appendChild(el('span', 'drawer-item-label', '👥 ' + String(g.name || '')));
+                b.appendChild(avatarNode(g.avatarUrl, g.name));
+                b.appendChild(el('span', 'drawer-item-label', String(g.name || '')));
                 b.addEventListener('click', () => {
                     closeDrawer();
                     if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id);

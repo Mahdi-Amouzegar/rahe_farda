@@ -39,6 +39,9 @@ export const MAX_OUTPUT_DIMENSION = 4096;
 /** کیفیت WebP */
 export const WEBP_QUALITY = 0.9;
 
+/** کیفیت AVIF (تصمیم کاربر — در صورت پشتیبانی مرورگر، اول AVIF) */
+export const AVIF_QUALITY = 0.8;
+
 /** کیفیت JPEG (fallback) */
 export const JPEG_QUALITY = 0.9;
 
@@ -124,6 +127,24 @@ export function isWebPSupported() {
         canvas.width = 1;
         canvas.height = 1;
         return canvas.toDataURL('image/webp').startsWith('data:image/webp');
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * آیا مرورگر خروجی AVIF می‌دهد؟
+ *
+ * ⚠️ تصمیم کاربر: اگر AVIF ممکن بود، همان (کیفیت عالی حتی در حجم کم).
+ *    تشخیص runtime است؛ در غیر این صورت زنجیره به WebP/JPEG می‌افتد.
+ *    canvasToBlob عدم تطابق type را خودش تشخیص می‌دهد (دفاع دوم).
+ */
+export function isAvifSupported() {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        return canvas.toDataURL('image/avif').startsWith('data:image/avif');
     } catch {
         return false;
     }
@@ -363,12 +384,22 @@ export async function processImageFile(file) {
 
     ctx.drawImage(img, 0, 0, target.width, target.height);
 
-    // ─── ۵. تبدیل به Blob ───
+    // ─── ۵. تبدیل به Blob: AVIF ← WebP ← JPEG ───
     let blob;
     let contentType;
     let extension;
 
-    if (isWebPSupported()) {
+    if (isAvifSupported()) {
+        try {
+            blob = await canvasToBlob(canvas, 'image/avif', AVIF_QUALITY);
+            contentType = 'image/avif';
+            extension = 'avif';
+        } catch {
+            // ادامه به WebP
+            blob = null;
+        }
+    }
+    if (!blob && isWebPSupported()) {
         try {
             blob = await canvasToBlob(canvas, 'image/webp', WEBP_QUALITY);
             contentType = 'image/webp';
@@ -379,7 +410,7 @@ export async function processImageFile(file) {
             contentType = 'image/jpeg';
             extension = 'jpeg';
         }
-    } else {
+    } else if (!blob) {
         blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);
         contentType = 'image/jpeg';
         extension = 'jpeg';

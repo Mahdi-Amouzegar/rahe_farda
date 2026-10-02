@@ -261,6 +261,22 @@ export function getCurrentUser() {
     return getAuthState().user;
 }
 
+/**
+ * به‌روزرسانی avatarUrl کاربر در session ذخیره‌شده (تصمیم F).
+ * فقط کش محلی است؛ مرجع نهایی سرور است.
+ */
+export function setStoredUserAvatar(avatarUrl) {
+    try {
+        const raw = localStorage.getItem(AUTH_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.user) return;
+        if (avatarUrl) parsed.user.avatarUrl = avatarUrl;
+        else delete parsed.user.avatarUrl;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+    } catch { /* silent */ }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Telegram Login URL (Redirect-based)
 // ═══════════════════════════════════════════════════════════════════════════

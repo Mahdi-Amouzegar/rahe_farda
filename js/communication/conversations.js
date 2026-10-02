@@ -20,7 +20,9 @@ import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
 import { setBadge } from '../ui/badge.js';
+import { avatarNode } from '../ui/avatar.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
+import { getCurrentUser } from '../auth.js';
 import {
     getIncomingRequests,
     requestConnection,
@@ -54,6 +56,22 @@ function el(tag, className, text) {
 function tr(key, fallback) {
     const v = i18nT(key);
     return v !== key ? v : fallback;
+}
+
+export /**
+ * آواتار خودم (از پروفایل session) — برای حباب‌های خودی.
+ */
+function myAvatarRef() {
+    try {
+        const u = getCurrentUser();
+        if (!u) return null;
+        if (typeof u.avatarUrl === 'string' && u.avatarUrl) return u.avatarUrl;
+        if (!u.profile) return null;
+        const p = typeof u.profile === 'string' ? JSON.parse(u.profile) : u.profile;
+        return (p && typeof p.avatarUrl === 'string' && p.avatarUrl) || null;
+    } catch {
+        return null;
+    }
 }
 
 export function displayNameOf(user) {
@@ -187,7 +205,7 @@ function renderListState(state) {
         for (const r of _incoming) {
             const other = r.otherUser || { id: r.otherUserId };
             const row = el('div', 'conv-row conv-request');
-            row.appendChild(el('span', 'conv-avatar', (displayNameOf(other) || '?').trim().charAt(0) || '?'));
+            row.appendChild(avatarNode(other.avatarUrl, displayNameOf(other)));
             row.appendChild(el('span', 'conv-name', displayNameOf(other)));
             const okBtn = el('button', 'conv-mini-btn', tr('conn.accept', 'قبول'));
             okBtn.type = 'button';
@@ -256,13 +274,11 @@ function renderListState(state) {
 
     const list = el('div', 'conv-list');
     list.setAttribute('role', 'list');
-    for (const c of _conversations) {
+        for (const c of _conversations) {
         const row = el('button', 'conv-row');
         row.type = 'button';
         row.setAttribute('role', 'listitem');
-        const avatar = el('span', 'conv-avatar', (displayNameOf(c.user) || '?').trim().charAt(0) || '?');
-        avatar.setAttribute('aria-hidden', 'true');
-        row.appendChild(avatar);
+        row.appendChild(avatarNode(c.user.avatarUrl, displayNameOf(c.user)));
         const mid = el('span', 'conv-main');
         mid.appendChild(el('span', 'conv-name', displayNameOf(c.user)));
         row.appendChild(mid);
@@ -441,14 +457,25 @@ function renderThread() {
 function messageNode(m) {
     const mine = !!m.mine;
     const wrap = el('div', 'msg' + (mine ? ' msg-mine' : ''));
-    wrap.appendChild(messageBodyNode(m));
+    // آواتار فرستنده (تصمیم F): مخاطب از کانکشن، خودم از session
+    const conv = _conversations.find((c) => c.user.id === _openWith);
+    const ref = mine ? myAvatarRef() : (conv && conv.user.avatarUrl) || null;
+    const who = mine
+        ? displayNameOf(null)
+        : displayNameOf(conv ? conv.user : null);
+    const av = avatarNode(ref, who === '…' ? '?' : who);
+    av.classList.add('msg-avatar');
+    wrap.appendChild(av);
+    const content = el('div', 'msg-content');
+    content.appendChild(messageBodyNode(m));
     const meta = el('div', 'msg-meta');
     try {
         meta.textContent = formatDateTime(m.createdAt) + (m.editedAt ? ' • ' + tr('msg.edited', 'ویرایش‌شده') : '');
     } catch {
         meta.textContent = '';
     }
-    wrap.appendChild(meta);
+    content.appendChild(meta);
+    wrap.appendChild(content);
     if (mine && m.kind === 'text') {
         const more = el('button', 'msg-more', '⋯');
         more.type = 'button';

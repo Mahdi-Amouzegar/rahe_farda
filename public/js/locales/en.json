@@ -152,6 +152,14 @@
     "unavailable": "Location unavailable."
   },
 
+  "avatar": {
+    "title": "Avatar",
+    "change": "Change avatar",
+    "remove": "Remove",
+    "uploadFailed": "Upload failed.",
+    "loginRequired": "Sign in for avatar."
+  },
+
   "grp": {
     "back": "‹ Groups",
     "members": "Members",
@@ -170,7 +178,8 @@
     "delete": "Delete group",
     "deleteConfirm": "Delete this group forever?",
     "removeMember": "Remove",
-    "removeConfirm": "Remove this member from the group?"
+    "removeConfirm": "Remove this member from the group?",
+    "avatar": "Group avatar"
   },
 
   "gtask": {
