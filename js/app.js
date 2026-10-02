@@ -160,6 +160,7 @@ import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
+import { renderBlockedList } from './communication/connections.js';
 import { openGroupsWorkspace } from './communication/groups.js';
 import { initGroupQueue } from './communication/group-queue.js';
 import { initWelcomeWizard } from './welcome-wizard.js';
@@ -997,6 +998,8 @@ function toggleSettings(force) {
         settingsTrapCleanup = trapFocus(settingsModal);
         setTimeout(() => settingsCloseBtn?.focus(), 60);
         updateAccountStatusText();
+        // ⚠️ تصمیم ۲: تازه‌سازی لیست بلاک‌ها هنگام باز شدن تنظیمات
+        renderBlockedList();
     } else {
         settingsTrapCleanup?.();
         settingsTrapCleanup = null;

@@ -8,6 +8,7 @@
 
 import { apiFetch } from '../api.js';
 import { state } from '../core.js';
+import { t as i18nT } from '../i18n.js';
 
 function myId() {
     try {
@@ -163,4 +164,60 @@ export async function searchUsers(query) {
     );
     if (!res.ok) return res;
     return { ok: true, users: (res.data && res.data.users) || [] };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// لیست بلاک‌ها در تنظیمات (تصمیم ۲ کاربر)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function blockDisplayName(b) {
+    const u = (b && b.blockedUser) || {};
+    return u.displayName || u.username || String((b && b.blockedId) || '').slice(0, 8);
+}
+
+/**
+ * رندر لیست کاربران بلاک‌شده در تنظیمات + دکمه‌ی رفع بلاک.
+ * کانتینر: #blockedList (اگر نباشد no-op).
+ */
+export async function renderBlockedList() {
+    const box = document.getElementById('blockedList');
+    if (!box) return;
+    box.replaceChildren();
+    const tr = (key, fallback) => {
+        const v = i18nT(key);
+        return v !== key ? v : fallback;
+    };
+    const res = await listBlocks();
+    if (!res.ok) {
+        const p = document.createElement('p');
+        p.className = 'settings-note';
+        p.textContent = tr('settings.sections.blocks.loadError', '…');
+        box.appendChild(p);
+        return;
+    }
+    if (res.blocks.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'settings-note';
+        p.textContent = tr('settings.sections.blocks.empty', '');
+        box.appendChild(p);
+        return;
+    }
+    for (const b of res.blocks) {
+        const row = document.createElement('div');
+        row.className = 'settings-row';
+        const name = document.createElement('span');
+        name.textContent = blockDisplayName(b);
+        row.appendChild(name);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-small';
+        btn.textContent = tr('conn.unblock', 'رفع بلاک');
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            await unblockUser(b.id);
+            await renderBlockedList();
+        });
+        row.appendChild(btn);
+        box.appendChild(row);
+    }
 }

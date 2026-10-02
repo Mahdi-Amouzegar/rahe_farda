@@ -309,6 +309,12 @@
         "enable": "Enable",
         "test": "Test"
       },
+      "blocks": {
+        "title": "Blocked users",
+        "description": "Previous messages are kept; only sending new messages is blocked.",
+        "empty": "You haven't blocked anyone.",
+        "loadError": "Could not load the list."
+      },
       "advanced": {
         "title": "Professional experience",
         "proMode": "Professional mode (advanced options always available)",
