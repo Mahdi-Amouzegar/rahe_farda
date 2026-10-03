@@ -140,8 +140,8 @@
 
 ### ⏳ در حال انجام / بعدی
 
-- **Phase 9** — حذف حساب (با مدل anonymize)، rate limiting، پاک‌سازی مدیا و audit نهایی
-  (پیش‌نیاز: تصمیم ARCH §۱۶ — پیام خصوصی حذف واقعی، محتوای گروه anonymize، مدیا hard-delete فوری)
+- **Phase 9** — بازسازی پیام/گروه روی مدل وظیفه‌ی واحد (کامپوزر و لیست یکسان در هر سه حالت؛ حذف مدل حبابی)
+- بعد از آن: حذف حساب، rate limiting و audit نهایی (نیازمند تصمیم ARCH §۱۶)
 
 ### 🗓️ برنامه‌ریزی‌شده
 
@@ -260,7 +260,8 @@ git clone https://github.com/Mahdi-Amouzegar/rahe-farda-worker.git
 | ✅ | همگام‌سازی گروه + صف آفلاین |
 | ✅ | UI ارتباطات و گروه (Shell، پیام، گروه) |
 | ✅ | Welcome Wizard + Backup / Restore نسخه ۲ |
-| ⏳ | Account Lifecycle و Security Hardening |
+| ⏳ | بازسازی پیام/گروه روی مدل وظیفه‌ی واحد |
+| 🗓️ | Account Lifecycle و Security Hardening |
 | 🗓️ | Final Security Audit |
 
 ---

@@ -131,8 +131,8 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 
 ### ⏳ In Progress / Next
 
-- **Phase 9** — Account deletion (anonymize model), rate limiting, media cleanup, and final audit
-  (Requires ARCH §16 decision: real-delete DMs, anonymize group content, immediate media hard-delete)
+- **Phase 9** — Unified tasks rebuild (same composer/list/page in all three modes; bubble model removed)
+- After that: account deletion, rate limiting, and final audit (requires ARCH §16 decision)
 
 ### 🗓️ Planned
 
@@ -246,7 +246,8 @@ Status	Milestone
 ✅	Group synchronization + offline queue
 ✅	Communication & group UI
 ✅	Welcome wizard + Backup / restore v2
-⏳	Account lifecycle & security hardening
+⏳	Unified tasks rebuild (same composer/list everywhere)
+🗓️	Account lifecycle & security hardening
 🗓️	Final security audit
 9. Privacy
 Rahe Farda is designed for personal, offline-first use:
