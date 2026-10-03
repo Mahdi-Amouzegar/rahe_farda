@@ -54,7 +54,6 @@ import {
     loadTrash,
     saveTrash,
     findTask,
-    addTask,
     addChild,
     createPlanCustom,
     PLAN_TEMPLATES,
@@ -133,6 +132,7 @@ import {
     showUndoFor,
     resetRenderSignature
 } from './ui.js';
+import { submitTask } from './tasks/composer.js';
 import {
     refreshSavedLocationUI,
     updateLocChip,
@@ -682,8 +682,8 @@ function syncDisclosure() {
 // Event wiring — add task, due, loc, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
-addBtn.addEventListener('click', () => addTask(state.pendingKind));
-input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(state.pendingKind); });
+addBtn.addEventListener('click', () => submitTask(state.pendingKind));
+input.addEventListener('keydown', e => { if (e.key === 'Enter') submitTask(state.pendingKind); });
 
 document.getElementById('dueBtn').addEventListener('click', () => openPicker('add'));
 document.getElementById('dueChips').addEventListener('click', e => {
