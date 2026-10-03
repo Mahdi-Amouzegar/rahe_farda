@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { normalizeDestination, isLocalDestination } from '../js/tasks/destination.js';
-import { ownerIdOf, isMine, canEdit, sideFor, splitTwoState, senderLabel } from '../js/tasks/list.js';
+import { ownerIdOf, isMine, canEdit, sideFor, splitTwoState, senderLabel, taskTitle } from '../js/tasks/list.js';
 
 describe('tasks destination', () => {
     it('پیش‌فرض local است', () => {
@@ -65,6 +65,12 @@ describe('tasks two-state list', () => {
     it('senderLabel نام را ترجیح می‌دهد و هرگز خالی نمی‌ماند', () => {
         expect(senderLabel(other)).toBe('سارا');
         expect(typeof senderLabel({})).toBe('string');
+    });
+    it('taskTitle قرارداد payload مشترک {title}/{text} را می‌خواند', () => {
+        expect(taskTitle({ payload: JSON.stringify({ title: 'خرید نان' }) })).toBe('خرید نان');
+        expect(taskTitle({ payload: { text: 'متن خام' } })).toBe('متن خام');
+        expect(taskTitle({ payload: 'not-json', body: 'جایگزین' })).toBe('جایگزین');
+        expect(taskTitle(null)).toBe('…');
     });
 });
 

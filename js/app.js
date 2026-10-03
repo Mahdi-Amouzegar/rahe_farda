@@ -157,7 +157,7 @@ import { initWorkspace, switchWorkspace } from './navigation/workspace.js';
 import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
-import { openMessagesWorkspace, refreshConversationBadges } from './communication/conversations.js';
+import { openMessagesWorkspace, refreshConversationBadges, openConversation, openConversationMenuFor, startDmPoll } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
 import { openGroupsWorkspace } from './communication/groups.js';
@@ -2415,6 +2415,13 @@ initI18n().then(async () => {
         onLogin: () => openAuthModal(),
         onOpenSettings: () => toggleSettings(true),
         onOpenAccount: () => openAuthModal(),
+        // ⚠️ Phase 9 قدم ۲: نام در دراور → رفتن به گفتگو؛ ⋯ کنار نام → منوی همان سطح
+        onOpenConversation: async (userId) => {
+            if (!switchWorkspace('messages')) return;
+            openMessagesWorkspace();
+            await openConversation(userId);
+        },
+        onConversationMenu: (userId, anchor) => openConversationMenuFor(userId, anchor),
     });
     initHeader({
         onDrawer: (opener) => openDrawer(opener),
@@ -2474,9 +2481,10 @@ initI18n().then(async () => {
     updateHeaderStatus({ immediate: true });
     updateAccountStatusText();
 
-    // ⚠️ فاز ۸ (8.2-A): بج پیام‌های نخوانده (best-effort؛ مهمان = صفر)
+    // ⚠️ فاز ۸ (8.2-A) + فاز ۹ قدم ۲: بج نخوانده‌های DM + شروع polling زنده
     try {
         await refreshConversationBadges();
+        startDmPoll();
     } catch (err) {
         console.warn('[app] refreshConversationBadges failed:', err);
     }

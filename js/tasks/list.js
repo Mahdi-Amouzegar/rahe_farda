@@ -63,6 +63,24 @@ export function splitTwoState(items, myId) {
 }
 
 /**
+ * عنوان نمایشی یک تسک (payload متنی یا JSON با text/title).
+ * قرارداد payload مشترک پیام/گروه: {title} — text هم تحمل می‌شود.
+ */
+export function taskTitle(task) {
+    if (!task || typeof task !== 'object') return '…';
+    try {
+        const p = typeof task.payload === 'string' ? JSON.parse(task.payload) : task.payload;
+        if (p && typeof p === 'object') {
+            const title = String((p.text || p.title) || '').slice(0, 200);
+            if (title) return title;
+        }
+    } catch { /* payload خراب → fallback */ }
+    if (typeof task.text === 'string' && task.text) return String(task.text).slice(0, 200);
+    if (typeof task.body === 'string' && task.body) return String(task.body).slice(0, 200);
+    return '…';
+}
+
+/**
  * نام نمایشی فرستنده برای بج «از: نام» در گروه.
  * هرگز رشته‌ی خام برنمی‌گرداند مگر از خود آبجکت (رندر با textContent).
  */

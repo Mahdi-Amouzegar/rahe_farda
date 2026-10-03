@@ -18,10 +18,20 @@ import { showInfoModal } from '../core.js';
 import { sanitizeTask, saveTask } from '../store.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
+import { isLoggedIn } from '../auth.js';
 import { openMenu } from '../ui/menu.js';
 import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
-import { updateDrawerBadges } from '../navigation/sidebar.js';
+import { updateDrawerBadges, setRecentConversations } from '../navigation/sidebar.js';
+import { sideFor, canEdit, taskTitle } from '../tasks/list.js';
+import {
+    listDmTasks,
+    createDmTask,
+    updateDmTask,
+    deleteDmTask,
+    getDmUnread,
+    markDmRead,
+} from './dm-tasks.js';
 import { getCurrentUser } from '../auth.js';
 import {
     getIncomingRequests,
@@ -45,6 +55,13 @@ let _messages = [];
 let _cursor = null;
 let _hasMore = false;
 let _loading = false;
+// ─── Phase 9 قدم ۲: thread تسک DM (جایگزین حباب متنی) ───
+let _dmTasks = [];
+let _dmCursor = null;
+let _dmHasMore = false;
+let _editingTaskId = null;
+let _pollTimer = null;
+let _lastPollTotal = null;
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -105,17 +122,28 @@ function messagesSection() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * لیست گفتگوها = کانکشن‌های accepted + شمارش نخوانده.
+ * لیست گفتگوها = کانکشن‌های accepted + شمارش نخوانده از cursorهای DM.
+ *
+ * ⚠️ قدم ۲: به‌جای N فراخوانی /api/messages، یک فراخوانی /api/dm/unread.
  */
 export async function listConversations() {
     const res = await apiFetch('/api/connections');
     if (!res.ok) return { ok: false, error: res.error };
     const all = (res.data && res.data.connections) || [];
     const accepted = all.filter((c) => c && c.status === 'accepted');
+    let unreadByPeer = new Map();
+    try {
+        const u = await getDmUnread();
+        if (u.ok) {
+            for (const row of u.unread.byPeer || []) {
+                unreadByPeer.set(String(row.peerId), row.count || 0);
+            }
+        }
+    } catch { /* best-effort: بدون شمارنده */ }
     const conversations = [];
     for (const c of accepted) {
         const other = c.otherUser || { id: c.otherUserId };
-        const unread = await countUnread(other.id);
+        const otherId = String(other.id || c.otherUserId || '');
         conversations.push({
             connectionId: c.id,
             user: {
@@ -124,13 +152,14 @@ export async function listConversations() {
                 displayName: other.displayName || null,
                 avatarUrl: other.avatarUrl || null,
             },
-            unread,
+            unread: unreadByPeer.get(otherId) || 0,
         });
     }
     _conversations = conversations;
     return { ok: true, conversations };
 }
 
+// ⚠️ legacy (مدل حبابی — حذف در قدم ۳): شمارش از /api/messages.
 async function countUnread(otherUserId) {
     try {
         const res = await apiFetch(
@@ -165,17 +194,38 @@ async function markReceivedRead(messages) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * مجموع نخوانده‌ها → بج دراور.
+ * مجموع نخوانده‌های DM → بج دراور + ردیف‌های اخیر دراور.
+ *
+ * ⚠️ قدم ۲: منبع شمارنده /api/dm/unread است (نه /api/messages).
  */
 export async function refreshConversationBadges() {
-    const res = await listConversations();
-    if (!res.ok) {
+    try {
+        const u = await getDmUnread();
+        const total = u.ok ? (u.unread.total || 0) : 0;
+        updateDrawerBadges({ messages: total });
+        pushRecentConversations();
+        return total;
+    } catch {
         updateDrawerBadges({ messages: 0 });
         return 0;
     }
-    const total = res.conversations.reduce((s, c) => s + (c.unread || 0), 0);
-    updateDrawerBadges({ messages: total });
-    return total;
+}
+
+/**
+ * ردیف‌های اخیر دراور (حداکثر ۳، مثل گروه‌های اخیر).
+ * خود نام → باز کردن گفتگو؛ ⋯ کنار نام → منوی همان سطح.
+ */
+export function pushRecentConversations() {
+    try {
+        const rows = (_conversations || []).slice(0, 10).map((c) => ({
+            userId: String((c.user && c.user.id) || ''),
+            name: displayNameOf(c.user),
+            avatarUrl: (c.user && c.user.avatarUrl) || null,
+            unread: c.unread || 0,
+        })).filter((r) => r.userId);
+        rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
+        setRecentConversations(rows.slice(0, 3));
+    } catch { /* best-effort */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -319,6 +369,7 @@ export async function reloadMessagesHome() {
     renderListState('list');
     const total = convRes.conversations.reduce((s, c) => s + (c.unread || 0), 0);
     updateDrawerBadges({ messages: total });
+    pushRecentConversations();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -381,10 +432,16 @@ function showUserProfile(otherUserId) {
     });
 }
 
+/**
+ * thread گفتگو روی تسک‌های DM (Phase 9 قدم ۲ — جایگزین حباب متنی).
+ *
+ * ساختار: سطر عنوان (برگشت + نام + ⋯) + لیست دوحالته + کامپوزر تسک.
+ * ویرایش/حذف فقط تسک خودی (مثل شخصی — §۶.۲).
+ */
 function renderThread() {
     const sec = messagesSection();
     if (!sec) return;
-    const conv = _conversations.find((c) => c.user.id === _openWith);
+    const conv = _conversations.find((c) => String(c.user.id) === String(_openWith));
     const name = conv ? displayNameOf(conv.user) : '…';
     sec.replaceChildren();
 
@@ -393,6 +450,7 @@ function renderThread() {
     back.type = 'button';
     back.addEventListener('click', () => {
         _openWith = null;
+        _editingTaskId = null;
         openMessagesWorkspace();
     });
     head.appendChild(back);
@@ -406,34 +464,33 @@ function renderThread() {
 
     const box = el('div', 'conv-box');
     box.id = 'convBox';
-    // پیام‌ها قدیمی‌تر اول (API نزولی برمی‌گرداند)
-    for (const m of [..._messages].reverse()) {
-        box.appendChild(messageNode(m));
+    const me = myId();
+    // API نزولی برمی‌گرداند → قدیمی‌تر اول
+    for (const t of [..._dmTasks].reverse()) {
+        box.appendChild(dmTaskNode(t, me, conv));
+    }
+    if (_dmTasks.length === 0) {
+        box.appendChild(el('p', null, tr('dm.empty', 'تسکی نیست.')));
     }
     sec.appendChild(box);
 
-    if (_hasMore) {
-        const more = el('button', 'conv-more', tr('msg.loadMore', 'پیام‌های قدیمی‌تر'));
+    if (_dmHasMore) {
+        const more = el('button', 'conv-more', tr('msg.loadMore', 'قدیمی‌ترها'));
         more.type = 'button';
-        more.addEventListener('click', () => loadMoreConversation());
+        more.addEventListener('click', () => loadMoreDm());
         sec.appendChild(more);
     }
 
     const composer = el('div', 'conv-composer');
     const input = el('input', 'conv-input');
-    input.id = 'convInput';
-    input.setAttribute('placeholder', tr('msg.placeholder', '…'));
-    input.setAttribute('maxlength', '2000');
+    input.id = 'dmTaskInput';
+    input.setAttribute('placeholder', tr('dm.taskPlaceholder', 'تسک تازه…'));
+    input.setAttribute('maxlength', '500');
     input.setAttribute('autocomplete', 'off');
-    const locBtn = el('button', 'conv-loc', '📍');
-    locBtn.type = 'button';
-    locBtn.setAttribute('aria-label', tr('loc.sendCurrent', 'ارسال موقعیت فعلی'));
-    locBtn.title = tr('loc.sendCurrent', 'ارسال موقعیت فعلی');
     const send = el('button', 'conv-send', tr('msg.send', '➤'));
     send.type = 'button';
-    const doSend = () => sendCurrentText();
+    const doSend = () => submitDmTask();
     send.addEventListener('click', doSend);
-    locBtn.addEventListener('click', () => sendCurrentLocation(locBtn));
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -443,15 +500,150 @@ function renderThread() {
     if (!isOnline()) {
         input.disabled = true;
         send.disabled = true;
-        locBtn.disabled = true;
     }
     composer.appendChild(input);
-    composer.appendChild(locBtn);
     composer.appendChild(send);
     sec.appendChild(composer);
 
     box.scrollTop = box.scrollHeight;
-    initLocationPreviews(box);
+}
+
+/**
+ * یک ردیف تسک DM: سمت خودی/مخاطب + آواتار + عنوان + ⋯ خودی.
+ */
+function dmTaskNode(t, me, conv) {
+    const mine = sideFor(t, me) === 'self';
+    const wrap = el('div', 'msg msg-task' + (mine ? ' msg-mine' : ' msg-other'));
+    const otherUser = conv ? conv.user : null;
+    const ref = mine ? myAvatarRef() : (otherUser && otherUser.avatarUrl) || null;
+    const who = mine ? displayNameOf(null) : displayNameOf(otherUser);
+    const av = avatarNode(ref, who === '…' ? '?' : who);
+    av.classList.add('msg-avatar');
+    wrap.appendChild(av);
+    const content = el('div', 'msg-content');
+    content.appendChild(el('div', 'msg-body', taskTitle(t)));
+    const meta = el('div', 'msg-meta');
+    try {
+        const edited = t.updatedAt && t.createdAt && t.updatedAt !== t.createdAt;
+        meta.textContent = formatDateTime(t.createdAt) + (edited ? ' • ' + tr('msg.edited', 'ویرایش‌شده') : '');
+    } catch {
+        meta.textContent = '';
+    }
+    content.appendChild(meta);
+    wrap.appendChild(content);
+    if (mine && canEdit(t, me)) {
+        const more = el('button', 'msg-more', '⋯');
+        more.type = 'button';
+        more.setAttribute('aria-label', tr('msg.moreAria', 'گزینه‌ها'));
+        more.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openMenu({
+                anchor: more,
+                items: [
+                    { id: 'edit', label: tr('msg.edit', 'ویرایش') },
+                    { id: 'delete', label: tr('msg.delete', 'حذف'), danger: true },
+                ],
+                onSelect: (id) => {
+                    if (id === 'edit') startDmEdit(t);
+                    else if (id === 'delete') removeDmTask(t.id);
+                },
+            });
+        });
+        wrap.appendChild(more);
+    }
+    return wrap;
+}
+
+function startDmEdit(t) {
+    const input = document.getElementById('dmTaskInput');
+    if (!input) return;
+    _editingTaskId = t.id;
+    input.value = taskTitle(t) === '…' ? '' : taskTitle(t);
+    input.focus();
+}
+
+/**
+ * ارسال کامپوزر: ساخت تسک تازه یا ثبت ویرایش.
+ */
+export async function submitDmTask() {
+    const input = document.getElementById('dmTaskInput');
+    if (!input || _loading || !_openWith) return;
+    const title = input.value.trim().slice(0, 500);
+    if (!title) return;
+    _loading = true;
+    let res;
+    try {
+        if (_editingTaskId) {
+            res = await updateDmTask(_editingTaskId, title);
+        } else {
+            res = await createDmTask(_openWith, title);
+        }
+    } finally {
+        _loading = false;
+    }
+    if (!res.ok) {
+        input.setAttribute('aria-invalid', 'true');
+        input.title = apiErrorMessage(res.error);
+        return;
+    }
+    input.value = '';
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('title');
+    _editingTaskId = null;
+    await openConversation(_openWith);
+}
+
+export async function removeDmTask(taskId) {
+    const res = await deleteDmTask(taskId);
+    if (!res.ok) return false;
+    _dmTasks = _dmTasks.filter((t) => t.id !== taskId);
+    renderThread();
+    return true;
+}
+
+/**
+ * باز کردن گفتگو روی تسک‌های DM + ثبت خواندن + تازه‌سازی بج.
+ */
+export async function openConversation(userId) {
+    _openWith = userId;
+    _dmTasks = [];
+    _dmCursor = null;
+    _dmHasMore = false;
+    _editingTaskId = null;
+    renderThread();
+    if (!isOnline()) return;
+    _loading = true;
+    let res;
+    try {
+        res = await listDmTasks(userId, null);
+    } finally {
+        _loading = false;
+    }
+    if (!res.ok) return;
+    _dmTasks = res.tasks || [];
+    _dmCursor = res.nextCursor || null;
+    _dmHasMore = !!res.hasMore;
+    renderThread();
+    try {
+        await markDmRead(userId);
+        await refreshConversationBadges();
+    } catch { /* best-effort */ }
+}
+
+export async function loadMoreDm() {
+    if (!_openWith || !_dmHasMore || _loading || !_dmCursor) return;
+    _loading = true;
+    let res;
+    try {
+        res = await listDmTasks(_openWith, _dmCursor);
+    } finally {
+        _loading = false;
+    }
+    if (!res.ok) return;
+    _dmTasks = _dmTasks.concat(res.tasks || []);
+    _dmCursor = res.nextCursor || null;
+    _dmHasMore = !!res.hasMore;
+    renderThread();
 }
 
 function messageNode(m) {
@@ -730,31 +922,7 @@ export async function sendCurrentLocation(btn) {
     await openConversation(_openWith);
 }
 
-export async function openConversation(userId) {
-    _openWith = userId;
-    _messages = [];
-    _cursor = null;
-    _hasMore = false;
-    renderThread();
-    if (!isOnline()) return;
-    _loading = true;
-    const res = await fetchPage(userId, null);
-    _loading = false;
-    if (!res.ok) return;
-    _messages = ((res.data && res.data.messages) || []).map((m) => ({
-        ...m,
-        mine: isMine(m, userId),
-    }));
-    _cursor = res.data.nextCursor || null;
-    _hasMore = !!res.data.hasMore;
-    renderThread();
-    const received = _messages.filter((m) => !m.mine && !m.readAt);
-    if (received.length > 0) {
-        await markReceivedRead(received);
-        refreshConversationBadges();
-    }
-}
-
+// ⚠️ legacy (مدل حبابی — حذف در قدم ۳؛ backup-v2 از fetchFullThread استفاده می‌کند).
 export async function loadMoreConversation() {
     if (!_openWith || !_hasMore || _loading || !_cursor) return;
     _loading = true;
@@ -840,6 +1008,91 @@ export async function submitEdit(messageId, body) {
     return res;
 }
 
+/**
+ * منوی ⋯ یک مخاطب برای استفاده‌ی دراور (همان منوی سطر عنوان).
+ */
+export function openConversationMenuFor(otherUserId, anchor) {
+    return openConversationMenu(otherUserId, anchor);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Toast زنده‌ی DM (Phase 9 قدم ۲ — §۱۳.۲)
+//
+// polling سبک /api/dm/unread (بدون WebSocket). با بیشتر شدن total نسبت به
+// baseline، یک toast درون‌برنامه‌ای + تازه‌سازی بج. یادآورهای زمانی تسک‌ها
+// در موتور reminder موجود می‌مانند (دست‌نخورده).
+// ═══════════════════════════════════════════════════════════════════════════
+
+const POLL_MS = 20000;
+let _toastTimer = null;
+
+function showDmToast(text) {
+    try {
+        const bar = document.getElementById('photoSnackbar');
+        const msgEl = document.getElementById('photoSnackbarMsg');
+        if (!bar || !msgEl) return;
+        msgEl.textContent = text;
+        bar.classList.add('show');
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(() => bar.classList.remove('show'), 5000);
+    } catch { /* silent */ }
+}
+
+function nameOfPeer(peerId) {
+    const conv = (_conversations || []).find((c) => String(c.user && c.user.id) === String(peerId));
+    return conv ? displayNameOf(conv.user) : String(peerId).slice(0, 8);
+}
+
+async function pollDmOnce() {
+    if (!isLoggedIn()) return;
+    if (!isOnline()) return;
+    let u;
+    try {
+        u = await getDmUnread();
+    } catch {
+        return;
+    }
+    if (!u.ok) return;
+    const total = u.unread.total || 0;
+    if (_lastPollTotal === null) {
+        _lastPollTotal = total;
+        updateDrawerBadges({ messages: total });
+        return;
+    }
+    if (total > _lastPollTotal) {
+        const top = (u.unread.byPeer || []).slice().sort((a, b) => (b.count || 0) - (a.count || 0))[0];
+        const who = top ? nameOfPeer(top.peerId) : '…';
+        showDmToast(i18nT('dm.toast', { name: who }));
+        try {
+            const res = await listConversations();
+            if (res.ok) pushRecentConversations();
+        } catch { /* best-effort */ }
+    }
+    _lastPollTotal = total;
+    updateDrawerBadges({ messages: total });
+}
+
+/**
+ * شروع polling (idempotent؛ بعد از boot صدا زده می‌شود).
+ */
+export function startDmPoll() {
+    if (_pollTimer) return;
+    _pollTimer = setInterval(() => {
+        pollDmOnce().catch(() => {});
+    }, POLL_MS);
+    if (typeof _pollTimer.unref === 'function') {
+        try { _pollTimer.unref(); } catch { /* silent */ }
+    }
+}
+
+export function stopDmPoll() {
+    if (_pollTimer) {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+    }
+    _lastPollTotal = null;
+}
+
 // ⚠️ فقط برای تست
 export function __resetConversationsForTest() {
     _conversations = [];
@@ -849,7 +1102,12 @@ export function __resetConversationsForTest() {
     _cursor = null;
     _hasMore = false;
     _loading = false;
+    _dmTasks = [];
+    _dmCursor = null;
+    _dmHasMore = false;
+    _editingTaskId = null;
+    stopDmPoll();
 }
 export function __getStateForTest() {
-    return { conversations: _conversations, openWith: _openWith, messages: _messages };
+    return { conversations: _conversations, openWith: _openWith, messages: _messages, dmTasks: _dmTasks };
 }

@@ -24,6 +24,7 @@ let _closeTimer = null;
 const _ANIM_MS = 260;
 const _badges = { messages: 0, groups: 0, notifications: 0 };
 let _recentGroups = [];
+let _recentConversations = [];
 
 function drawerRoot() {
     return document.getElementById('drawerRoot');
@@ -144,6 +145,39 @@ function renderDrawer() {
                 aside.appendChild(b);
             }
         }
+
+        // ─── Phase 9 قدم ۲: پیام‌های اخیر — نام + عدد نخوانده + ⋯ ───
+        // کلیک روی نام → رفتن به گفتگو؛ ⋯ → مدیریت همان سطح.
+        if (_recentConversations.length > 0) {
+            aside.appendChild(el('div', 'drawer-section', i18nT('nav.recentMessages') !== 'nav.recentMessages' ? i18nT('nav.recentMessages') : 'پیام‌های اخیر'));
+            for (const r of _recentConversations.slice(0, 3)) {
+                const row = el('div', 'drawer-item drawer-recent');
+                const b = el('button', 'drawer-item-label-btn');
+                b.type = 'button';
+                b.appendChild(avatarNode(r.avatarUrl, r.name));
+                b.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
+                b.addEventListener('click', () => {
+                    closeDrawer();
+                    if (_opts && typeof _opts.onOpenConversation === 'function') _opts.onOpenConversation(r.userId);
+                    else switchWorkspace('messages');
+                });
+                row.appendChild(b);
+                const badge = el('span', 'drawer-badge');
+                row.appendChild(badge);
+                setBadge(badge, r.unread || 0);
+                const more = el('button', 'drawer-more', '⋯');
+                more.type = 'button';
+                more.setAttribute('aria-label', '⋯');
+                more.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (_opts && typeof _opts.onConversationMenu === 'function') {
+                        _opts.onConversationMenu(r.userId, more);
+                    }
+                });
+                row.appendChild(more);
+                aside.appendChild(row);
+            }
+        }
     }
 
     const sep2 = el('div', 'drawer-sep');
@@ -238,6 +272,14 @@ export function setRecentGroups(list) {
 }
 
 /**
+ * ست کردن گفتگوهای اخیر (حداکثر ۳ — با عدد نخوانده).
+ * ردیف‌ها: { userId, name, avatarUrl, unread } (نام از قبل محاسبه شده — بدون import چرخه‌ای).
+ */
+export function setRecentConversations(list) {
+    _recentConversations = Array.isArray(list) ? list.slice(0, 10) : [];
+}
+
+/**
  * راه‌اندازی (idempotent).
  */
 export function initSidebar(opts) {
@@ -270,4 +312,5 @@ export function __resetSidebarForTest() {
     _badges.groups = 0;
     _badges.notifications = 0;
     _recentGroups = [];
+    _recentConversations = [];
 }

@@ -75,6 +75,7 @@
     "groups": "👥 Groups",
     "notifications": "🔔 Notifications",
     "recentGroups": "Recent groups",
+    "recentMessages": "Recent messages",
     "settings": "⚙ Settings",
     "account": "👤 My account",
     "login": "🔐 Log in / Sign up",
@@ -114,6 +115,12 @@
     "edited": "edited",
     "moreAria": "Message options",
     "offline": "You are offline — connect to see messages."
+  },
+
+  "dm": {
+    "taskPlaceholder": "New task…",
+    "empty": "No tasks yet — create the first one.",
+    "toast": "New task from {name}"
   },
 
   "conn": {

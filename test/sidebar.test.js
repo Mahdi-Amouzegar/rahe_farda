@@ -21,6 +21,7 @@ import {
     isDrawerOpen,
     updateDrawerBadges,
     setRecentGroups,
+    setRecentConversations,
     __resetSidebarForTest,
 } from '../js/navigation/sidebar.js';
 
@@ -130,5 +131,27 @@ describe('sidebar — logged in', () => {
         openDrawer();
         const msgBtn = document.querySelector('#drawer [data-workspace="messages"] .drawer-badge');
         expect(msgBtn.hidden).toBe(false);
+    });
+
+    it('گفتگوهای اخیر: نام + بج نخوانده + ⋯ (حداکثر ۳)', () => {
+        setRecentConversations([
+            { userId: 'u2', name: 'سارا', avatarUrl: null, unread: 2 },
+            { userId: 'u3', name: 'رضا', avatarUrl: null, unread: 0 },
+        ]);
+        const opened = [];
+        const menus = [];
+        initSidebar({
+            onOpenConversation: (id) => opened.push(id),
+            onConversationMenu: (id) => menus.push(id),
+        });
+        openDrawer();
+        const rows = [...document.querySelectorAll('#drawer .drawer-recent')];
+        expect(rows.length).toBe(2);
+        const badge = rows[0].querySelector('.drawer-badge');
+        expect(badge.hidden).toBe(false);
+        rows[0].querySelector('.drawer-more').click();
+        expect(menus).toEqual(['u2']);
+        rows[0].querySelector('.drawer-item-label-btn').click();
+        expect(opened).toEqual(['u2']);
     });
 });
