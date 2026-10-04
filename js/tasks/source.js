@@ -8,6 +8,7 @@
 
 import { apiFetch } from '../api.js';
 import { state } from '../core.js';
+import { events, EV } from '../events.js';
 import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { getDestination } from './destination.js';
@@ -188,15 +189,24 @@ function stripShared(item) {
 }
 
 async function writeSharedTask(dest, remoteId, taskObj) {
-    if (dest.type === 'peer') {
-        return updateDmTask(remoteId, taskObj);
-    }
-    if (dest.type === 'group') {
-        await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: taskObj });
-        try {
-            await flushGroup(dest.groupId);
-        } catch { /* آفلاین */ }
-        return { ok: true };
+    try {
+        if (dest.type === 'peer') {
+            return updateDmTask(remoteId, taskObj);
+        }
+        if (dest.type === 'group') {
+            await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: taskObj });
+            let failed = 0;
+            try {
+                const fr = await flushGroup(dest.groupId);
+                failed = (fr && fr.failed) || 0;
+            } catch {
+                failed = 0; // آفلاین/transport: در صف می‌ماند، خطا نیست
+            }
+            if (failed > 0) return { ok: false, code: 'FLUSH_FAILED' };
+            return { ok: true };
+        }
+    } catch {
+        return { ok: false };
     }
     return { ok: false };
 }
@@ -275,6 +285,31 @@ export function setDetailBridge(item) {
 export function clearDetailBridge() {
     _detailBridge = null;
 }
+
+let _reconcileSubscribed = false;
+
+function ensureReconcileSubscribed() {
+    if (_reconcileSubscribed) return;
+    _reconcileSubscribed = true;
+    // بعد از بستن جزئیات مشترک: تطبیق با حقیقت سرور (اگر PATCH شکست خورده بود، لیست اصلاح می‌شود)
+    events.on(EV.DETAIL_CLOSED, async () => {
+        if (!_detailBridge) return;
+        const hadBridge = _detailBridge;
+        _detailBridge = null;
+        if (!hadBridge || !hadBridge._shared) return;
+        try {
+            const dest = getDestination();
+            const sameDest = dest.type !== 'local' &&
+                String((dest.peerId || dest.groupId || '')) ===
+                String((hadBridge._shared.dest.peerId || hadBridge._shared.dest.groupId || ''));
+            if (!sameDest) return;
+            await refreshSharedList();
+            const { render } = await import('../ui.js');
+            render();
+        } catch { /* best-effort */ }
+    });
+}
+ensureReconcileSubscribed();
 
 /**
  * آبجکت پل اگر id همان جزئیات باز باشد، وگرنه null.

@@ -1366,7 +1366,8 @@
     "refreshFailed": "Failed to refresh token",
     "loginFailed": "Login failed",
     "payloadInvalid": "Invalid payload",
-    "signatureMissing": "Telegram signature not found"
+    "signatureMissing": "Telegram signature not found",
+    "saveFailed": "Save failed — try again"
   },
 
   "warnings": {

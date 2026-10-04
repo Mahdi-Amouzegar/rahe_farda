@@ -1365,7 +1365,8 @@
     "refreshFailed": "خطا در تازه‌سازی توکن",
     "loginFailed": "خطا در ورود",
     "payloadInvalid": "payload نامعتبر است",
-    "signatureMissing": "امضای Telegram یافت نشد"
+    "signatureMissing": "امضای Telegram یافت نشد",
+    "saveFailed": "ذخیره ناموفق بود — دوباره تلاش کنید"
   },
 
   "warnings": {

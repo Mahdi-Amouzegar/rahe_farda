@@ -22,7 +22,9 @@ import {
 import { createDmTask, markDmRead, getDmUnread } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
-import { apiFetch } from '../api.js';
+import { apiFetch, apiErrorMessage } from '../api.js';
+import { showToast } from '../ui.js';
+import { t as i18nT } from '../i18n.js';
 
 export {
     refreshSharedList,
@@ -46,20 +48,23 @@ export async function submitTask(kind) {
     if (dest.type === 'peer') {
         const res = await createDmTask(dest.peerId, task);
         if (!res.ok) {
+            const msg = apiErrorMessage(res.error);
             const input = document.getElementById('taskInput');
             if (input) {
                 input.setAttribute('aria-invalid', 'true');
-                try {
-                    const { apiErrorMessage } = await import('../api.js');
-                    input.title = apiErrorMessage(res.error);
-                } catch { /* silent */ }
+                input.title = msg;
             }
+            showToast(msg);
             return res;
         }
     } else if (dest.type === 'group') {
         await enqueueGroupOp(dest.groupId, 'save', task.id, { kind: 'task', payload: task });
         try {
-            await flushGroup(dest.groupId);
+            const fr = await flushGroup(dest.groupId);
+            if (fr && fr.failed > 0) {
+                showToast(i18nT('errors.saveFailed'));
+                return { ok: false };
+            }
         } catch { /* آفلاین: pending می‌ماند */ }
     }
     resetComposerForm();

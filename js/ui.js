@@ -857,6 +857,23 @@ export function hideSnackbar() {
     if (bar) bar.classList.remove('show');
 }
 
+let _toastTimer = null;
+
+/**
+ * toast اطلاع‌رسانی درون‌برنامه‌ای (بدون دکمه — برای خطاها و رویدادها).
+ */
+export function showToast(text, durationMs) {
+    try {
+        const bar = document.getElementById('photoSnackbar');
+        const msgEl = document.getElementById('photoSnackbarMsg');
+        if (!bar || !msgEl) return;
+        msgEl.textContent = String(text || '');
+        bar.classList.add('show');
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(() => bar.classList.remove('show'), durationMs || 5000);
+    } catch { /* silent */ }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // رندر اصلی — با diffing
 // ═══════════════════════════════════════════════════════════════════════════

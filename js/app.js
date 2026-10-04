@@ -130,6 +130,7 @@ import {
     commitEdit,
     cancelEdit,
     showUndoFor,
+    showToast,
     resetRenderSignature
 } from './ui.js';
 
@@ -2088,16 +2089,23 @@ taskList.addEventListener('click', e => {
             return;
         }
         if (action === 'toggle') {
-            toggleSharedTask(id).then(() => refreshSharedList().then(() => render()));
+            toggleSharedTask(id).then((res) => {
+                if (res && !res.ok) showToast(t('errors.saveFailed'));
+                refreshSharedList().then(() => render());
+            });
             return;
         }
         if (action === 'delete') {
-            deleteSharedTask(id).then(() => refreshSharedList().then(() => render()));
+            deleteSharedTask(id).then((res) => {
+                if (res && !res.ok) showToast(t('errors.saveFailed'));
+                refreshSharedList().then(() => render());
+            });
             return;
         }
         if (action === 'edit-ok') {
             const inp = scopeEl.querySelector('.task-edit-input');
-            updateSharedTaskText(id, inp ? inp.value : '').then(() => {
+            updateSharedTaskText(id, inp ? inp.value : '').then((res) => {
+                if (res && !res.ok) showToast(t('errors.saveFailed'));
                 state.editingId = null;
                 refreshSharedList().then(() => render());
             });
