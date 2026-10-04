@@ -32,7 +32,7 @@ vi.mock('../js/detail.js', async () => ({
 }));
 
 import { state } from '../js/core.js';
-import { findTask, saveTask } from '../js/store.js';
+import { findTask, saveTask, saveTasks } from '../js/store.js';
 import {
     setDetailBridge,
     clearDetailBridge,
@@ -116,8 +116,7 @@ describe('detail bridge — save routing', () => {
     });
 });
 
-describe('detail bridge — openSharedDetail', () => {
-    it('خودی: پل ست + openDetail صدا زده می‌شود', async () => {
+describe('detail bridge — openSharedDetail', () => {    it('خودی: پل ست + openDetail صدا زده می‌شود', async () => {
         seedBridge(mine);
         const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
         __setSharedItemsForTest([mine]);
@@ -134,5 +133,25 @@ describe('detail bridge — openSharedDetail', () => {
         state.currentDetailId = null;
         expect(await openSharedDetail('d1')).toBe(false);
         expect(detailCalls).toEqual([]);
+    });
+});
+
+describe('detail bridge — bulk save (مسیر واقعی جزئیات)', () => {
+    it('saveTasks گروهی هم پل را به PATCH ریموت می‌برد', async () => {
+        seedBridge(mine);
+        const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
+        __setSharedItemsForTest([mine]);
+        state.currentDetailId = 'd2';
+        expect(setDetailBridge(mine)).toBe(true);
+        mine.text = 'از جزئیات';
+        await saveTasks();
+        // صبر برای persist آتش‌وبگذار
+        await new Promise((r) => setTimeout(r, 20));
+        const patches = apiCalls.filter(
+            (c) => c.path === '/api/dm/tasks/d2' && c.opts && c.opts.method === 'PATCH'
+        );
+        expect(patches.length).toBe(1);
+        expect(patches[0].opts.body.payload.text).toBe('از جزئیات');
+        state.currentDetailId = null;
     });
 });

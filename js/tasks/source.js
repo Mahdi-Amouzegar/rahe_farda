@@ -218,7 +218,29 @@ export async function saveSharedTask(task) {
     if (!task || !task._shared || !task._shared.mine || !task._shared.dest) {
         return { ok: false };
     }
-    return writeSharedTask(task._shared.dest, task.id, stripShared(task));
+    const gen = ++_sharedSaveGen;
+    _inflightSharedSave = (async () => {
+        try {
+            return await writeSharedTask(task._shared.dest, task.id, stripShared(task));
+        } catch {
+            return { ok: false };
+        }
+    })();
+    try {
+        return await _inflightSharedSave;
+    } finally {
+        if (gen === _sharedSaveGen) _inflightSharedSave = null;
+    }
+}
+
+let _inflightSharedSave = null;
+let _sharedSaveGen = 0;
+
+/**
+ * انتظار برای ذخیره‌های مشترک در حال پرواز (برای تطبیق بعد از بستن جزئیات).
+ */
+export function waitSharedSaves() {
+    return _inflightSharedSave || Promise.resolve();
 }
 
 /**
@@ -292,6 +314,7 @@ function ensureReconcileSubscribed() {
     if (_reconcileSubscribed) return;
     _reconcileSubscribed = true;
     // بعد از بستن جزئیات مشترک: تطبیق با حقیقت سرور (اگر PATCH شکست خورده بود، لیست اصلاح می‌شود)
+    // بعد از بستن جزئیات مشترک: اول ذخیره‌های در حال پرواز، بعد تطبیق با حقیقت سرور
     events.on(EV.DETAIL_CLOSED, async () => {
         if (!_detailBridge) return;
         const hadBridge = _detailBridge;
@@ -303,6 +326,7 @@ function ensureReconcileSubscribed() {
                 String((dest.peerId || dest.groupId || '')) ===
                 String((hadBridge._shared.dest.peerId || hadBridge._shared.dest.groupId || ''));
             if (!sameDest) return;
+            await waitSharedSaves();
             await refreshSharedList();
             const { render } = await import('../ui.js');
             render();

@@ -682,6 +682,22 @@ export function saveTasks() {
             message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
         });
     });
+    // پل جزئیات مشترک: ذخیره‌سازهای bulk جزئیات (عنوان/توضیح/تلفن/...) باید به API مقصد بروند.
+    // بدون این، ویرایش فقط روی آبجکت زنده دیده می‌شود و با رفرش برمی‌گردد.
+    try {
+        const bridge = state.currentDetailId ? getDetailBridgeTask(state.currentDetailId) : null;
+        if (bridge) {
+            persistSharedTask(bridge).then(async (res) => {
+                if (res && !res.ok) {
+                    const [{ showToast }, { t }] = await Promise.all([
+                        import('./ui.js'),
+                        import('./i18n.js'),
+                    ]);
+                    showToast(t('errors.saveFailed'));
+                }
+            }).catch(() => {});
+        }
+    } catch { /* silent */ }
     return p;
 }
 
