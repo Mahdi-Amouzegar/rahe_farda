@@ -224,6 +224,7 @@ function renderDrawer() {
 
 /**
  * باز کردن دراور (رندر تازه در هر بازشدن + ورود نرم با کلاس open).
+ * بعد از رندر، هوک onDrawerOpened (تازه‌سازی پس‌زمینه‌ی لیست‌ها) صدا زده می‌شود.
  */
 export function openDrawer(opener) {
     const root = drawerRoot();
@@ -245,6 +246,20 @@ export function openDrawer(opener) {
         const first = drawerEl().querySelector('button');
         if (first) first.focus();
     } catch { /* silent */ }
+    // تازه‌سازی پس‌زمینه‌ی لیست‌ها (خودترمیمی اگر boot-preload جا مانده باشد)
+    try {
+        if (_opts && typeof _opts.onDrawerOpened === 'function') {
+            const r = _opts.onDrawerOpened();
+            if (r && typeof r.catch === 'function') r.catch(() => {});
+        }
+    } catch { /* silent */ }
+}
+
+/**
+ * رندر دوباره‌ی دراور اگر باز است (بعد از تازه‌سازی پس‌زمینه).
+ */
+export function rerenderDrawer() {
+    if (isDrawerOpen()) renderDrawer();
 }
 
 /**

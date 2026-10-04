@@ -146,6 +146,23 @@ async function preloadDrawerLists() {
         await refreshGroupBadges().catch(() => {});
     } catch { /* best-effort */ }
 }
+
+let _drawerRefreshAt = 0;
+const DRAWER_REFRESH_MS = 60000;
+
+/**
+ * تازه‌سازی لیست‌های دراور هنگام باز شدن (خودترمیمی + throttle).
+ */
+async function refreshDrawerListsThrottled() {
+    try {
+        const now = Date.now();
+        if (now - _drawerRefreshAt < DRAWER_REFRESH_MS) return;
+        _drawerRefreshAt = now;
+        if (!isLoggedIn()) return;
+        await preloadDrawerLists();
+        rerenderDrawer();
+    } catch { /* best-effort */ }
+}
 function applyDestinationLabel() {
     try {
         const el = document.getElementById('headerContext');
@@ -209,7 +226,7 @@ import { events, EV } from './events.js';
 
 // ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
 import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation/workspace.js';
-import { initSidebar, openDrawer } from './navigation/sidebar.js';
+import { initSidebar, openDrawer, rerenderDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations } from './communication/conversations.js';
@@ -2540,6 +2557,7 @@ initI18n().then(async () => {
     // ⚠️ فاز ۸ (T3/T4): راه‌اندازی Shell — Workspace + Drawer + Header + گیت ورود
     initWorkspace();
     initSidebar({
+        onDrawerOpened: () => refreshDrawerListsThrottled(),
         onNavigate: (ws) => {
             if (!switchWorkspace(ws)) return;
             // ⚠️ تک‌صفحه: ورود به وظایف = مقصد محلی

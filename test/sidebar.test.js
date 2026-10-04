@@ -22,6 +22,7 @@ import {
     updateDrawerBadges,
     setRecentGroups,
     setRecentConversations,
+    rerenderDrawer,
     __resetSidebarForTest,
 } from '../js/navigation/sidebar.js';
 
@@ -109,6 +110,21 @@ describe('sidebar — logged in', () => {
         expect(menus).toEqual(['g1']);
         rows[0].querySelector('.drawer-item-label-btn').click();
         expect(opened).toEqual(['g1']);
+    });
+
+    it('باز شدن دراور هوک onDrawerOpened را صدا می‌زند (خودترمیمی)', () => {
+        let called = 0;
+        initSidebar({ onDrawerOpened: () => { called += 1; } });
+        openDrawer();
+        expect(called).toBe(1);
+    });
+
+    it('rerenderDrawer دراور باز را تازه می‌کند', () => {
+        openDrawer();
+        setRecentGroups([{ id: 'g1', name: 'سفر', avatarUrl: null, unread: 0 }]);
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(0);
+        rerenderDrawer();
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
     });
 
     it('کلیک مقصد، onNavigate را صدا می‌زند و می‌بندد', () => {
