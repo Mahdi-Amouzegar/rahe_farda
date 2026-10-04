@@ -13,9 +13,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
-import { state, escapeHtml, uid } from '../core.js';
+import { state, escapeHtml } from '../core.js';
 import { showInfoModal } from '../core.js';
-import { sanitizeTask, saveTask } from '../store.js';
 import { t as i18nT, formatDateTime } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { isLoggedIn } from '../auth.js';
@@ -51,11 +50,8 @@ const PAGE_LIMIT = 30;
 let _conversations = [];
 let _incoming = [];
 let _openWith = null;
-let _messages = [];
-let _cursor = null;
-let _hasMore = false;
 let _loading = false;
-// ─── Phase 9 قدم ۲: thread تسک DM (جایگزین حباب متنی) ───
+// ─── Phase 9: thread تسک DM ───
 let _dmTasks = [];
 let _dmCursor = null;
 let _dmHasMore = false;
@@ -76,7 +72,7 @@ function tr(key, fallback) {
 }
 
 export /**
- * آواتار خودم (از پروفایل session) — برای حباب‌های خودی.
+ * آواتار خودم (از پروفایل session) — برای ردیف‌های خودی.
  */
 function myAvatarRef() {
     try {
@@ -105,12 +101,6 @@ function myId() {
     } catch {
         return null;
     }
-}
-
-function isMine(m, otherUserId) {
-    const me = myId();
-    if (me) return m.senderId === me;
-    return m.senderId !== otherUserId;
 }
 
 function messagesSection() {
@@ -159,20 +149,7 @@ export async function listConversations() {
     return { ok: true, conversations };
 }
 
-// ⚠️ legacy (مدل حبابی — حذف در قدم ۳): شمارش از /api/messages.
-async function countUnread(otherUserId) {
-    try {
-        const res = await apiFetch(
-            '/api/messages?with=' + encodeURIComponent(otherUserId) + '&limit=50'
-        );
-        if (!res.ok) return 0;
-        return ((res.data && res.data.messages) || []).filter(
-            (m) => m && !m.readAt && !isMine(m, otherUserId)
-        ).length;
-    } catch {
-        return 0;
-    }
-}
+// (countUnread حبابی حذف شد — قدم ۳ §۱۳.۱)
 
 async function fetchPage(otherUserId, cursor) {
     let path = '/api/messages?with=' + encodeURIComponent(otherUserId) + '&limit=' + PAGE_LIMIT;
@@ -180,14 +157,7 @@ async function fetchPage(otherUserId, cursor) {
     return apiFetch(path);
 }
 
-async function markReceivedRead(messages) {
-    for (const m of messages) {
-        if (!m || !m.id) continue;
-        try {
-            await apiFetch('/api/messages/' + encodeURIComponent(m.id) + '/read', { method: 'PATCH' });
-        } catch { /* best-effort */ }
-    }
-}
+// (markReceivedRead حبابی حذف شد — قدم ۳ §۱۳.۱؛ خواندن DM از markDmRead است)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Badges
@@ -646,298 +616,18 @@ export async function loadMoreDm() {
     renderThread();
 }
 
-function messageNode(m) {
-    const mine = !!m.mine;
-    const wrap = el('div', 'msg' + (mine ? ' msg-mine' : ''));
-    // آواتار فرستنده (تصمیم F): مخاطب از کانکشن، خودم از session
-    const conv = _conversations.find((c) => c.user.id === _openWith);
-    const ref = mine ? myAvatarRef() : (conv && conv.user.avatarUrl) || null;
-    const who = mine
-        ? displayNameOf(null)
-        : displayNameOf(conv ? conv.user : null);
-    const av = avatarNode(ref, who === '…' ? '?' : who);
-    av.classList.add('msg-avatar');
-    wrap.appendChild(av);
-    const content = el('div', 'msg-content');
-    content.appendChild(messageBodyNode(m));
-    const meta = el('div', 'msg-meta');
-    try {
-        meta.textContent = formatDateTime(m.createdAt) + (m.editedAt ? ' • ' + tr('msg.edited', 'ویرایش‌شده') : '');
-    } catch {
-        meta.textContent = '';
-    }
-    content.appendChild(meta);
-    wrap.appendChild(content);
-    if (mine && m.kind === 'text') {
-        const more = el('button', 'msg-more', '⋯');
-        more.type = 'button';
-        more.setAttribute('aria-label', tr('msg.moreAria', 'گزینه‌ها'));
-        more.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openMenu({
-                anchor: more,
-                items: [
-                    { id: 'edit', label: tr('msg.edit', 'ویرایش') },
-                    { id: 'delete', label: tr('msg.delete', 'حذف'), danger: true },
-                ],
-                onSelect: (id) => {
-                    if (id === 'edit') startEditMessage(m.id, m.body);
-                    else if (id === 'delete') deleteMessage(m.id);
-                },
-            });
-        });
-        wrap.appendChild(more);
-    }
-    return wrap;
-}
-
-/**
- * بدنه‌ی پیام (حباب متن / کارت تسک / کارت مکان) — بدون اکشن.
- * ⚠️ برای reuse در تایم‌لاین گروه export شده (8.3-A).
- */
-export function messageBodyNode(m) {
-    if (m.kind === 'task') return taskCardNode(m);
-    if (m.kind === 'location') return locationCardNode(m);
-    return el('div', 'msg-body', (m && m.body) || '');
-}
-
-function parseTaskMeta(m) {
-    try {
-        const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
-        if (!meta || typeof meta !== 'object') return null;
-        const snap = typeof meta.snapshot === 'string' ? JSON.parse(meta.snapshot) : meta.snapshot;
-        if (!snap || typeof snap !== 'object') return null;
-        return { snapshot: snap, sourceTaskId: meta.source_task_id || null };
-    } catch {
-        return null;
-    }
-}
-
-function taskCardNode(m) {
-    const card = el('div', 'msg-task-card');
-    const parsed = parseTaskMeta(m);
-    if (!parsed) {
-        card.appendChild(el('div', 'msg-body', m.body || ''));
-        card.appendChild(el('div', 'msg-meta', tr('plan.invalidSnapshot', 'این تسک قابل افزودن نیست.')));
-        return card;
-    }
-    const snap = parsed.snapshot;
-    const title = String(snap.text || snap.title || m.body || '').slice(0, 200) || '…';
-    card.appendChild(el('div', 'msg-task-title', '📋 ' + title));
-    if (snap.dueAt || snap.at) {
-        try {
-            card.appendChild(el('div', 'msg-task-sub', formatDateTime(snap.dueAt || snap.at)));
-        } catch { /* silent */ }
-    }
-    const add = el('button', 'msg-task-add', tr('plan.add', 'افزودن به برنامه'));
-    add.type = 'button';
-    add.addEventListener('click', () => addSharedTaskToPlan(parsed.snapshot, add));
-    card.appendChild(add);
-    return card;
-}
-
-async function addSharedTaskToPlan(snapshot, btn) {
-    try {
-        const clean = sanitizeTask({
-            id: uid(),
-            text: String((snapshot && (snapshot.text || snapshot.title)) || '').slice(0, 200),
-            kind: 'task',
-            completed: false,
-            dueAt: snapshot && typeof snapshot.dueAt === 'string' ? snapshot.dueAt : null,
-        });
-        if (!clean.text || clean.text.trim() === '') {
-            showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.invalidSnapshot', 'x')] });
-            return;
-        }
-        await saveTask(clean);
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = tr('plan.added', 'به برنامه اضافه شد.');
-        }
-        showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.added', 'ok')] });
-    } catch {
-        showInfoModal({ title: tr('plan.add', 'افزودن به برنامه'), paragraphs: [tr('plan.invalidSnapshot', 'x')] });
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
-// 8.2-C: پیام مکان (preview + مودال)
+// thread قدیمی حبابی حذف شد (قدم ۳ — §۱۳.۱). بکاپ تا قدم ۴ از fetchFullThread
+// (پایین همین فایل) استفاده می‌کند.
 // ═══════════════════════════════════════════════════════════════════════════
 
-let _previewMaps = [];
+// (thread حبابی حذف شد — قدم ۳ §۱۳.۱؛ fetchFullThread بکاپ پایین فایل می‌ماند)
 
-function cleanupPreviewMaps() {
-    for (const mm of _previewMaps) {
-        try {
-            if (mm && typeof mm.remove === 'function') mm.remove();
-        } catch { /* silent */ }
-    }
-    _previewMaps = [];
-}
+// (کارت تسک مشترک قدیمی + افزودن به برنامه حذف شد — قدم ۳ §۱۳.۱)
 
-function parseLocationMeta(m) {
-    try {
-        const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
-        if (!meta || typeof meta !== 'object') return null;
-        const lat = Number(meta.lat);
-        const lng = Number(meta.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-        return { lat, lng, name: typeof meta.name === 'string' ? meta.name : '' };
-    } catch {
-        return null;
-    }
-}
+// (ارسال لوکیشن مستقل + preview/مودال مکان حذف شد — قدم ۳ §۱۳.۱؛ لوکیشن فقط آپشن کامپوزر وظیفه است)
 
-function locationCardNode(m) {
-    const card = el('div', 'msg-loc-card');
-    const loc = parseLocationMeta(m);
-    const label = (loc && loc.name) || m.body || '';
-    if (label) card.appendChild(el('div', 'msg-loc-name', '📍 ' + label));
-    if (loc) {
-        const preview = el('div', 'loc-preview');
-        preview.dataset.lat = String(loc.lat);
-        preview.dataset.lng = String(loc.lng);
-        card.appendChild(preview);
-        const route = el('button', 'msg-loc-route', tr('loc.route', 'نمایش مسیر'));
-        route.type = 'button';
-        route.addEventListener('click', () => openMapModal(loc));
-        card.appendChild(route);
-    } else {
-        card.appendChild(el('div', 'msg-body', m.body || ''));
-    }
-    return card;
-}
-
-/**
- * ساخت previewهای نقشه بعد از رندر (بدون L → فقط placeholder می‌ماند).
- */
-export function initLocationPreviews(box) {
-    cleanupPreviewMaps();
-    if (typeof window === 'undefined' || typeof window.L === 'undefined') return;
-    const L = window.L;
-    for (const pv of box.querySelectorAll('.loc-preview')) {
-        const lat = Number(pv.dataset.lat);
-        const lng = Number(pv.dataset.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-        try {
-            const mm = L.map(pv, {
-                zoomControl: false,
-                dragging: false,
-                scrollWheelZoom: false,
-                doubleClickZoom: false,
-                boxZoom: false,
-                keyboard: false,
-                attributionControl: false,
-            }).setView([lat, lng], 14);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mm);
-            L.marker([lat, lng]).addTo(mm);
-            _previewMaps.push(mm);
-        } catch { /* silent */ }
-    }
-}
-
-/**
- * مودال نقشه‌ی تعاملی برای یک مکان.
- */
-export function openMapModal(loc) {
-    closeMapModal();
-    const overlay = el('div', 'picker-overlay loc-modal-overlay');
-    overlay.id = 'locModalOverlay';
-    const box = el('div', 'picker loc-modal-box');
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-modal', 'true');
-    box.appendChild(el('div', 'picker-title', tr('loc.mapTitle', 'نقشه')));
-    const mapDiv = el('div', 'loc-modal-map');
-    box.appendChild(mapDiv);
-    const close = el('button', 'btn-clear', tr('msg.back', '‹ بازگشت'));
-    close.type = 'button';
-    close.addEventListener('click', () => closeMapModal());
-    box.appendChild(close);
-    overlay.appendChild(box);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeMapModal();
-    });
-    document.body.appendChild(overlay);
-    if (typeof window !== 'undefined' && typeof window.L !== 'undefined' && loc) {
-        try {
-            const mm = window.L.map(mapDiv).setView([loc.lat, loc.lng], 15);
-            window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mm);
-            window.L.marker([loc.lat, loc.lng]).addTo(mm);
-            _previewMaps.push(mm);
-            setTimeout(() => {
-                try { mm.invalidateSize(); } catch { /* silent */ }
-            }, 60);
-        } catch { /* silent */ }
-    }
-}
-
-export function closeMapModal() {
-    const old = document.getElementById('locModalOverlay');
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-}
-
-/**
- * ارسال موقعیت فعلی (geolocation) به‌عنوان پیام مکان.
- */
-export async function sendCurrentLocation(btn) {
-    if (!navigator.geolocation) {
-        if (btn) btn.title = tr('loc.unavailable', 'موقعیت در دسترس نیست.');
-        return;
-    }
-    if (btn) {
-        btn.disabled = true;
-        btn.title = tr('loc.locating', 'در حال مکان‌یابی…');
-    }
-    const pos = await new Promise((resolve) => {
-        try {
-            navigator.geolocation.getCurrentPosition(
-                (p) => resolve(p),
-                () => resolve(null),
-                { timeout: 10000, maximumAge: 60000 }
-            );
-        } catch {
-            resolve(null);
-        }
-    });
-    if (btn) {
-        btn.disabled = false;
-        btn.title = tr('loc.sendCurrent', 'ارسال موقعیت فعلی');
-    }
-    if (!pos || !pos.coords) return;
-    const { latitude, longitude } = pos.coords;
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    _loading = true;
-    const res = await apiFetch('/api/messages', {
-        method: 'POST',
-        body: {
-            recipientId: _openWith,
-            body: latitude.toFixed(5) + ',' + longitude.toFixed(5),
-            kind: 'location',
-            metadata: { lat: latitude, lng: longitude },
-        },
-    });
-    _loading = false;
-    if (!res.ok) return;
-    await openConversation(_openWith);
-}
-
-// ⚠️ legacy (مدل حبابی — حذف در قدم ۳؛ backup-v2 از fetchFullThread استفاده می‌کند).
-export async function loadMoreConversation() {
-    if (!_openWith || !_hasMore || _loading || !_cursor) return;
-    _loading = true;
-    const res = await fetchPage(_openWith, _cursor);
-    _loading = false;
-    if (!res.ok) return;
-    const more = ((res.data && res.data.messages) || []).map((m) => ({
-        ...m,
-        mine: isMine(m, _openWith),
-    }));
-    _messages = _messages.concat(more);
-    _cursor = res.data.nextCursor || null;
-    _hasMore = !!res.data.hasMore;
-    renderThread();
-}
+// (loadMore حبابی حذف شد — قدم ۳ §۱۳.۱)
 
 /**
  * دریافت کل thread یک گفتگو (برای بکاپ — حداکثر ۲۰ صفحه).
@@ -953,59 +643,6 @@ export async function fetchFullThread(otherUserId) {
         if (!res.data || !res.data.hasMore || !cursor) break;
     }
     return { ok: true, messages: all };
-}
-
-export async function sendCurrentText() {
-    const input = document.getElementById('convInput');
-    if (!input || _loading || !_openWith) return;
-    const body = input.value.trim();
-    if (!body) return;
-    // حالت ویرایش؟ (startEditMessage ست می‌کند)
-    if (input.dataset.editingId) {
-        await submitEdit(input.dataset.editingId, body);
-        delete input.dataset.editingId;
-        return;
-    }
-    _loading = true;
-    const res = await apiFetch('/api/messages', {
-        method: 'POST',
-        body: { recipientId: _openWith, body, kind: 'text' },
-    });
-    _loading = false;
-    if (!res.ok) {
-        // ⚠️ خطا را در همان کامپوزر نشان بده (بدون alert)
-        input.setAttribute('aria-invalid', 'true');
-        input.title = apiErrorMessage(res.error);
-        return;
-    }
-    input.value = '';
-    await openConversation(_openWith);
-}
-
-export async function deleteMessage(messageId) {
-    const res = await apiFetch('/api/messages/' + encodeURIComponent(messageId), { method: 'DELETE' });
-    if (!res.ok) return false;
-    _messages = _messages.filter((m) => m.id !== messageId);
-    renderThread();
-    return true;
-}
-
-async function startEditMessage(messageId, oldBody) {
-    const input = document.getElementById('convInput');
-    if (!input) return;
-    input.value = oldBody || '';
-    input.dataset.editingId = messageId;
-    input.focus();
-}
-
-export async function submitEdit(messageId, body) {
-    const res = await apiFetch('/api/messages/' + encodeURIComponent(messageId), {
-        method: 'PATCH',
-        body: { body },
-    });
-    if (!res.ok) return res;
-    await openConversation(_openWith);
-    return res;
 }
 
 /**
@@ -1098,9 +735,6 @@ export function __resetConversationsForTest() {
     _conversations = [];
     _incoming = [];
     _openWith = null;
-    _messages = [];
-    _cursor = null;
-    _hasMore = false;
     _loading = false;
     _dmTasks = [];
     _dmCursor = null;
@@ -1109,5 +743,5 @@ export function __resetConversationsForTest() {
     stopDmPoll();
 }
 export function __getStateForTest() {
-    return { conversations: _conversations, openWith: _openWith, messages: _messages, dmTasks: _dmTasks };
+    return { conversations: _conversations, openWith: _openWith, dmTasks: _dmTasks };
 }

@@ -20,15 +20,12 @@ import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
 import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
-import { updateDrawerBadges } from '../navigation/sidebar.js';
+import { updateDrawerBadges, setRecentGroups } from '../navigation/sidebar.js';
 import { showInfoModal, showConfirmModal } from '../core.js';
-import {
-    messageBodyNode,
-    displayNameOf,
-    initLocationPreviews,
-} from './conversations.js';
+import { displayNameOf } from './conversations.js';
+import { sideFor, canEdit, taskTitle } from '../tasks/list.js';
 import { searchUsers } from './connections.js';
-import { switchWorkspace } from '../navigation/workspace.js';
+import { switchWorkspace, getActiveWorkspace } from '../navigation/workspace.js';
 import { enqueueGroupOp, flushGroup, getPendingCount } from './group-queue.js';
 import { changeGroupAvatar } from '../ui/avatar-settings.js';
 
@@ -62,10 +59,16 @@ function groupsSection() {
     return document.getElementById('ws-groups');
 }
 
-function memberName(userId) {
-    const m = _members.find((x) => x.userId === userId);
-    if (m && m.username) return m.username;
-    return String(userId || '').slice(0, 8);
+/**
+ * نام + آواتار یک عضو (برای بج «از: نام» روی آیتم دیگران).
+ */
+function memberInfo(userId) {
+    const m = _members.find((x) => String(x.userId) === String(userId));
+    if (!m) return { name: String(userId || '').slice(0, 8), avatarUrl: null };
+    return {
+        name: m.username || m.displayName || String(m.userId || '').slice(0, 8),
+        avatarUrl: m.avatarUrl || null,
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -299,9 +302,13 @@ function renderGroupView() {
 
     const box = el('div', 'conv-box');
     box.id = 'convBox';
+    const me = myUserId();
     // API نزولی برمی‌گرداند؛ قدیمی‌تر اول نمایش بده
     for (const item of [..._items].reverse()) {
-        box.appendChild(timelineNode(item));
+        box.appendChild(groupTimelineNode(item, me));
+    }
+    if (_items.length === 0) {
+        box.appendChild(el('p', null, tr('gtask.empty', 'تسکی نیست.')));
     }
     sec.appendChild(box);
 
@@ -312,73 +319,143 @@ function renderGroupView() {
         sec.appendChild(more);
     }
 
-    const composer = el('div', 'conv-composer');
-    const input = el('input', 'conv-input');
-    input.id = 'grpInput';
-    input.setAttribute('placeholder', tr('msg.placeholder', '…'));
-    input.setAttribute('maxlength', '2000');
-    input.setAttribute('autocomplete', 'off');
-    const send = el('button', 'conv-send', tr('msg.send', '➤'));
-    send.type = 'button';
-    const doSend = () => sendGroupText();
-    send.addEventListener('click', doSend);
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            doSend();
+    // ─── کامپوزر تسک (مثل پیام: عنوان ساده؛ جزئیات کامل در فضای شخصی) ───
+    // آفلاین = از طریق صف (enqueue + flush؛ flush ناموفق = pending می‌ماند)
+    if (_group && !_group.closedAt) {
+        const composer = el('div', 'conv-composer');
+        const input = el('input', 'conv-input');
+        input.id = 'grpTaskInput';
+        input.setAttribute('placeholder', tr('gtask.placeholder', 'تسک تازه…'));
+        input.setAttribute('maxlength', '500');
+        input.setAttribute('autocomplete', 'off');
+        const send = el('button', 'conv-send', tr('gtask.create', 'افزودن'));
+        send.type = 'button';
+        const doSend = () => submitGroupTask(input, send);
+        send.addEventListener('click', doSend);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                doSend();
+            }
+        });
+        if (!isOnline()) {
+            input.disabled = true;
+            send.disabled = true;
         }
-    });
-    if (!isOnline()) {
-        input.disabled = true;
-        send.disabled = true;
+        composer.appendChild(input);
+        composer.appendChild(send);
+        sec.appendChild(composer);
     }
-    composer.appendChild(input);
-    composer.appendChild(send);
-    sec.appendChild(composer);
 
     box.scrollTop = box.scrollHeight;
-    initLocationPreviews(box);
 }
 
-function timelineNode(item) {
-    const wrap = el('div', 'msg');
-    if (item.entityType === 'group_task') {
-        wrap.appendChild(groupTaskNode(item));
-    } else {
-        // پیام گروهی → همان رندر DM (بدون اکشن در A)
-        wrap.appendChild(
-            messageBodyNode({
-                kind: item.kind || 'text',
-                body: item.body || '',
-                metadata: item.metadata || null,
-            })
-        );
+/**
+ * یک ردیف تسک گروه: سمت خودی/اعضا + آواتار+نام فرستنده + ⋯ (ویرایش خودی، حذف creator/owner).
+ */
+function groupTimelineNode(item, me) {
+    const mine = sideFor({ creator_id: item.actorId }, me) === 'self';
+    const wrap = el('div', 'msg msg-task' + (mine ? ' msg-mine' : ' msg-other'));
+    const info = mine ? null : memberInfo(item.actorId);
+    const av = avatarNode(info ? info.avatarUrl : null, mine ? '?' : (info ? info.name : '?'));
+    av.classList.add('msg-avatar');
+    wrap.appendChild(av);
+    const content = el('div', 'msg-content');
+    if (!mine && info) {
+        content.appendChild(el('div', 'msg-from', info.name));
     }
+    content.appendChild(el('div', 'msg-body', taskTitle({ payload: item.body })));
     const meta = el('div', 'msg-meta');
     try {
-        const who = item.actorId ? memberName(item.actorId) : '';
-        meta.textContent = (who ? who + ' • ' : '') + formatDateTime(item.createdAt);
+        meta.textContent = formatDateTime(item.createdAt || item.updated_at);
     } catch {
         meta.textContent = '';
     }
-    wrap.appendChild(meta);
+    content.appendChild(meta);
+    wrap.appendChild(content);
+    const editable = canEdit({ creator_id: item.actorId }, me);
+    const canDelete = editable || isOwner();
+    if (editable || canDelete) {
+        const more = el('button', 'msg-more', '⋯');
+        more.type = 'button';
+        more.setAttribute('aria-label', tr('msg.moreAria', 'گزینه‌ها'));
+        more.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const items = [];
+            if (editable) items.push({ id: 'edit', label: tr('msg.edit', 'ویرایش') });
+            if (canDelete) items.push({ id: 'delete', label: tr('msg.delete', 'حذف'), danger: true });
+            openMenu({
+                anchor: more,
+                items,
+                onSelect: (id) => {
+                    if (id === 'edit') startTimelineEdit(item, wrap);
+                    else if (id === 'delete') removeTimelineTask(item.id);
+                },
+            });
+        });
+        wrap.appendChild(more);
+    }
     return wrap;
 }
 
 /**
- * تسک تایم‌لاین فقط خواندنی (payload JSON است، نه snapshot).
+ * ساخت تسک گروهی از کامپوزر نمای اصلی (از طریق صف آفلاین).
  */
-function groupTaskNode(item) {
-    const card = el('div', 'msg-task-card');
-    let title = '';
+export async function submitGroupTask(inputEl, sendEl) {
+    const input = inputEl || document.getElementById('grpTaskInput');
+    const send = sendEl || null;
+    if (!input || _loading || !_openGroupId) return;
+    const text = input.value.trim().slice(0, 500);
+    if (!text) return;
+    _loading = true;
+    if (send) send.disabled = true;
     try {
-        const payload = typeof item.body === 'string' ? JSON.parse(item.body) : item.body;
-        title = String((payload && (payload.text || payload.title)) || '').slice(0, 200);
-    } catch {
-        title = '';
+        await enqueueGroupOp(_openGroupId, 'save', uid(), { kind: 'task', payload: { title: text } });
+        await flushGroup(_openGroupId);
+    } finally {
+        _loading = false;
+        if (send) send.disabled = false;
     }
-    card.appendChild(el('div', 'msg-task-title', '📋 ' + (title || '…')));
-    return card;
+    input.value = '';
+    await openGroup(_openGroupId);
+}
+
+function startTimelineEdit(item, rowEl) {
+    if (!rowEl) return;
+    rowEl.replaceChildren();
+    const input = el('input', 'conv-input');
+    const cur = taskTitle({ payload: item.body });
+    input.value = cur === '…' ? '' : cur;
+    input.setAttribute('maxlength', '500');
+    const save = el('button', 'conv-mini-btn', tr('gtask.save', 'ذخیره'));
+    save.type = 'button';
+    save.addEventListener('click', async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        save.disabled = true;
+        await enqueueGroupOp(_openGroupId, 'save', item.id, { kind: item.kind || 'task', payload: { title: text } });
+        await flushGroup(_openGroupId);
+        await openGroup(_openGroupId);
+    });
+    const cancel = el('button', 'conv-mini-btn', tr('gtask.cancel', 'انصراف'));
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => renderGroupView());
+    rowEl.appendChild(input);
+    rowEl.appendChild(save);
+    rowEl.appendChild(cancel);
+    input.focus();
+}
+
+async function removeTimelineTask(taskId) {
+    const ok = await showConfirmModal({
+        title: tr('msg.delete', 'حذف'),
+        message: tr('gtask.deleteConfirm', 'این تسک حذف شود؟'),
+        danger: true,
+    });
+    if (!ok) return;
+    await enqueueGroupOp(_openGroupId, 'delete', taskId, null);
+    await flushGroup(_openGroupId);
+    await openGroup(_openGroupId);
 }
 
 function renderMembersView(sec) {
@@ -499,36 +576,90 @@ async function openTransferPicker() {
     });
 }
 
-async function confirmGroupClose() {
-    if (!_group) return;
+/**
+ * منوی ⋯ یک گروه برای استفاده‌ی دراور (مدیریت همان سطح، بر اساس نقش).
+ * خود نام در دراور → باز کردن گروه (از طریق onOpenGroup).
+ */
+export async function openGroupMenuFor(groupId, anchor) {
+    if (!groupId) return;
+    let detail = null;
+    try {
+        const res = await apiFetch('/api/groups/' + encodeURIComponent(groupId));
+        if (!res.ok) return;
+        detail = res.data;
+    } catch {
+        return;
+    }
+    const role = (detail && detail.myRole) || null;
+    const group = (detail && detail.group) || { id: groupId };
+    const owner = role === 'owner';
+    const manager = owner || role === 'admin';
+    const items = [
+        { id: 'open', label: tr('grp.open', 'باز کردن') },
+        { id: 'members', label: tr('grp.members', 'اعضا') },
+    ];
+    if (manager) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
+    if (owner) {
+        items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
+        items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
+    } else {
+        items.push({ id: 'leave', label: tr('grp.leave', 'ترک گروه'), danger: true });
+    }
+    openMenu({
+        anchor,
+        items,
+        onSelect: async (id) => {
+            if (id === 'open') {
+                if (switchWorkspace('groups')) await openGroup(groupId);
+            } else if (id === 'members' || id === 'invite') {
+                if (switchWorkspace('groups')) {
+                    await openGroup(groupId);
+                    _view = 'members';
+                    renderGroupView();
+                }
+            } else if (id === 'leave') {
+                await confirmGroupLeave(groupId);
+            } else if (id === 'close') {
+                await confirmGroupClose(groupId);
+            } else if (id === 'delete') {
+                await confirmGroupDelete(groupId);
+            }
+        },
+    });
+}
+
+async function confirmGroupClose(forId) {
+    const targetId = forId || _openGroupId;
+    if (!targetId && !_group) return;
     const ok = await showConfirmModal({
         title: tr('grp.close', 'بستن گروه'),
         message: tr('grp.closeConfirm', 'گروه بسته و تسک‌هایش حذف می‌شوند. ادامه؟'),
         danger: true,
     });
     if (!ok) return;
-    await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/close', { method: 'POST' });
-    _openGroupId = null;
-    await openGroupsWorkspace();
+    await apiFetch('/api/groups/' + encodeURIComponent(targetId) + '/close', { method: 'POST' });
+    if (targetId === _openGroupId) _openGroupId = null;
+    if (getActiveWorkspace() === 'groups') await openGroupsWorkspace();
 }
 
-async function confirmGroupLeave() {
-    if (!_group) return;
+async function confirmGroupLeave(forId) {
+    const targetId = forId || _openGroupId;
+    if (!targetId) return;
     const ok = await showConfirmModal({
         title: tr('grp.leave', 'ترک گروه'),
         message: tr('grp.leaveConfirm', 'از این گروه خارج می‌شوی؟'),
         danger: true,
     });
     if (!ok) return;
-    const res = await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/leave', {
+    const res = await apiFetch('/api/groups/' + encodeURIComponent(targetId) + '/leave', {
         method: 'POST',
     });
     if (!res.ok) {
         showInfoModal({ title: tr('grp.leave', 'ترک گروه'), paragraphs: [apiErrorMessage(res.error)] });
         return;
     }
-    _openGroupId = null;
-    await openGroupsWorkspace();
+    if (targetId === _openGroupId) _openGroupId = null;
+    if (getActiveWorkspace() === 'groups') await openGroupsWorkspace();
 }
 
 function buildInviteLink(token) {
@@ -624,17 +755,18 @@ export async function processPendingJoin() {
     return true;
 }
 
-async function confirmGroupDelete() {
-    if (!_group) return;
+async function confirmGroupDelete(forId) {
+    const targetId = forId || _openGroupId;
+    if (!targetId) return;
     const ok = await showConfirmModal({
         title: tr('grp.delete', 'حذف گروه'),
         message: tr('grp.deleteConfirm', 'گروه برای همیشه حذف شود؟'),
         danger: true,
     });
     if (!ok) return;
-    await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId), { method: 'DELETE' });
-    _openGroupId = null;
-    await openGroupsWorkspace();
+    await apiFetch('/api/groups/' + encodeURIComponent(targetId), { method: 'DELETE' });
+    if (targetId === _openGroupId) _openGroupId = null;
+    if (getActiveWorkspace() === 'groups') await openGroupsWorkspace();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -837,8 +969,8 @@ export async function openGroup(groupId) {
     }
     if (memRes.ok) _members = memRes.data.members || [];
     renderGroupView();
-    // ثبت خواندن پیام‌ها + تازه‌سازی بج‌ها (best-effort)
-    markCurrentGroupRead('messages').then(() => refreshGroupBadges()).catch(() => {});
+    // ثبت خواندن همه + تازه‌سازی بج‌ها (best-effort)
+    markCurrentGroupRead('all').then(() => refreshGroupBadges()).catch(() => {});
 }
 
 function renderGroupSkeleton() {
@@ -874,26 +1006,6 @@ export async function fetchFullTimeline(groupId) {
         if (!cursor) break;
     }
     return { ok: true, items: all };
-}
-
-export async function sendGroupText() {
-    const input = document.getElementById('grpInput');
-    if (!input || _loading || !_openGroupId) return;
-    const body = input.value.trim();
-    if (!body) return;
-    _loading = true;
-    const res = await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/messages', {
-        method: 'POST',
-        body: { body, kind: 'text' },
-    });
-    _loading = false;
-    if (!res.ok) {
-        input.setAttribute('aria-invalid', 'true');
-        input.title = apiErrorMessage(res.error);
-        return;
-    }
-    input.value = '';
-    await openGroup(_openGroupId);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -966,7 +1078,7 @@ function isOwner() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * تازه‌سازی بج نخوانده‌ی همه‌ی گروه‌های لیست + بج دعوت‌های دراور.
+ * تازه‌سازی بج نخوانده‌ی همه‌ی گروه‌های لیست + بج دعوت‌های دراور + ردیف‌های اخیر دراور.
  */
 export async function refreshGroupBadges() {
     try {
@@ -977,16 +1089,28 @@ export async function refreshGroupBadges() {
             updateDrawerBadges({ groups: ((mineRes.data && mineRes.data.invitations) || []).length });
         }
     } catch { /* best-effort */ }
+    const unreadByGroup = new Map();
     for (const g of _groups) {
         try {
             const res = await apiFetch('/api/groups/' + encodeURIComponent(g.id) + '/unread');
             if (!res.ok) continue;
             const u = (res.data && res.data.unread) || { messages: 0, tasks: 0 };
             const total = (Number(u.messages) || 0) + (Number(u.tasks) || 0);
+            unreadByGroup.set(String(g.id), total);
             const badge = document.querySelector('[data-group-unread="' + String(g.id).replace(/"/g, '') + '"]');
             if (badge) setBadge(badge, total);
         } catch { /* best-effort per group */ }
     }
+    try {
+        const rows = (_groups || []).map((g) => ({
+            id: String(g.id),
+            name: g.name || '…',
+            avatarUrl: g.avatarUrl || null,
+            unread: unreadByGroup.get(String(g.id)) || 0,
+        }));
+        rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
+        setRecentGroups(rows.slice(0, 3));
+    } catch { /* best-effort */ }
 }
 
 /**

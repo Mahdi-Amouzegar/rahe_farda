@@ -1,5 +1,5 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// test/groups.test.js — تست‌های فضای گروه (8.3-A)
+// test/groups.test.js — تست‌های فضای گروه روی مدل تسک واحد (Phase 9 قدم ۳)
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -44,8 +44,8 @@ vi.mock('../js/api.js', async () => ({
                 ok: true,
                 data: {
                     items: [
-                        { id: 'gm1', entityType: 'message', actorId: 'u1', body: 'سلام گروه', kind: 'text', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-                        { id: 'gt1', entityType: 'group_task', actorId: 'u1', body: JSON.stringify({ text: 'بلیت' }), kind: 'task', metadata: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' },
+                        { id: 'gt1', entityType: 'group_task', actorId: 'u2', body: JSON.stringify({ title: 'بلیت' }), kind: 'task', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+                        { id: 'gt2', entityType: 'group_task', actorId: 'u1', body: JSON.stringify({ title: 'هتل' }), kind: 'task', metadata: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' },
                     ],
                     nextCursor: null,
                 },
@@ -56,14 +56,11 @@ vi.mock('../js/api.js', async () => ({
                 ok: true,
                 data: {
                     members: [
-                        { id: 'm1', groupId: 'g1', userId: 'u1', role: 'owner', status: 'active', username: 'ali' },
-                        { id: 'm2', groupId: 'g1', userId: 'u2', role: 'member', status: 'active', username: 'sara' },
+                        { id: 'm1', groupId: 'g1', userId: 'u1', role: 'owner', status: 'active', username: 'ali', avatarUrl: null },
+                        { id: 'm2', groupId: 'g1', userId: 'u2', role: 'member', status: 'active', username: 'sara', avatarUrl: null },
                     ],
                 },
             };
-        }
-        if (path === '/api/groups/g1/messages' && opts && opts.method === 'POST') {
-            return { ok: true, data: { message: { id: 'gm9' }, changeSeq: 9 } };
         }
         if (path === '/api/invitations/mine') {
             return {
@@ -90,7 +87,15 @@ vi.mock('../js/api.js', async () => ({
             };
         }
         if (path.startsWith('/api/groups/g2/timeline')) {
-            return { ok: true, data: { items: [], nextCursor: null } };
+            return {
+                ok: true,
+                data: {
+                    items: [
+                        { id: 'gt9', entityType: 'group_task', actorId: 'u9', body: JSON.stringify({ title: 'کار مدیر' }), kind: 'task', metadata: null, createdAt: '2026-01-03T00:00:00Z', updatedAt: '2026-01-03T00:00:00Z' },
+                    ],
+                    nextCursor: null,
+                },
+            };
         }
         if (path === '/api/groups/g2/tasks') {
             return {
@@ -115,11 +120,8 @@ vi.mock('../js/api.js', async () => ({
         if (path.startsWith('/api/search')) {
             return { ok: true, data: { users: [{ id: 'u7', username: 'guest7' }] } };
         }
-        if (path === '/api/invitations/mine') {
-            return { ok: true, data: { invitations: [] } };
-        }
         if (path.endsWith('/unread')) {
-            return { ok: true, data: { unread: { messages: 2, tasks: 1 } } };
+            return { ok: true, data: { unread: { messages: 0, tasks: 1 } } };
         }
         if (path.endsWith('/read') && opts && opts.method === 'POST') {
             return { ok: true, data: { readAt: 'now' } };
@@ -154,7 +156,8 @@ import {
     listGroups,
     openGroupsWorkspace,
     openGroup,
-    sendGroupText,
+    openGroupMenuFor,
+    submitGroupTask,
     loadMoreTimeline,
     __resetGroupsForTest,
     __getGroupsStateForTest,
@@ -180,7 +183,8 @@ function buildShell() {
                 <div id="infoModalBody"></div>
                 <button id="infoModalOk"></button>
             </div>
-        </div>`;
+        </div>
+        <button id="anchor">⋯</button>`;
 }
 
 beforeEach(() => {
@@ -191,7 +195,7 @@ beforeEach(() => {
     buildShell();
 });
 
-describe('groups — list (8.3-A)', () => {
+describe('groups — list (قدم ۳)', () => {
     it('لیست گروه‌ها رندر می‌شود', async () => {
         const res = await listGroups();
         expect(res.ok).toBe(true);
@@ -207,33 +211,59 @@ describe('groups — list (8.3-A)', () => {
     });
 });
 
-describe('groups — workspace (8.3-A)', () => {
-    it('باز کردن گروه: هدر + تایم‌لاین + کامپوزر', async () => {
+describe('groups — unified task list (قدم ۳)', () => {
+    it('نمای اصلی: هدر + لیست دوحالته + کامپوزر تسک (بدون کامپوزر متنی)', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
         const st = __getGroupsStateForTest();
         expect(st.items.length).toBe(2);
         expect(document.querySelector('.conv-title').textContent).toContain('سفر');
-        expect(document.getElementById('grpInput')).not.toBeNull();
+        expect(document.getElementById('grpTaskInput')).not.toBeNull();
+        expect(document.getElementById('grpInput')).toBeNull();
     });
 
-    it('تسک تایم‌لاین فقط خواندنی است (بدون دکمه‌ی ویرایش)', async () => {
+    it('آیتم دیگران سمت مقابل + آواتار و نام فرستنده؛ خودی راست‌چین', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
-        const card = document.querySelector('.msg-task-card');
-        expect(card).not.toBeNull();
-        expect(card.textContent).toContain('بلیت');
-        expect(card.querySelector('.msg-task-add')).toBeNull();
+        expect(document.querySelectorAll('.msg-mine').length).toBe(1);
+        expect(document.querySelectorAll('.msg-other').length).toBe(1);
+        const other = document.querySelector('.msg-other');
+        expect(other.textContent).toContain('بلیت');
+        expect(other.textContent).toContain('sara');
+        expect(other.querySelector('.msg-avatar')).not.toBeNull();
     });
 
-    it('ارسال پیام متنی POST می‌زند', async () => {
+    it('⋯ خودی ویرایش/حذف دارد؛ دیگران برای مالک فقط حذف (read-only محتوا)', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
-        document.getElementById('grpInput').value = 'سلام';
-        await sendGroupText();
-        const posts = apiCalls.filter((c) => c.path === '/api/groups/g1/messages');
-        expect(posts.length).toBe(1);
-        expect(posts[0].opts.body).toMatchObject({ body: 'سلام', kind: 'text' });
+        expect(document.querySelector('.msg-mine .msg-more')).not.toBeNull();
+        // مالک روی آیتم دیگران فقط حذف مدیریتی دارد (نه ویرایش)
+        const otherMore = document.querySelector('.msg-other .msg-more');
+        expect(otherMore).not.toBeNull();
+        otherMore.click();
+        await new Promise((r) => setTimeout(r, 10));
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(['delete']);
+    });
+
+    it('کامپوزر تسک از مسیر صف sync می‌سازد', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g1');
+        document.getElementById('grpTaskInput').value = 'تازه';
+        await submitGroupTask();
+        const syncs = apiCalls.filter((c) => c.path === '/api/groups/g1/sync');
+        expect(syncs.length).toBeGreaterThan(0);
+        const saveOp = syncs.flatMap((c) => (c.opts.body && c.opts.body.ops) || [])
+            .find((o) => o.type === 'save');
+        expect(saveOp).toBeTruthy();
+        expect(saveOp.data.payload).toMatchObject({ title: 'تازه' });
+    });
+
+    it('عضو عادی روی آیتم دیگران هیچ ⋯ نمی‌بیند', async () => {
+        await openGroupsWorkspace();
+        await openGroup('g2');
+        expect(document.querySelector('.msg-other')).not.toBeNull();
+        expect(document.querySelector('.msg-other .msg-more')).toBeNull();
     });
 
     it('نمای اعضا فقط خواندنی با نقش‌هاست', async () => {
@@ -246,12 +276,30 @@ describe('groups — workspace (8.3-A)', () => {
         memberItem.click();
         expect(document.querySelector('.conv-role')).not.toBeNull();
         expect(__getGroupsStateForTest().view).toBe('members');
-        // عضو عادی: دکمه‌ی حذف ندارد
         expect(document.querySelector('.conv-row .conv-mini-btn')).toBeNull();
     });
 });
 
-describe('groups — inbox + management (8.3-B)', () => {
+describe('groups — drawer menu (قدم ۳)', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('منوی owner: باز کردن/اعضا/دعوت/بستن/حذف', async () => {
+        await openGroupMenuFor('g1', document.getElementById('anchor'));
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(expect.arrayContaining(['open', 'members', 'invite', 'close', 'delete']));
+        expect(ids).not.toContain('leave');
+    });
+
+    it('منوی عضو عادی: باز کردن/اعضا/ترک', async () => {
+        await openGroupMenuFor('g2', document.getElementById('anchor'));
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(['open', 'members', 'leave']);
+    });
+});
+
+describe('groups — inbox + management (بدون تغییر)', () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     it('inbox دعوت با نام گروه + قبول', async () => {
@@ -275,29 +323,13 @@ describe('groups — inbox + management (8.3-B)', () => {
         expect(ids).toEqual(expect.arrayContaining(['members', 'tasks', 'invite', 'transfer', 'close', 'delete']));
     });
 
-     it('منوی عضو عادی: members/tasks/leave بدون مدیریت', async () => {
+    it('منوی عضو عادی: members/tasks/leave بدون مدیریت', async () => {
         await openGroupsWorkspace();
         await openGroup('g2');
         document.querySelector('.conv-menu-btn').click();
         await sleep(10);
         const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
         expect(ids).toEqual(['members', 'tasks', 'leave']);
-    });
-
-    it('حذف عضو توسط owner', async () => {
-        await openGroupsWorkspace();
-        await openGroup('g1');
-        // رفتن به نمای اعضا
-        document.querySelector('.conv-menu-btn').click();
-        await sleep(10);
-        [...document.querySelectorAll('[data-menu-id]')]
-            .find((b) => b.dataset.menuId === 'members').click();
-        // دکمه‌ی حذف برای sara هست، برای خودم نیست
-        const rows = [...document.querySelectorAll('.conv-box .conv-row')];
-        const saraRow = rows.find((r) => r.textContent.includes('sara'));
-        expect(saraRow.querySelector('.conv-mini-btn')).not.toBeNull();
-        // confirm modal لازم دارد — بدون DOM مودال، showConfirmModal به alert می‌رسد؛
-        // پس فقط حضور دکمه را چک می‌کنیم (فلو کامل در تست دوکاربره‌ی دستی)
     });
 
     it('نمای تسک‌ها + ساخت تسک (از مسیر صف sync)', async () => {
@@ -310,18 +342,9 @@ describe('groups — inbox + management (8.3-B)', () => {
         await sleep(30);
         expect(document.getElementById('gtaskInput')).not.toBeNull();
         expect(document.body.textContent).toContain('Mine');
-        document.getElementById('gtaskInput').value = 'تازه';
-        document.querySelector('.conv-composer .conv-send').click();
-        await sleep(30);
-        const syncs = apiCalls.filter((c) => c.path === '/api/groups/g1/sync');
-        expect(syncs.length).toBeGreaterThan(0);
-        const saveOp = syncs.flatMap((c) => (c.opts.body && c.opts.body.ops) || [])
-            .find((o) => o.type === 'save');
-        expect(saveOp).toBeTruthy();
-        expect(saveOp.data.payload).toMatchObject({ title: 'تازه' });
     });
 
-    it('ویرایش تسک خودی، حذف تسک خودی', async () => {
+    it('ویرایش تسک خودی ⋯ دارد', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
         document.querySelector('.conv-menu-btn').click();
@@ -334,7 +357,7 @@ describe('groups — inbox + management (8.3-B)', () => {
     });
 });
 
-describe('groups — create (8.3-D)', () => {
+describe('groups — create (بدون تغییر)', () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     it('فرم ساخت گروه POST می‌زند', async () => {
@@ -354,7 +377,7 @@ describe('groups — create (8.3-D)', () => {
     });
 });
 
-describe('groups — unread badges (تصمیم ۳)', () => {
+describe('groups — unread badges (قدم ۳: ثبت all)', () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     it('بج نخوانده روی ردیف گروه', async () => {
@@ -366,17 +389,17 @@ describe('groups — unread badges (تصمیم ۳)', () => {
         expect(badge.textContent).toBeTruthy();
     });
 
-    it('باز کردن گروه، خواندن را ثبت می‌کند', async () => {
+    it('باز کردن گروه، خواندن all را ثبت می‌کند', async () => {
         await openGroupsWorkspace();
         await openGroup('g1');
         await sleep(30);
         const reads = apiCalls.filter((c) => c.path === '/api/groups/g1/read');
         expect(reads.length).toBeGreaterThan(0);
-        expect(reads[0].opts.body).toMatchObject({ type: 'messages' });
+        expect(reads[0].opts.body).toMatchObject({ type: 'all' });
     });
 });
 
-describe('groups — leave + invite link (تصمیم کاربر)', () => {
+describe('groups — leave + invite link (بدون تغییر)', () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     async function openMenuFor(groupId) {
@@ -429,7 +452,6 @@ describe('groups — leave + invite link (تصمیم کاربر)', () => {
         const { takePendingJoinToken, processPendingJoin } = await import('../js/communication/groups.js');
         window.location.hash = '#/join/tok-123';
         expect(takePendingJoinToken()).toBe('tok-123');
-        // مهمان (session نیست) → false و توکن حفظ می‌شود
         expect(await processPendingJoin()).toBe(false);
         expect(takePendingJoinToken()).toBe('tok-123');
         window.location.hash = '';

@@ -91,6 +91,26 @@ describe('sidebar — logged in', () => {
         expect(document.querySelectorAll('.drawer-recent').length).toBe(3);
     });
 
+    it('ردیف گروه: نام + بج نخوانده + ⋯', () => {
+        setRecentGroups([
+            { id: 'g1', name: 'سفر', avatarUrl: null, unread: 2 },
+        ]);
+        const opened = [];
+        const menus = [];
+        initSidebar({
+            onOpenGroup: (id) => opened.push(id),
+            onGroupMenu: (id) => menus.push(id),
+        });
+        openDrawer();
+        const rows = [...document.querySelectorAll('#drawer .drawer-recent')];
+        expect(rows.length).toBe(1);
+        expect(rows[0].querySelector('.drawer-badge').hidden).toBe(false);
+        rows[0].querySelector('.drawer-more').click();
+        expect(menus).toEqual(['g1']);
+        rows[0].querySelector('.drawer-item-label-btn').click();
+        expect(opened).toEqual(['g1']);
+    });
+
     it('کلیک مقصد، onNavigate را صدا می‌زند و می‌بندد', () => {
         const seen = [];
         initSidebar({ onNavigate: (ws) => seen.push(ws) });

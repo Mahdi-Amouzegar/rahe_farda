@@ -133,7 +133,8 @@ function renderDrawer() {
         if (_recentGroups.length > 0) {
             aside.appendChild(el('div', 'drawer-section', i18nT('nav.recentGroups') !== 'nav.recentGroups' ? i18nT('nav.recentGroups') : 'گروه‌های اخیر'));
             for (const g of _recentGroups.slice(0, 3)) {
-                const b = el('button', 'drawer-item drawer-recent');
+                const row = el('div', 'drawer-item drawer-recent');
+                const b = el('button', 'drawer-item-label-btn');
                 b.type = 'button';
                 b.appendChild(avatarNode(g.avatarUrl, g.name));
                 b.appendChild(el('span', 'drawer-item-label', String(g.name || '')));
@@ -142,7 +143,21 @@ function renderDrawer() {
                     if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id);
                     else switchWorkspace('groups');
                 });
-                aside.appendChild(b);
+                row.appendChild(b);
+                const badge = el('span', 'drawer-badge');
+                row.appendChild(badge);
+                setBadge(badge, g.unread || 0);
+                const more = el('button', 'drawer-more', '⋯');
+                more.type = 'button';
+                more.setAttribute('aria-label', '⋯');
+                more.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (_opts && typeof _opts.onGroupMenu === 'function') {
+                        _opts.onGroupMenu(g.id, more);
+                    }
+                });
+                row.appendChild(more);
+                aside.appendChild(row);
             }
         }
 

@@ -160,7 +160,7 @@ import { initSheet, openSheet } from './ui/sheet.js';
 import { openMessagesWorkspace, refreshConversationBadges, openConversation, openConversationMenuFor, startDmPoll } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupsWorkspace } from './communication/groups.js';
+import { openGroupsWorkspace, openGroup, openGroupMenuFor } from './communication/groups.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
@@ -2422,6 +2422,12 @@ initI18n().then(async () => {
             await openConversation(userId);
         },
         onConversationMenu: (userId, anchor) => openConversationMenuFor(userId, anchor),
+        // ⚠️ Phase 9 قدم ۳: نام گروه در دراور → باز کردن گروه؛ ⋯ کنار نام → منوی همان سطح
+        onOpenGroup: async (groupId) => {
+            if (!switchWorkspace('groups')) return;
+            await openGroup(groupId);
+        },
+        onGroupMenu: (groupId, anchor) => openGroupMenuFor(groupId, anchor),
     });
     initHeader({
         onDrawer: (opener) => openDrawer(opener),
