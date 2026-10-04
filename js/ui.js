@@ -61,7 +61,7 @@ import {
 } from './render-diff.js';
 import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18nT } from './i18n.js';
 import { isLocalView } from './tasks/destination.js';
-import { getSharedItems } from './tasks/source.js';
+import { getSharedItems, getSharedItem } from './tasks/source.js';
 
 /**
  * منبع لیست صفحه‌ی اصلی: وظایف شخصی یا آیتم‌های مقصد مشترک.
@@ -129,7 +129,7 @@ function hydrateWeatherIcons(rootEl) {
         const at = key.slice(sepIdx + 1);
 
         const found = findTask(taskId);
-        const task = found ? found.task : null;
+        const task = found ? found.task : getSharedItem(taskId);
         if (!task || !task.location) {
             slot.textContent = '';
             return;

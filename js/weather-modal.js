@@ -4,6 +4,7 @@
 import { state, escapeHtml, trapFocus } from './core.js';
 import { faShort, nearestUpcoming } from './sessions.js';
 import { findTask } from './store.js';
+import { getSharedItem } from './tasks/source.js';
 import {
     fetchWeather,
     extractHourlyAt,
@@ -144,7 +145,8 @@ function renderWeatherView() {
     }
 
     const task = findTask(_currentTaskId);
-    const taskText = task ? task.task.text : '';
+    const sharedTask = task ? null : getSharedItem(_currentTaskId);
+    const taskText = task ? task.task.text : (sharedTask ? sharedTask.text || '' : '');
     const placeName = formatPlace(_currentLocation);
 
     const canPrev = _currentDayIndex > 0;
@@ -217,8 +219,10 @@ function renderWeatherView() {
  */
 export async function showWeatherModal(taskId, sessionId) {
     const found = findTask(taskId);
-    if (!found) return;
-    const task = found.task;
+    // آیتم مشترک (پیام/گروه): از فروشگاه نمای مشترک
+    const shared = found ? null : getSharedItem(taskId);
+    if (!found && !shared) return;
+    const task = found ? found.task : shared;
 
     // انتخاب سررسید هدف
     let targetSession = null;
