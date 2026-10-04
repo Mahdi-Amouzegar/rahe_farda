@@ -17,7 +17,6 @@ import {
     exportTasks,
     importTasks,
 } from './store.js';
-import { listConversations, fetchFullThread } from './communication/conversations.js';
 import { listGroups, fetchFullTimeline } from './communication/groups.js';
 
 export const BACKUP_V2_VERSION = '2.0.0';
@@ -75,9 +74,8 @@ export async function exportBackupV2(options) {
 
     const mediaIds = new Set(collectMediaIds(v1.data.tasks).concat(collectMediaIds(v1.data.trash)));
 
-    // ─── بخش سرور (فقط ارسال‌شده‌های خودم) ───
-    const groups = { created: [], messages_sent: [], tasks_sent: [] };
-    const direct_messages = [];
+    // ─── بخش سرور (فقط ارسال‌شده‌های خودم — بدون پیام متنی، قدم ۴) ───
+    const groups = { created: [], tasks_sent: [] };
     const me = myUserId();
 
     if (isLoggedIn() && me) {
@@ -91,24 +89,10 @@ export async function exportBackupV2(options) {
                 if (!tl.ok) continue;
                 for (const item of tl.items) {
                     if (item.actorId !== me) continue; // ⚠️ فقط خودم — هرگز دیگران
-                    if (item.entityType === 'group_message') groups.messages_sent.push(item);
-                    else if (item.entityType === 'group_task') {
+                    if (item.entityType === 'group_task') {
                         groups.tasks_sent.push(item);
                         for (const id of collectMediaIds([{ payload: item.body }])) mediaIds.add(id);
                     }
-                }
-            }
-        } catch { /* best-effort */ }
-
-        // پیام‌های مستقیم من
-        try {
-            const cres = await listConversations();
-            for (const c of (cres.ok && cres.conversations) || []) {
-                const th = await fetchFullThread(c.user.id);
-                if (!th.ok) continue;
-                const mineOnly = th.messages.filter((m) => m.senderId === me);
-                if (mineOnly.length > 0) {
-                    direct_messages.push({ withUserId: c.user.id, messages: mineOnly });
                 }
             }
         } catch { /* best-effort */ }
@@ -124,7 +108,6 @@ export async function exportBackupV2(options) {
         personal: v1.data,
         settings: v1.settings,
         groups,
-        direct_messages,
         media: { included_files: false, media_ids: [...mediaIds] },
         checksum: '',
     };
@@ -178,7 +161,6 @@ export function normalizeBackup(raw) {
     // ─── v2 ───
     if (typeof raw.version === 'string' && raw.version.startsWith('2.') && raw.personal) {
         const groups = raw.groups || {};
-        const dms = Array.isArray(raw.direct_messages) ? raw.direct_messages : [];
         return {
             ok: true,
             kind: 'v2',
@@ -189,10 +171,7 @@ export function normalizeBackup(raw) {
             checksum: raw.checksum,
             serverSummary: {
                 groupsCreated: (groups.created || []).length,
-                groupMessagesSent: (groups.messages_sent || []).length,
                 groupTasksSent: (groups.tasks_sent || []).length,
-                dmThreads: dms.length,
-                dmMessages: dms.reduce((s, t) => s + ((t.messages || []).length), 0),
                 mediaIds: ((raw.media && raw.media.media_ids) || []).length,
             },
         };

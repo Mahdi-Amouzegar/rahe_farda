@@ -45,8 +45,6 @@ import {
     searchUsers,
 } from './connections.js';
 
-const PAGE_LIMIT = 30;
-
 let _conversations = [];
 let _incoming = [];
 let _openWith = null;
@@ -151,11 +149,7 @@ export async function listConversations() {
 
 // (countUnread حبابی حذف شد — قدم ۳ §۱۳.۱)
 
-async function fetchPage(otherUserId, cursor) {
-    let path = '/api/messages?with=' + encodeURIComponent(otherUserId) + '&limit=' + PAGE_LIMIT;
-    if (cursor) path += '&before=' + encodeURIComponent(cursor);
-    return apiFetch(path);
-}
+// (fetchPage حبابی حذف شد — قدم ۴؛ بکاپ دیگر thread متنی نمی‌خواند)
 
 // (markReceivedRead حبابی حذف شد — قدم ۳ §۱۳.۱؛ خواندن DM از markDmRead است)
 
@@ -617,33 +611,8 @@ export async function loadMoreDm() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// thread قدیمی حبابی حذف شد (قدم ۳ — §۱۳.۱). بکاپ تا قدم ۴ از fetchFullThread
-// (پایین همین فایل) استفاده می‌کند.
+// thread قدیمی حبابی حذف شد (قدم ۳ — §۱۳.۱؛ بکاپ قدم ۴ دیگر thread متنی نمی‌خواند).
 // ═══════════════════════════════════════════════════════════════════════════
-
-// (thread حبابی حذف شد — قدم ۳ §۱۳.۱؛ fetchFullThread بکاپ پایین فایل می‌ماند)
-
-// (کارت تسک مشترک قدیمی + افزودن به برنامه حذف شد — قدم ۳ §۱۳.۱)
-
-// (ارسال لوکیشن مستقل + preview/مودال مکان حذف شد — قدم ۳ §۱۳.۱؛ لوکیشن فقط آپشن کامپوزر وظیفه است)
-
-// (loadMore حبابی حذف شد — قدم ۳ §۱۳.۱)
-
-/**
- * دریافت کل thread یک گفتگو (برای بکاپ — حداکثر ۲۰ صفحه).
- */
-export async function fetchFullThread(otherUserId) {
-    const all = [];
-    let cursor = null;
-    for (let page = 0; page < 20; page++) {
-        const res = await fetchPage(otherUserId, cursor);
-        if (!res.ok) return { ok: false, error: res.error };
-        all.push(...((res.data && res.data.messages) || []));
-        cursor = (res.data && res.data.nextCursor) || null;
-        if (!res.data || !res.data.hasMore || !cursor) break;
-    }
-    return { ok: true, messages: all };
-}
 
 /**
  * منوی ⋯ یک مخاطب برای استفاده‌ی دراور (همان منوی سطر عنوان).

@@ -1194,7 +1194,7 @@ document.getElementById('importFileInput')?.addEventListener('change', async e =
 
         if (metaEl) {
             const serverNote = norm.serverSummary
-                ? `<div class="import-meta-row"><span>${t('import.metaServer')}</span> <strong>${formatNumber(norm.serverSummary.groupMessagesSent + norm.serverSummary.groupTasksSent + norm.serverSummary.dmMessages)}</strong></div>`
+                ? `<div class="import-meta-row"><span>${t('import.metaServer')}</span> <strong>${formatNumber(norm.serverSummary.groupTasksSent)}</strong></div>`
                 : '';
             metaEl.innerHTML = `
                 <div class="import-meta-row"><span>${t('import.metaVersion')}</span> <strong>${escapeHtml(schemaVersion)}</strong></div>

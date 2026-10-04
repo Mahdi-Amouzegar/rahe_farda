@@ -28,34 +28,10 @@ vi.mock('../js/api.js', async () => ({
                 ok: true,
                 data: {
                     items: [
-                        { id: 'gm1', entityType: 'group_message', actorId: 'u1', body: 'mine', kind: 'text', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-                        { id: 'gm2', entityType: 'group_message', actorId: 'u2', body: 'theirs', kind: 'text', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
                         { id: 'gt1', entityType: 'group_task', actorId: 'u1', body: '{"title":"T","mediaIds":["med-1"]}', kind: 'task', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+                        { id: 'gt2', entityType: 'group_task', actorId: 'u2', body: '{"title":"theirs"}', kind: 'task', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
                     ],
                     nextCursor: null,
-                },
-            };
-        }
-        if (path === '/api/connections') {
-            return {
-                ok: true,
-                data: {
-                    connections: [
-                        { id: 'c1', status: 'accepted', otherUserId: 'u2', otherUser: { id: 'u2' } },
-                    ],
-                },
-            };
-        }
-        if (path.startsWith('/api/messages?with=')) {
-            return {
-                ok: true,
-                data: {
-                    messages: [
-                        { id: 'dm1', senderId: 'u1', recipientId: 'u2', body: 'hi', kind: 'text', createdAt: '2026-01-01T00:00:00Z' },
-                        { id: 'dm2', senderId: 'u2', recipientId: 'u1', body: 'yo', kind: 'text', createdAt: '2026-01-01T00:00:00Z' },
-                    ],
-                    nextCursor: null,
-                    hasMore: false,
                 },
             };
         }
@@ -92,12 +68,11 @@ describe('backup v2 — export (8C)', () => {
         expect(b.personal.tasks.length).toBe(1);
     });
 
-    it('فقط ارسال‌شده‌های خودم — هرگز دیگران', async () => {
+    it('فقط تسک‌های ارسال‌شده‌ی خودم — هرگز دیگران و هرگز پیام متنی', async () => {
         const b = await exportBackupV2({});
-        expect(b.groups.messages_sent.map((m) => m.id)).toEqual(['gm1']);
         expect(b.groups.tasks_sent.map((t) => t.id)).toEqual(['gt1']);
-        expect(b.direct_messages.length).toBe(1);
-        expect(b.direct_messages[0].messages.map((m) => m.id)).toEqual(['dm1']);
+        expect(b).not.toHaveProperty('direct_messages');
+        expect(b.groups).not.toHaveProperty('messages_sent');
     });
 
     it('media_ids جمع می‌شود (تسک محلی + تسک گروهی)', async () => {
@@ -108,7 +83,7 @@ describe('backup v2 — export (8C)', () => {
     it('checksum روی کل فایل تأیید می‌شود', async () => {
         const b = await exportBackupV2({});
         expect(await verifyBackupChecksum(b)).toBe('');
-        const tampered = { ...b, groups: { created: [], messages_sent: [], tasks_sent: [{ id: 'evil' }] } };
+        const tampered = { ...b, groups: { created: [], tasks_sent: [{ id: 'evil' }] } };
         expect(await verifyBackupChecksum(tampered)).not.toBe('');
     });
 
@@ -116,7 +91,7 @@ describe('backup v2 — export (8C)', () => {
         authState.loggedIn = false;
         const b = await exportBackupV2({});
         expect(b.user).toBeNull();
-        expect(b.groups.messages_sent).toEqual([]);
+        expect(b.groups.tasks_sent).toEqual([]);
         expect(b.personal.tasks.length).toBe(1);
     });
 });
