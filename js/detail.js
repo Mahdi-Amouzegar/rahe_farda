@@ -1273,6 +1273,16 @@ export function bindDetailInputs() {
             danger: true
         });
         if (!ok) return;
+        // تسک خودیِ مشترک: حذف از API مقصد (بدون سطل/undo محلی)
+        if (task._shared && task._shared.mine) {
+            const { deleteSharedTask } = await import('./tasks/source.js');
+            closeDetail();
+            await deleteSharedTask(task.id);
+            const { refreshSharedList } = await import('./tasks/source.js');
+            await refreshSharedList();
+            call('render');
+            return;
+        }
         const id = task.id;
         closeDetail();
         moveToTrashById(id);

@@ -8,7 +8,8 @@
 
 import { apiFetch } from '../api.js';
 import { state } from '../core.js';
-import { listDmTasks } from '../communication/dm-tasks.js';
+import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
+import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { getDestination } from './destination.js';
 
 function parsePayload(raw) {
@@ -168,6 +169,126 @@ export function __resetSharedForTest() {
     _items = [];
     _loading = false;
     _error = null;
+    _detailBridge = null;
+}
+
+// ⚠️ فقط برای تست
+export function __setSharedItemsForTest(items) {
+    _items = Array.isArray(items) ? items : [];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// نوشتن روی مقصد مشترک (ویرایش فقط خودی)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function stripShared(item) {
+    const clean = { ...item };
+    delete clean._shared;
+    return clean;
+}
+
+async function writeSharedTask(dest, remoteId, taskObj) {
+    if (dest.type === 'peer') {
+        return updateDmTask(remoteId, taskObj);
+    }
+    if (dest.type === 'group') {
+        await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: taskObj });
+        try {
+            await flushGroup(dest.groupId);
+        } catch { /* آفلاین */ }
+        return { ok: true };
+    }
+    return { ok: false };
+}
+
+/**
+ * ذخیره‌ی کامل آبجکت تسک مشترک (برای saveTask پل جزئیات — بدون refresh).
+ */
+export async function saveSharedTask(task) {
+    if (!task || !task._shared || !task._shared.mine || !task._shared.dest) {
+        return { ok: false };
+    }
+    return writeSharedTask(task._shared.dest, task.id, stripShared(task));
+}
+
+/**
+ * ویرایش عنوان تسک خودی در نمای مشترک.
+ */
+export async function updateSharedTaskText(remoteId, title) {
+    const item = getSharedItem(remoteId);
+    if (!item || !item._shared || !item._shared.mine) return { ok: false };
+    const next = { ...stripShared(item), text: String(title).slice(0, 200) };
+    return writeSharedTask(item._shared.dest, remoteId, next);
+}
+
+/**
+ * تاگل تسک خودی در نمای مشترک.
+ */
+export async function toggleSharedTask(remoteId) {
+    const item = getSharedItem(remoteId);
+    if (!item || !item._shared || !item._shared.mine) return { ok: false };
+    const completed = !item.completed;
+    const next = {
+        ...stripShared(item),
+        completed,
+        completedAt: completed ? new Date().toISOString() : null,
+    };
+    return writeSharedTask(item._shared.dest, remoteId, next);
+}
+
+/**
+ * حذف تسک خودی در نمای مشترک.
+ */
+export async function deleteSharedTask(remoteId) {
+    const item = getSharedItem(remoteId);
+    if (!item || !item._shared || !item._shared.mine) return { ok: false };
+    const dest = item._shared.dest;
+    if (dest.type === 'peer') {
+        return deleteDmTask(remoteId);
+    }
+    if (dest.type === 'group') {
+        await enqueueGroupOp(dest.groupId, 'delete', remoteId, null);
+        try {
+            await flushGroup(dest.groupId);
+        } catch { /* آفلاین */ }
+        return { ok: true };
+    }
+    return { ok: false };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// پل جزئیات: آیتم خودیِ مشترک زیر دست detail (خواندن/نوشتن روی همان آبجکت)
+// فعال فقط وقتی state.currentDetailId با آن ست است (با بستن detail غیرفعال).
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _detailBridge = null;
+
+/**
+ * ثبت پل برای باز کردن جزئیات (فقط خودی).
+ */
+export function setDetailBridge(item) {
+    if (!item || !item._shared || !item._shared.mine) return false;
+    _detailBridge = item;
+    return true;
+}
+
+export function clearDetailBridge() {
+    _detailBridge = null;
+}
+
+/**
+ * آبجکت پل اگر id همان جزئیات باز باشد، وگرنه null.
+ */
+export function getDetailBridgeTask(id) {
+    try {
+        if (!_detailBridge) return null;
+        if (!state.currentDetailId) return null;
+        if (String(state.currentDetailId) !== String(id)) return null;
+        if (String(_detailBridge.id) !== String(id)) return null;
+        return _detailBridge;
+    } catch {
+        return null;
+    }
 }
 
 /**

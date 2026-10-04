@@ -182,6 +182,7 @@ import {
     deleteSharedTask,
     selectDestination,
     resetToLocal,
+    openSharedDetail,
 } from './tasks/composer.js';
 import { getSharedRole, getSharedItem, refreshSharedList } from './tasks/source.js';
 import { getDestination } from './tasks/destination.js';
@@ -2108,6 +2109,10 @@ taskList.addEventListener('click', e => {
         }
         if (action === 'edit-btn') {
             startEdit(id);
+            return;
+        }
+        if (action === 'detail') {
+            openSharedDetail(id);
             return;
         }
         if (action === 'locate') {

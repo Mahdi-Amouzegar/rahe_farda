@@ -675,13 +675,19 @@ async function pollDmOnce() {
             const res = await listConversations();
             if (res.ok) pushRecentConversations();
         } catch { /* best-effort */ }
-        // اگر مخاطب همین گفتگو باز است، لیست صفحه را هم تازه کن
+        // اگر مخاطب همین گفتگو باز است و جزئیات باز نیست، لیست صفحه را هم تازه کن
         try {
             const dest = getDestination();
             if (dest.type === 'peer' && top && String(top.peerId) === String(dest.peerId)) {
-                await refreshSharedList();
-                const { render } = await import('../ui.js');
-                render();
+                let detailOpen = false;
+                try {
+                    detailOpen = !!(state && state.currentDetailId);
+                } catch { /* silent */ }
+                if (!detailOpen) {
+                    await refreshSharedList();
+                    const { render } = await import('../ui.js');
+                    render();
+                }
             }
         } catch { /* best-effort */ }
     }

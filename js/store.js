@@ -26,6 +26,12 @@ import {
 import {
     enqueueUpload as enqueueMediaUpload,
 } from './media-upload.js';
+import { getDetailBridgeTask, saveSharedTask as persistSharedTask } from './tasks/source.js';
+
+async function saveSharedTask(task) {
+    const res = await persistSharedTask(task);
+    if (!res || !res.ok) throw new Error('saveSharedTask failed');
+}
 import { formatNumber } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -604,6 +610,17 @@ export function saveTask(task, parent) {
         return Promise.reject(new Error('saveTask: invalid task'));
     }
 
+    // پل جزئیات مشترک: ذخیره به API مقصد می‌رود، نه IDB/sync شخصی
+    if (task._shared && task._shared.mine && task._shared.dest) {
+        return saveSharedTask(task).then(
+            () => undefined,
+            (err) => {
+                console.error('saveTask (shared) failed', err);
+                events.emit(EV.STORAGE_ERROR, { message: 'خطا در ذخیره‌سازی. اتصال را بررسی کنید.' });
+            }
+        );
+    }
+
     // ⚠️ Phase 4: استفاده از saveTaskAndEnqueue (transactional)
     const p = saveTaskAndEnqueue(task, parent);
 
@@ -940,6 +957,11 @@ export function invalidateTaskIndex() {
 
 export function findTask(id) {
     const key = String(id);
+    // پل جزئیات تسک خودیِ مشترک (فقط وقتی همان جزئیات باز است)
+    try {
+        const bridge = getDetailBridgeTask(key);
+        if (bridge) return { task: bridge, parent: null };
+    } catch { /* silent */ }
     for (const t of state.tasks) {
         if (String(t.id) === key) return { task: t, parent: null };
         if (t.kind === 'plan' && Array.isArray(t.children)) {

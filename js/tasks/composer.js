@@ -6,16 +6,31 @@
 //   peer  → POST /api/dm/tasks با payload کامل تسک
 //   group → صف آفلاین گروه (enqueue + flush) با همان payload
 // ⚠️ payload ریموت = همان آبجکت تسک محلی (سریال‌شده) تا همان کارت/فیلتر کار کند.
-// ⚠️ ویرایش/حذف فقط تسک خودی؛ دیگران read-only (گیت در dispatcher اپ).
+// ⚠️ نوشتن روی مقصد در source.js است (بدون چرخه‌ی import با store)؛ اینجا re-export می‌شود.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { addTask, buildTaskFromComposer, resetComposerForm } from '../store.js';
 import { getDestination, setDestination } from './destination.js';
-import { refreshSharedList, getSharedItem } from './source.js';
-import { createDmTask, updateDmTask, deleteDmTask, markDmRead, getDmUnread } from '../communication/dm-tasks.js';
+import {
+    refreshSharedList,
+    updateSharedTaskText,
+    toggleSharedTask,
+    deleteSharedTask,
+    setDetailBridge,
+    getSharedItem,
+} from './source.js';
+import { createDmTask, markDmRead, getDmUnread } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
 import { apiFetch } from '../api.js';
+
+export {
+    refreshSharedList,
+    getSharedItem,
+    updateSharedTaskText,
+    toggleSharedTask,
+    deleteSharedTask,
+};
 
 /**
  * ساخت وظیفه از کامپوزر واحد (مقصد = جاری صفحه).
@@ -55,71 +70,18 @@ export async function submitTask(kind) {
 }
 
 /**
- * ویرایش عنوان تسک خودی در نمای مشترک (inline-edit موجود همین را صدا می‌زند).
+ * باز کردن جزئیات تسک خودیِ مشترک (پل زنده زیر دست detail).
+ * دیگران: false (read-only می‌ماند).
  */
-export async function updateSharedTaskText(remoteId, title) {
+export async function openSharedDetail(remoteId) {
     const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const dest = item._shared.dest;
-    const next = { ...stripShared(item), text: String(title).slice(0, 200) };
-    return writeSharedTask(dest, remoteId, next);
+    if (!item || !item._shared || !item._shared.mine) return false;
+    if (!setDetailBridge(item)) return false;
+    const { openDetail } = await import('../detail.js');
+    openDetail(remoteId);
+    return true;
 }
 
-/**
- * تاگل تسک خودی در نمای مشترک.
- */
-export async function toggleSharedTask(remoteId) {
-    const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const dest = item._shared.dest;
-    const completed = !item.completed;
-    const next = {
-        ...stripShared(item),
-        completed,
-        completedAt: completed ? new Date().toISOString() : null,
-    };
-    return writeSharedTask(dest, remoteId, next);
-}
-
-/**
- * حذف تسک خودی در نمای مشترک.
- */
-export async function deleteSharedTask(remoteId) {
-    const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const dest = item._shared.dest;
-    if (dest.type === 'peer') {
-        return deleteDmTask(remoteId);
-    }
-    if (dest.type === 'group') {
-        await enqueueGroupOp(dest.groupId, 'delete', remoteId, null);
-        try {
-            await flushGroup(dest.groupId);
-        } catch { /* آفلاین */ }
-        return { ok: true };
-    }
-    return { ok: false };
-}
-
-function stripShared(item) {
-    const clean = { ...item };
-    delete clean._shared;
-    return clean;
-}
-
-async function writeSharedTask(dest, remoteId, taskObj) {
-    if (dest.type === 'peer') {
-        return updateDmTask(remoteId, taskObj);
-    }
-    if (dest.type === 'group') {
-        await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: taskObj });
-        try {
-            await flushGroup(dest.groupId);
-        } catch { /* آفلاین */ }
-        return { ok: true };
-    }
-    return { ok: false };
-}
 /**
  * ثبت خواندن مقصد جاری + تازه‌سازی بج دراور.
  */
