@@ -149,6 +149,7 @@ function applyDestinationLabel() {
     } catch { /* silent */ }
 }
 import {
+    submitTask,
     toggleSharedTask,
     updateSharedTaskText,
     deleteSharedTask,
