@@ -134,8 +134,18 @@ import {
 } from './ui.js';
 
 /**
- * لیبل زمینه‌ی هدر: در نمای وظایف با مقصد مشترک، نام مخاطب/گروه.
+ * پیش‌بارگذاری لیست‌های دراور (مخاطبان + گروه‌ها) بلافاصله بعد از ورود.
+ * بدون این، ردیف‌های اخیر تا بازدید از فضاهای قدیمی خالی می‌ماند.
  */
+async function preloadDrawerLists() {
+    try {
+        if (!isLoggedIn()) return;
+        await listConversations().catch(() => {});
+        await refreshConversationBadges().catch(() => {});
+        await listGroups().catch(() => {});
+        await refreshGroupBadges().catch(() => {});
+    } catch { /* best-effort */ }
+}
 function applyDestinationLabel() {
     try {
         const el = document.getElementById('headerContext');
@@ -202,10 +212,10 @@ import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation
 import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
-import { openMessagesWorkspace, refreshConversationBadges, openConversationMenuFor, startDmPoll } from './communication/conversations.js';
+import { openMessagesWorkspace, refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupsWorkspace, openGroupMenuFor } from './communication/groups.js';
+import { openGroupsWorkspace, openGroupMenuFor, listGroups, refreshGroupBadges } from './communication/groups.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
@@ -232,7 +242,8 @@ import {
     formatExpiry,
     refreshToken,
     ttlLabel,
-    ALLOWED_TTL_DAYS
+    ALLOWED_TTL_DAYS,
+    isLoggedIn,
 } from './auth.js';
 
 // ⚠️ فاز ۴C — چندزبانه
@@ -586,6 +597,7 @@ function wireEvents() {
 
     events.on('auth:login', () => {
         updateAccountStatusText();
+        preloadDrawerLists();
     });
     events.on('auth:logout', () => {
         updateAccountStatusText();
@@ -2602,12 +2614,13 @@ initI18n().then(async () => {
         console.warn('[auth] handleTelegramRedirect failed:', err);
     }
 
-    // ⚠️ بازیابی session
+    // ⚠️ بازیابی session + پیش‌بارگذاری لیست‌های دراور (مخاطبان/گروه‌ها)
     try {
         const restored = await restoreSession();
         if (restored.restored) {
             console.log('[auth] session restored for user:', restored.user?.id);
         }
+        await preloadDrawerLists();
     } catch (err) {
         console.warn('[auth] restoreSession failed:', err);
     }
