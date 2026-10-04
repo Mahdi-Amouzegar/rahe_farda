@@ -74,14 +74,9 @@ describe('tasks two-state list', () => {
     });
 });
 
-describe('tasks composer seam', () => {
-    it('peer/group تا بک‌اند ۱.۵ خطای NOT_READY می‌دهند', async () => {
-        const { submitTask } = await import('../js/tasks/composer.js');
-        expect(() => submitTask('task', { type: 'peer', peerId: 'u2' })).toThrowError();
-        try {
-            submitTask('task', { type: 'group', groupId: 'g1' });
-        } catch (e) {
-            expect(e.code).toBe('NOT_READY_UNTIL_1_5');
-        }
+describe('tasks composer seam (تک‌صفحه)', () => {
+    it('peer/group معتبر نرمال می‌شوند (مسیریابی در shared-page تست می‌شود)', () => {
+        expect(normalizeDestination({ type: 'peer', peerId: 'u2' })).toEqual({ type: 'peer', peerId: 'u2' });
+        expect(normalizeDestination({ type: 'group', groupId: 'g1' })).toEqual({ type: 'group', groupId: 'g1' });
     });
 });

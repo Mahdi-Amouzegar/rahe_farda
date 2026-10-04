@@ -55,3 +55,47 @@ export function normalizeDestination(dest) {
 export function isLocalDestination(dest) {
     return normalizeDestination(dest).type === 'local';
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// مقصد جاری صفحه‌ی اصلی (تک‌صفحه: وظایف من / مخاطب / گروه)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _current = { type: 'local' };
+const _listeners = new Set();
+
+/**
+ * مقصد جاری (همیشه نرمال‌شده + name نمایشی اختیاری).
+ */
+export function getDestination() {
+    return _current;
+}
+
+export function isLocalView() {
+    return _current.type === 'local';
+}
+
+/**
+ * ست کردن مقصد + خبر به شنونده‌ها (رندر/بج/هدر).
+ * name فقط نمایشی است (در API فرستاده نمی‌شود).
+ */
+export function setDestination(dest) {
+    const norm = normalizeDestination(dest);
+    _current = dest && typeof dest === 'object' && typeof dest.name === 'string'
+        ? { ...norm, name: dest.name }
+        : norm;
+    for (const fn of _listeners) {
+        try { fn(_current); } catch { /* silent */ }
+    }
+    return _current;
+}
+
+export function onDestinationChange(fn) {
+    _listeners.add(fn);
+    return () => _listeners.delete(fn);
+}
+
+// ⚠️ فقط برای تست
+export function __resetDestinationForTest() {
+    _current = { type: 'local' };
+    _listeners.clear();
+}

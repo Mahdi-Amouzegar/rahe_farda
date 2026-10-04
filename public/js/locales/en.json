@@ -380,6 +380,7 @@
 
   "tasks": {
     "add": "Add",
+    "sharedFrom": "From {name}",
     "new": "New task",
     "newPlaceholder": "Write your new task…",
     "planPlaceholder": "Plan name (e.g. Trip to Tehran)…",

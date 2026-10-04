@@ -863,6 +863,12 @@
         border: 1px solid;
     }
 
+    .shared-from {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
     .priority-badge.p-high {
         color: var(--accent-pink);
         border-color: var(--accent-pink-border);

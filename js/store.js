@@ -1180,7 +1180,11 @@ export function restoreTrash(id) {
 // CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function addTask(forceKind) {
+/**
+ * ساخت آبجکت تسک از فرم کامپوزر (بدون ذخیره — برای مصرف محلی و مقصد مشترک).
+ * @returns {{task, kind} | null} — null یعنی اعتبارسنجی ناموفق (خطا inline نمایش داده شد)
+ */
+export function buildTaskFromComposer(forceKind) {
     const input = document.getElementById('taskInput');
     const prioritySelect = document.getElementById('prioritySelect');
     const text = input.value.trim().replace(/\s+/g, ' ');
@@ -1189,7 +1193,7 @@ export function addTask(forceKind) {
         void input.offsetWidth;
         input.classList.add('input-error');
         input.focus();
-        return;
+        return null;
     }
     const kind = forceKind || state.pendingKind || 'task';
     const isPlan = kind === 'plan';
@@ -1211,7 +1215,7 @@ export function addTask(forceKind) {
             if (!(n >= 1 && n <= 168)) {
                 if (errEl) errEl.textContent = 'عدد ساعت بین ۱ تا ۱۶۸ باشد';
                 input.focus();
-                return;
+                return null;
             }
             recur = 'hourly';
             recurN = n;
@@ -1220,16 +1224,15 @@ export function addTask(forceKind) {
             if (!state.seriesDays.length) {
                 if (errEl) errEl.textContent = 'حداقل یک روز انتخاب کنید';
                 input.focus();
-                return;
+                return null;
             }
             recur = state.seriesType;
             recurDays = [...state.seriesDays];
             sessions = [];
         }
     }
-    state.justAddedId = uid();
     const newTask = {
-        id: state.justAddedId,
+        id: uid(),
         text: text.slice(0, MAX_LENGTH),
         completed: false,
         completedAt: null,
@@ -1254,11 +1257,14 @@ export function addTask(forceKind) {
         startAt: isPlan ? (state.planDraftStart || null) : null,
         endAt: isPlan ? (state.planDraftEnd || null) : null
     };
-    state.tasks.unshift(newTask);
-    if (isPlan) state.expandedPlans.add(String(state.justAddedId));
+    return { task: newTask, kind };
+}
 
-    saveTask(newTask);
-
+/**
+ * پاک‌سازی فرم کامپوزر بعد از ثبت موفق (بدون رندر).
+ */
+export function resetComposerForm() {
+    const input = document.getElementById('taskInput');
     input.value = '';
     input.classList.remove('input-error');
     state.addDraftSessions = [];
@@ -1280,6 +1286,19 @@ export function addTask(forceKind) {
     }
     call('updateLocChip');
     input.focus();
+}
+
+export function addTask(forceKind) {
+    const built = buildTaskFromComposer(forceKind);
+    if (!built) return;
+    const { task: newTask, kind } = built;
+    state.justAddedId = newTask.id;
+    state.tasks.unshift(newTask);
+    if (kind === 'plan') state.expandedPlans.add(String(state.justAddedId));
+
+    saveTask(newTask);
+
+    resetComposerForm();
     call('render');
     if (kind === 'series') {
         const newId = state.justAddedId;

@@ -380,6 +380,7 @@
 
   "tasks": {
     "add": "افزودن",
+    "sharedFrom": "از {name}",
     "new": "کار جدید",
     "newPlaceholder": "کار جدید را بنویسید...",
     "planPlaceholder": "نام برنامه (مثلاً سفر به تهران)...",

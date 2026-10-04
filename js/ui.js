@@ -60,6 +60,23 @@ import {
     isSafeForDiff
 } from './render-diff.js';
 import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18nT } from './i18n.js';
+import { isLocalView } from './tasks/destination.js';
+import { getSharedItems } from './tasks/source.js';
+
+/**
+ * منبع لیست صفحه‌ی اصلی: وظایف شخصی یا آیتم‌های مقصد مشترک.
+ */
+function visibleSource() {
+    return isLocalView() ? state.tasks : getSharedItems();
+}
+
+/**
+ * بج «از: نام» برای آیتم دیگران در نمای مشترک.
+ */
+function sharedFromBadge(task) {
+    if (!task || !task._shared || task._shared.mine || !task._shared.senderName) return '';
+    return `<span class="shared-from">${escapeHtml(i18nT('tasks.sharedFrom', { name: task._shared.senderName }))}</span>`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
@@ -207,7 +224,7 @@ export function getFiltered() {
         if (state.currentFilter === 'completed') return t.completed;
         return true;
     };
-    let list = state.tasks.filter(t => {
+    let list = visibleSource().filter(t => {
         if (!base(t)) return false;
         if (!state.selectedDay) return true;
         if (t.kind === 'plan') {
@@ -705,7 +722,7 @@ function planHtml(task) {
             </div>
         </div>
         <div class="task-meta plan-meta-row">
-            <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>${recurBadge(task)}
+            <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>${recurBadge(task)}${sharedFromBadge(task)}
             <span>${i18nT('taskItem.plan.subCount', { done: formatNumber(st.done), total: formatNumber(st.total) })}</span>
             ${(task.startAt || task.endAt) ? `<span>📅 ${planDateRange(task)}</span>` : ''}
             ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
@@ -786,6 +803,7 @@ function taskItemHtml(task) {
         <div class="task-info-row">
             <span class="priority-badge p-${task.priority}">${priorityLabel(task.priority)}</span>
             ${recurBadge(task)}
+            ${sharedFromBadge(task)}
             <span class="created-date">${faDate(task.createdAt)}</span>
             ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${task.location ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
@@ -959,7 +977,8 @@ function renderDiff(filtered) {
 export function render() {
     scheduleMarkerRefresh();
 
-    const live = state.tasks.filter(t => !t.archived);
+    const source = visibleSource();
+    const live = source.filter(t => !t.archived);
     const filtered = getFiltered();
     const total = live.length;
     const done = live.filter(t => t.kind === 'plan' ? planIsDone(t) : t.completed).length;
@@ -993,7 +1012,7 @@ export function render() {
     let archivedCount = 0;
     let locCount = 0;
     let dueCount = 0;
-    state.tasks.forEach(t => {
+    source.forEach(t => {
         if (t.archived) { archivedCount++; return; }
         if (t.location) locCount++;
         if ((t.sessions || []).length) dueCount++;

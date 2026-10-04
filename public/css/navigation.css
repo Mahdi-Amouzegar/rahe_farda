@@ -101,6 +101,42 @@ html[dir="ltr"] .drawer {
     flex: 1;
 }
 
+.drawer-item-label-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    padding: 0;
+    min-width: 0;
+}
+
+.drawer-item-label-btn .drawer-item-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drawer-more {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-md);
+}
+
+.drawer-more:hover {
+    background: var(--bg-4);
+    color: var(--text-primary);
+}
+
 .drawer-badge {
     min-width: 22px;
     text-align: center;

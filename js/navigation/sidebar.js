@@ -140,7 +140,7 @@ function renderDrawer() {
                 b.appendChild(el('span', 'drawer-item-label', String(g.name || '')));
                 b.addEventListener('click', () => {
                     closeDrawer();
-                    if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id);
+                    if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id, g.name);
                     else switchWorkspace('groups');
                 });
                 row.appendChild(b);
@@ -173,7 +173,7 @@ function renderDrawer() {
                 b.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
                 b.addEventListener('click', () => {
                     closeDrawer();
-                    if (_opts && typeof _opts.onOpenConversation === 'function') _opts.onOpenConversation(r.userId);
+                    if (_opts && typeof _opts.onOpenConversation === 'function') _opts.onOpenConversation(r.userId, r.name);
                     else switchWorkspace('messages');
                 });
                 row.appendChild(b);

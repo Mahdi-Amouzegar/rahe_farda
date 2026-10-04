@@ -31,22 +31,28 @@ export async function listDmTasks(peerId, cursor) {
 }
 
 /**
- * ساخت تسک DM.
+ * ساخت تسک DM (payload = آبجکت کامل تسک یا فقط عنوان).
  */
-export async function createDmTask(peerId, title) {
+export async function createDmTask(peerId, titleOrTask) {
+    const payload = titleOrTask && typeof titleOrTask === 'object' && !Array.isArray(titleOrTask)
+        ? titleOrTask
+        : { title: titleOrTask };
     return apiFetch('/api/dm/tasks', {
         method: 'POST',
-        body: { peerId, kind: 'task', payload: { title } },
+        body: { peerId, kind: 'task', payload },
     });
 }
 
 /**
- * ویرایش تسک خودی.
+ * ویرایش تسک خودی (payload کامل یا فقط عنوان).
  */
-export async function updateDmTask(taskId, title) {
+export async function updateDmTask(taskId, titleOrTask) {
+    const payload = titleOrTask && typeof titleOrTask === 'object' && !Array.isArray(titleOrTask)
+        ? titleOrTask
+        : { title: titleOrTask };
     return apiFetch('/api/dm/tasks/' + encodeURIComponent(taskId), {
         method: 'PATCH',
-        body: { payload: { title } },
+        body: { payload },
     });
 }
 

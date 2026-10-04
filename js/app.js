@@ -132,7 +132,51 @@ import {
     showUndoFor,
     resetRenderSignature
 } from './ui.js';
-import { submitTask } from './tasks/composer.js';
+
+/**
+ * لیبل زمینه‌ی هدر: در نمای وظایف با مقصد مشترک، نام مخاطب/گروه.
+ */
+function applyDestinationLabel() {
+    try {
+        const el = document.getElementById('headerContext');
+        if (!el) return;
+        const dest = getDestination();
+        if (getActiveWorkspace() === 'tasks' && dest.type !== 'local' && dest.name) {
+            el.textContent = dest.name;
+            return;
+        }
+        refreshHeaderContext();
+    } catch { /* silent */ }
+}
+import {
+    toggleSharedTask,
+    updateSharedTaskText,
+    deleteSharedTask,
+    selectDestination,
+    resetToLocal,
+} from './tasks/composer.js';
+import { getSharedRole, getSharedItem, refreshSharedList } from './tasks/source.js';
+import { getDestination } from './tasks/destination.js';
+
+/**
+ * پرواز نقشه به لوکیشن آیتم مشترک (read-only هم مجاز است).
+ */
+function flyToShared(id) {
+    try {
+        const t = getSharedItem(id);
+        if (!t) return;
+        const loc = t.location || ((t.sessions || []).map((s) => s.location).find(Boolean));
+        if (!loc) {
+            mapHint(t('map.hint.noLocationForTask'));
+            return;
+        }
+        ensureMapVisible();
+        const map = getMap();
+        if (map && typeof map.flyTo === 'function') {
+            map.flyTo([loc.lat, loc.lng], 14, { duration: 1 });
+        }
+    } catch { /* silent */ }
+}
 import {
     refreshSavedLocationUI,
     updateLocChip,
@@ -153,14 +197,14 @@ import { bindWeatherModal } from './weather-modal.js';
 import { events, EV } from './events.js';
 
 // ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
-import { initWorkspace, switchWorkspace } from './navigation/workspace.js';
+import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation/workspace.js';
 import { initSidebar, openDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
-import { openMessagesWorkspace, refreshConversationBadges, openConversation, openConversationMenuFor, startDmPoll } from './communication/conversations.js';
+import { openMessagesWorkspace, refreshConversationBadges, openConversationMenuFor, startDmPoll } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupsWorkspace, openGroup, openGroupMenuFor } from './communication/groups.js';
+import { openGroupsWorkspace, openGroupMenuFor } from './communication/groups.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
@@ -1994,6 +2038,62 @@ taskList.addEventListener('click', e => {
 
     const action = actionEl ? actionEl.dataset.action : null;
 
+    // ─── نمای مشترک: گیت read-only + مسیریابی API ───
+    // دیگران: فقط expand/locate. خودی: toggle/edit/delete از API مقصد، بقیه مسدود.
+    const sharedRole = getSharedRole(id);
+    if (sharedRole) {
+        if (!sharedRole.mine) {
+            if (action === 'expand') {
+                const gid = String(id);
+                if (state.expandedPlans.has(gid)) state.expandedPlans.delete(gid);
+                else state.expandedPlans.add(gid);
+                render();
+                return;
+            }
+            if (action === 'locate') {
+                flyToShared(id);
+                return;
+            }
+            return;
+        }
+        if (action === 'toggle') {
+            toggleSharedTask(id).then(() => refreshSharedList().then(() => render()));
+            return;
+        }
+        if (action === 'delete') {
+            deleteSharedTask(id).then(() => refreshSharedList().then(() => render()));
+            return;
+        }
+        if (action === 'edit-ok') {
+            const inp = scopeEl.querySelector('.task-edit-input');
+            updateSharedTaskText(id, inp ? inp.value : '').then(() => {
+                state.editingId = null;
+                refreshSharedList().then(() => render());
+            });
+            return;
+        }
+        if (action === 'edit-cancel') {
+            cancelEdit();
+            return;
+        }
+        if (action === 'edit-btn') {
+            startEdit(id);
+            return;
+        }
+        if (action === 'locate') {
+            flyToShared(id);
+            return;
+        }
+        if (action === 'expand') {
+            const gid = String(id);
+            if (state.expandedPlans.has(gid)) state.expandedPlans.delete(gid);
+            else state.expandedPlans.add(gid);
+            render();
+            return;
+        }
+        return;
+    }
+
     if (action === 'toggle') toggleTask(id);
     else if (action === 'delete') deleteTask(id, scopeEl);
     else if (action === 'edit-btn') startEdit(id);
@@ -2093,14 +2193,18 @@ taskList.addEventListener('dblclick', e => {
     const textEl = e.target.closest('[data-action="edit"]');
     if (!textEl) return;
     const scopeEl = textEl.closest('.child-item') || textEl.closest('.task-item');
-    if (scopeEl) startEdit(scopeEl.dataset.id);
+    if (!scopeEl) return;
+    const role = getSharedRole(scopeEl.dataset.id);
+    if (role && !role.mine) return;
+    startEdit(scopeEl.dataset.id);
 });
 
 taskList.addEventListener('keydown', e => {
     if (e.target.classList.contains('child-input')) {
         if (e.key === 'Enter') {
             const item = e.target.closest('.task-item');
-            if (item) addChild(item.dataset.id);
+            if (!item || getSharedRole(item.dataset.id)) return;
+            addChild(item.dataset.id);
         }
         return;
     }
@@ -2108,6 +2212,17 @@ taskList.addEventListener('keydown', e => {
     if (!editInput) return;
     const scopeEl = editInput.closest('.child-item') || editInput.closest('.task-item');
     if (!scopeEl) return;
+    const sharedRole = getSharedRole(scopeEl.dataset.id);
+    if (sharedRole) {
+        if (!sharedRole.mine) return;
+        if (e.key === 'Enter') {
+            updateSharedTaskText(scopeEl.dataset.id, editInput.value).then(() => {
+                state.editingId = null;
+                refreshSharedList().then(() => render());
+            });
+        } else if (e.key === 'Escape') cancelEdit();
+        return;
+    }
     if (e.key === 'Enter') commitEdit(scopeEl.dataset.id, editInput.value);
     else if (e.key === 'Escape') cancelEdit();
 });
@@ -2119,6 +2234,15 @@ taskList.addEventListener('focusout', e => {
     if (item && item.contains(e.relatedTarget)) return;
     const scopeEl = editInput.closest('.child-item') || item;
     if (!scopeEl) return;
+    const role = getSharedRole(scopeEl.dataset.id);
+    if (role) {
+        if (!role.mine) return;
+        updateSharedTaskText(scopeEl.dataset.id, editInput.value).then(() => {
+            state.editingId = null;
+            refreshSharedList().then(() => render());
+        });
+        return;
+    }
     commitEdit(scopeEl.dataset.id, editInput.value);
 });
 
@@ -2204,7 +2328,7 @@ document.addEventListener('keydown', e => {
 let dragId = null;
 taskList.addEventListener('dragstart', e => {
     const item = e.target.closest('.task-item');
-    if (!item || state.currentSort !== 'manual' || e.target.closest('.child-item')) {
+    if (!item || state.currentSort !== 'manual' || e.target.closest('.child-item') || getSharedRole(item.dataset.id)) {
         e.preventDefault();
         return;
     }
@@ -2405,27 +2529,34 @@ initI18n().then(async () => {
     initSidebar({
         onNavigate: (ws) => {
             if (!switchWorkspace(ws)) return;
+            // ⚠️ تک‌صفحه: ورود به وظایف = مقصد محلی
+            if (ws === 'tasks') {
+                resetToLocal().then(() => applyDestinationLabel());
+                return;
+            }
             // ⚠️ فاز ۸ (8.2-A): ورود به فضای پیام‌ها = لود لیست + بج
             if (ws === 'messages') openMessagesWorkspace();
             // ⚠️ فاز ۸ (8.3-A): ورود به فضای گروه‌ها = لود لیست
             if (ws === 'groups') openGroupsWorkspace();
             // ⚠️ 8.3-D: ورود به فضای جستجو
             if (ws === 'search') openSearchWorkspace();
+            applyDestinationLabel();
         },
         onLogin: () => openAuthModal(),
         onOpenSettings: () => toggleSettings(true),
         onOpenAccount: () => openAuthModal(),
-        // ⚠️ Phase 9 قدم ۲: نام در دراور → رفتن به گفتگو؛ ⋯ کنار نام → منوی همان سطح
-        onOpenConversation: async (userId) => {
-            if (!switchWorkspace('messages')) return;
-            openMessagesWorkspace();
-            await openConversation(userId);
+        // ⚠️ تک‌صفحه: نام در دراور → همان صفحه با مقصد مخاطب (بدون تغییر فضا)
+        onOpenConversation: async (userId, name) => {
+            if (!switchWorkspace('tasks')) return;
+            await selectDestination({ type: 'peer', peerId: String(userId), name });
+            applyDestinationLabel();
         },
         onConversationMenu: (userId, anchor) => openConversationMenuFor(userId, anchor),
-        // ⚠️ Phase 9 قدم ۳: نام گروه در دراور → باز کردن گروه؛ ⋯ کنار نام → منوی همان سطح
-        onOpenGroup: async (groupId) => {
-            if (!switchWorkspace('groups')) return;
-            await openGroup(groupId);
+        // ⚠️ تک‌صفحه: نام گروه در دراور → همان صفحه با مقصد گروه (بدون تغییر فضا)
+        onOpenGroup: async (groupId, name) => {
+            if (!switchWorkspace('tasks')) return;
+            await selectDestination({ type: 'group', groupId: String(groupId), name });
+            applyDestinationLabel();
         },
         onGroupMenu: (groupId, anchor) => openGroupMenuFor(groupId, anchor),
     });
@@ -2436,6 +2567,11 @@ initI18n().then(async () => {
     });
     initSheet();
     events.on(EV.AUTH_REQUIRED, () => openAuthModal());
+    events.on(EV.WORKSPACE_CHANGED, () => applyDestinationLabel());
+    try {
+        const { onDestinationChange } = await import('./tasks/destination.js');
+        onDestinationChange(() => applyDestinationLabel());
+    } catch { /* silent */ }
 
     // ⚠️ بعد از i18n، taskها را لود کن
     await loadTasks();

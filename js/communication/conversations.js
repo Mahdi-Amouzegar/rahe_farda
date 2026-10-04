@@ -23,6 +23,8 @@ import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
 import { updateDrawerBadges, setRecentConversations } from '../navigation/sidebar.js';
 import { sideFor, canEdit, taskTitle } from '../tasks/list.js';
+import { getDestination } from '../tasks/destination.js';
+import { refreshSharedList } from '../tasks/source.js';
 import {
     listDmTasks,
     createDmTask,
@@ -672,6 +674,15 @@ async function pollDmOnce() {
         try {
             const res = await listConversations();
             if (res.ok) pushRecentConversations();
+        } catch { /* best-effort */ }
+        // اگر مخاطب همین گفتگو باز است، لیست صفحه را هم تازه کن
+        try {
+            const dest = getDestination();
+            if (dest.type === 'peer' && top && String(top.peerId) === String(dest.peerId)) {
+                await refreshSharedList();
+                const { render } = await import('../ui.js');
+                render();
+            }
         } catch { /* best-effort */ }
     }
     _lastPollTotal = total;
