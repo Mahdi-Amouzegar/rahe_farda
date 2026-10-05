@@ -716,17 +716,16 @@ export async function refreshGroupBadges() {
         }
     } catch { /* best-effort */ }
     const unreadByGroup = new Map();
-    for (const g of _groups) {
+    // ⚠️ موازی (نه ترتیبی): هر گروه یک /unread جدا می‌خواهد و latency جمع می‌شد
+    await Promise.all((_groups || []).map(async (g) => {
         try {
             const res = await apiFetch('/api/groups/' + encodeURIComponent(g.id) + '/unread');
-            if (!res.ok) continue;
+            if (!res.ok) return;
             const u = (res.data && res.data.unread) || { messages: 0, tasks: 0 };
             const total = (Number(u.messages) || 0) + (Number(u.tasks) || 0);
             unreadByGroup.set(String(g.id), total);
-            const badge = document.querySelector('[data-group-unread="' + String(g.id).replace(/"/g, '') + '"]');
-            if (badge) setBadge(badge, total);
         } catch { /* best-effort per group */ }
-    }
+    }));
     try {
         const rows = (_groups || []).map((g) => ({
             id: String(g.id),

@@ -141,12 +141,17 @@ import {
 async function preloadDrawerLists() {
     try {
         if (!isLoggedIn()) return;
-        await listConversations().catch(() => {});
-        await refreshConversationBadges().catch(() => {});
-        await refreshIncomingRequests().catch(() => {});
-        await listGroups().catch(() => {});
-        await refreshGroupBadges().catch(() => {});
-        await refreshGroupInbox().catch(() => {});
+        // لیست‌ها مستقل‌اند → موازی؛ بج‌ها به آن‌ها وابسته‌اند → بعدش موازی
+        await Promise.all([
+            listConversations().catch(() => {}),
+            listGroups().catch(() => {}),
+            refreshIncomingRequests().catch(() => {}),
+            refreshGroupInbox().catch(() => {}),
+        ]);
+        await Promise.all([
+            refreshConversationBadges().catch(() => {}),
+            refreshGroupBadges().catch(() => {}),
+        ]);
     } catch { /* best-effort */ }
 }
 
