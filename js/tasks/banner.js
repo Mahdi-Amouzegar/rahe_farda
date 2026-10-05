@@ -4,7 +4,7 @@
 //   - pending-in  → متن + دکمه‌های پذیرش/رد (زیر اولین پیام‌ها)
 //   - pending-out → «در انتظار پذیرش» + سقف باقی‌مانده
 //   - accepted/none → مخفی
-// ⚠️ بدون innerHTML — فقط DOM API و textContent.
+// ⚠️ فقط DOM API و textContent برای رندر (بدون تزریق رشته به درخت).
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch, apiErrorMessage } from '../api.js';
