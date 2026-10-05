@@ -233,7 +233,7 @@ import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation
 import { initSidebar, openDrawer, rerenderDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
-import { openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
+import { refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
 import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog } from './communication/groups.js';
