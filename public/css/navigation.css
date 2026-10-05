@@ -101,6 +101,54 @@ html[dir="ltr"] .drawer {
     flex: 1;
 }
 
+.drawer-duo {
+    display: flex;
+    gap: 8px;
+}
+
+.drawer-duo .drawer-duo-btn {
+    flex: 1;
+    justify-content: center;
+}
+
+.drawer-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 4px 2px;
+}
+
+.drawer-tab {
+    flex: 1;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 7px 4px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.drawer-tab.active {
+    background: var(--bg-4);
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.drawer-mini-btn {
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.drawer-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline-end: 4px;
+}
+
 .drawer-item-label-btn {
     flex: 1;
     display: flex;

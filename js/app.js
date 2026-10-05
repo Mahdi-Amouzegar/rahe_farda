@@ -247,6 +247,7 @@ import {
     requestConnection,
     acceptConnection,
     rejectConnection,
+    findActiveConnectionWith,
 } from './communication/connections.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
@@ -2628,6 +2629,54 @@ initI18n().then(async () => {
         onSearchUsers: async (q) => {
             const res = await searchUsers(q).catch(() => null);
             return (res && res.ok && res.users) || [];
+        },
+        onSearchAll: async (q) => {
+            try {
+                const { apiFetch } = await import('./api.js');
+                const res = await apiFetch('/api/search?q=' + encodeURIComponent(q) + '&type=all');
+                if (!res.ok) return { users: [], groups: [] };
+                return {
+                    users: (res.data && res.data.users) || [],
+                    groups: (res.data && res.data.groups) || [],
+                };
+            } catch {
+                return { users: [], groups: [] };
+            }
+        },
+        onOpenSearchUser: async (u) => {
+            if (!u || !u.id) return;
+            try {
+                const c = await findActiveConnectionWith(u.id).catch(() => null);
+                if (c && c.ok && c.connection) {
+                    await selectDestination({
+                        type: 'peer',
+                        peerId: String(u.id),
+                        name: u.displayName || u.username,
+                    });
+                    applyDestinationLabel();
+                    return;
+                }
+            } catch { /* silent */ }
+            const res = await requestConnection(u.id).catch(() => ({ ok: false }));
+            showToast(res && res.ok ? t('conn.requestSent') : t('errors.serverError'));
+        },
+        onOpenSearchGroup: async (g) => {
+            if (!g || !g.id) return;
+            try {
+                const mine = await listGroups().catch(() => null);
+                const found = mine && mine.ok
+                    ? (mine.groups || []).find((x) => String(x.id) === String(g.id))
+                    : null;
+                if (found) {
+                    await selectDestination({ type: 'group', groupId: String(g.id), name: g.name });
+                    applyDestinationLabel();
+                    return;
+                }
+            } catch { /* silent */ }
+            showInfoModal({
+                title: g.name || '',
+                paragraphs: [t('search.inviteOnly')],
+            });
         },
         onRequestConnection: async (userId) => {
             const res = await requestConnection(userId).catch(() => ({ ok: false }));

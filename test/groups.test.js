@@ -189,6 +189,7 @@ describe('groups — drawer preload (رگرسیون لود اولیه)', () => {
             </div>`;
         sb.initSidebar({});
         sb.openDrawer();
+        document.querySelector('#drawer [data-dtab="groups"]').click();
         const drawerText = document.getElementById('drawer').textContent;
         expect(drawerText).toContain('سفر');
         // زیر سرفصل گروه‌ها، نه مخاطبان

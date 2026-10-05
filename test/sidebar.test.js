@@ -67,20 +67,34 @@ describe('sidebar — guest', () => {
 });
 
 describe('sidebar — logged in', () => {
-    it('جستجو + وظایف + تنظیمات + حساب (بدون دکمه قدیمی پیام/گروه/اعلان)', () => {
+    it('جستجو + وظایف (بدون دکمه قدیمی پیام/گروه/اعلان و بدون جستجوی جدا)', () => {
         openDrawer();
         const labels = [...document.querySelectorAll('#drawer [data-workspace]')]
             .map((b) => b.getAttribute('data-workspace'));
-        expect(labels).toEqual(['search', 'tasks']);
+        expect(labels).toEqual(['tasks']);
     });
 
-    it('زیربخش مخاطبان و گروه‌ها با سرفصل جدا', () => {
-        setRecentConversations([{ userId: 'u2', name: 'سارا', avatarUrl: null, unread: 1 }]);
-        setRecentGroups([{ id: 'g1', name: 'سفر', avatarUrl: null, unread: 0 }]);
+    it('تب سه‌تایی مخاطبان/گروه‌ها/جستجو', () => {
         openDrawer();
-        const text = document.getElementById('drawer').textContent;
-        expect(text).toContain('مخاطبان');
-        expect(text).toContain('گروه‌ها');
+        const tabs = [...document.querySelectorAll('#drawer [data-dtab]')]
+            .map((b) => b.getAttribute('data-dtab'));
+        expect(tabs).toEqual(['contacts', 'groups', 'search']);
+    });
+
+    function openGroupsTab() {
+        openDrawer();
+        document.querySelector('#drawer [data-dtab="groups"]').click();
+    }
+
+    it('تب مخاطبان پیش‌فرض است و لیست کامل را نشان می‌دهد', () => {
+        setRecentConversations([
+            { userId: 'u2', name: 'سارا', avatarUrl: null, unread: 1 },
+            { userId: 'u3', name: 'رضا', avatarUrl: null, unread: 0 },
+            { userId: 'u4', name: 'نگار', avatarUrl: null, unread: 0 },
+            { userId: 'u5', name: 'امیر', avatarUrl: null, unread: 0 },
+        ]);
+        openDrawer();
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(4);
     });
 
     it('درخواست ورودی با قبول/رد', async () => {
@@ -100,8 +114,8 @@ describe('sidebar — logged in', () => {
     });
 
     it('دکمه ＋ فرم ساخت گروه را باز می‌کند', () => {
-        openDrawer();
-        const addBtns = [...document.querySelectorAll('#drawer .drawer-section-head .drawer-more')];
+        openGroupsTab();
+        const addBtns = [...document.querySelectorAll('#drawer .drawer-mini-btn')];
         expect(addBtns.length).toBe(1);
         addBtns[0].click();
         expect(document.querySelector('#drawer .conv-search .conv-input')).not.toBeNull();
@@ -119,13 +133,13 @@ describe('sidebar — logged in', () => {
         expect(badges[1].hidden).toBe(true);
     });
 
-    it('حداکثر ۳ گروه اخیر', () => {
+    it('لیست کامل گروه‌ها (بدون سقف ۳تایی)', () => {
         setRecentGroups([
             { id: 'g1', name: 'یک' }, { id: 'g2', name: 'دو' },
             { id: 'g3', name: 'سه' }, { id: 'g4', name: 'چهار' },
         ]);
-        openDrawer();
-        expect(document.querySelectorAll('.drawer-recent').length).toBe(3);
+        openGroupsTab();
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(4);
     });
 
     it('ردیف گروه: نام + بج نخوانده + ⋯', () => {
@@ -138,7 +152,7 @@ describe('sidebar — logged in', () => {
             onOpenGroup: (id) => opened.push(id),
             onGroupMenu: (id) => menus.push(id),
         });
-        openDrawer();
+        openGroupsTab();
         const rows = [...document.querySelectorAll('#drawer .drawer-recent')];
         expect(rows.length).toBe(1);
         expect(rows[0].querySelector('.drawer-badge').hidden).toBe(false);
@@ -156,19 +170,42 @@ describe('sidebar — logged in', () => {
     });
 
     it('rerenderDrawer دراور باز را تازه می‌کند', () => {
-        openDrawer();
+        openGroupsTab();
         setRecentGroups([{ id: 'g1', name: 'سفر', avatarUrl: null, unread: 0 }]);
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(0);
         rerenderDrawer();
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
     });
 
+    it('تب جستجو: input + نتایج قابل کلیک', async () => {
+        const seen = [];
+        initSidebar({
+            onSearchAll: async () => ({
+                users: [{ id: 'u9', username: 'newguy', displayName: null }],
+                groups: [{ id: 'g9', name: 'تازه' }],
+            }),
+            onOpenSearchUser: (u) => seen.push(['user', u.id]),
+            onOpenSearchGroup: (g) => seen.push(['group', g.id]),
+        });
+        openDrawer();
+        document.querySelector('#drawer [data-dtab="search"]').click();
+        const input = document.querySelector('#drawer .conv-search .conv-input');
+        expect(input).not.toBeNull();
+        input.value = 'new';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(500);
+        const rows = [...document.querySelectorAll('#drawer .conv-search-results .conv-row')];
+        expect(rows.length).toBe(2);
+        rows[0].click();
+        expect(seen).toEqual([['user', 'u9']]);
+    });
+
     it('کلیک مقصد، onNavigate را صدا می‌زند و می‌بندد', () => {
         const seen = [];
         initSidebar({ onNavigate: (ws) => seen.push(ws) });
         openDrawer();
-        document.querySelector('#drawer [data-workspace="search"]').click();
-        expect(seen).toEqual(['search']);
+        document.querySelector('#drawer [data-workspace="tasks"]').click();
+        expect(seen).toEqual(['tasks']);
         vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
     });
