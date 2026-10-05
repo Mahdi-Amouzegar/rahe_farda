@@ -248,6 +248,7 @@ import {
     acceptConnection,
     rejectConnection,
     findActiveConnectionWith,
+    getRelationshipMap,
 } from './communication/connections.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
@@ -2628,7 +2629,14 @@ initI18n().then(async () => {
         },
         onSearchUsers: async (q) => {
             const res = await searchUsers(q).catch(() => null);
-            return (res && res.ok && res.users) || [];
+            const users = (res && res.ok && res.users) || [];
+            try {
+                const rel = await getRelationshipMap().catch(() => new Map());
+                for (const u of users) {
+                    if (u && u.id) u.rel = rel.get(String(u.id)) || 'none';
+                }
+            } catch { /* silent */ }
+            return users;
         },
         onSearchAll: async (q) => {
             try {

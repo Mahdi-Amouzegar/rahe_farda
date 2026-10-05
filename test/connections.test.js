@@ -39,6 +39,7 @@ import { state } from '../js/core.js';
 import {
     getIncomingRequests,
     getOutgoingRequests,
+    getRelationshipMap,
     requestConnection,
     acceptConnection,
     rejectConnection,
@@ -62,6 +63,14 @@ describe('connections — requests', () => {
         const out = await getOutgoingRequests();
         expect(inc.requests.map((r) => r.id)).toEqual(['c2']);
         expect(out.requests.map((r) => r.id)).toEqual(['c3']);
+    });
+
+    it('نقشه رابطه: accepted/pending-in/pending-out', async () => {
+        const rel = await getRelationshipMap();
+        expect(rel.get('u2')).toBe('accepted');
+        expect(rel.get('u9')).toBe('pending-in');
+        expect(rel.get('u8')).toBe('pending-out');
+        expect(rel.get('u7') || 'none').toBe('none');
     });
 
     it('request/accept/reject/close مسیر درست را صدا می‌زنند', async () => {

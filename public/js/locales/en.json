@@ -135,7 +135,9 @@
     "block": "Block",
     "unblock": "Unblock",
     "closeChat": "Close conversation",
-    "profile": "Profile"
+    "profile": "Profile",
+    "connected": "Contact",
+    "pending": "Pending"
   },
 
   "share": {

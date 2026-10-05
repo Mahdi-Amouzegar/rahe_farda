@@ -177,6 +177,26 @@ describe('sidebar — logged in', () => {
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
     });
 
+    it('جستجوی گفتگوی تازه: مخاطب موجود دکمه درخواست ندارد', async () => {
+        initSidebar({
+            onSearchUsers: async () => [
+                { id: 'u2', username: 'sara', rel: 'accepted' },
+                { id: 'u9', username: 'newguy', rel: 'none' },
+            ],
+        });
+        openDrawer();
+        document.querySelector('#drawer .drawer-mini-btn').click();
+        const input = document.querySelector('#drawer .conv-search input');
+        input.value = 'sar';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(500);
+        const rows = [...document.querySelectorAll('#drawer .conv-search-results .conv-row')];
+        expect(rows.length).toBe(2);
+        expect(rows[0].querySelector('.conv-mini-btn')).toBeNull();
+        expect(rows[0].textContent).toContain('مخاطب');
+        expect(rows[1].querySelector('.conv-mini-btn')).not.toBeNull();
+    });
+
     it('تب جستجو: input + نتایج قابل کلیک', async () => {
         const seen = [];
         initSidebar({

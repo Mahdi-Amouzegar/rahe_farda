@@ -135,7 +135,9 @@
     "block": "بلاک",
     "unblock": "رفع بلاک",
     "closeChat": "بستن گفتگو",
-    "profile": "پروفایل"
+    "profile": "پروفایل",
+    "connected": "مخاطب",
+    "pending": "در انتظار"
   },
 
   "share": {

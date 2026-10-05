@@ -28,6 +28,31 @@ export async function listConnectionsRaw() {
 }
 
 /**
+ * نقشه‌ی رابطه با کاربران: accepted | pending-in | pending-out.
+ * برای اینکه جستجو دکمه‌ی «درخواست» را فقط وقتی نشان بدهد که رابطه‌ای نیست
+ * (وگرنه سرور 409 already-connected می‌دهد).
+ */
+export async function getRelationshipMap() {
+    const map = new Map();
+    try {
+        const res = await listConnectionsRaw();
+        if (!res.ok) return map;
+        const me = myId();
+        for (const c of res.connections || []) {
+            if (!c) continue;
+            const otherId = String(c.otherUserId || (c.otherUser && c.otherUser.id) || '');
+            if (!otherId) continue;
+            if (c.status === 'accepted') {
+                map.set(otherId, 'accepted');
+            } else if (c.status === 'pending' && !map.has(otherId)) {
+                map.set(otherId, (!me || c.requestedBy !== me) ? 'pending-in' : 'pending-out');
+            }
+        }
+    } catch { /* best-effort */ }
+    return map;
+}
+
+/**
  * درخواست‌های ورودی (pending که دیگران فرستاده‌اند).
  */
 export async function getIncomingRequests() {
