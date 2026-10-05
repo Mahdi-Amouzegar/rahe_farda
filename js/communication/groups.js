@@ -27,6 +27,8 @@ import { displayNameOf } from './conversations.js';
 import { searchUsers } from './connections.js';
 import { flushGroup } from './group-queue.js';
 
+const PAGE_LIMIT = 30;
+
 let _groups = [];
 let _openGroupId = null;
 let _group = null;
