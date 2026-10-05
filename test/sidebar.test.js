@@ -186,6 +186,11 @@ describe('sidebar — logged in', () => {
         openDrawer();
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(2);
         expect(removeDrawerRow('peer', 'u2')).toBe(true);
+        // بلافاصله: کلاس انیمیشن خورده ولی هنوز در DOM است
+        const leaving = document.querySelector('#drawer .drawer-recent.drawer-row-leaving');
+        expect(leaving).not.toBeNull();
+        expect(leaving.textContent).toContain('سارا');
+        await vi.advanceTimersByTimeAsync(300);
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
         expect(document.getElementById('drawer').textContent).not.toContain('سارا');
         expect(document.getElementById('drawer').textContent).toContain('رضا');
