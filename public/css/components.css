@@ -682,6 +682,20 @@
         gap: 12px;
     }
 
+    /* لیست وظایف اسکرول داخلی دارد تا صفحه ارتفاع بی‌نهایت نگیرد */
+    .list-zone .task-list {
+        max-height: 62vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-inline-end: 4px;
+    }
+
+    @media (max-width: 900px) {
+        .list-zone .task-list {
+            max-height: 52vh;
+        }
+    }
+
     /* ═══ Task Item ═══ */
     .task-item {
         display: flex;

@@ -19,9 +19,8 @@ import {
     setDetailBridge,
     getSharedItem,
 } from './source.js';
-import { createDmTask, markDmRead, getDmUnread } from '../communication/dm-tasks.js';
+import { createDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
-import { updateDrawerBadges } from '../navigation/sidebar.js';
 import { apiFetch, apiErrorMessage } from '../api.js';
 import { showToast } from '../ui.js';
 import { t as i18nT } from '../i18n.js';
@@ -89,37 +88,23 @@ export async function openSharedDetail(remoteId) {
 }
 
 /**
- * ثبت خواندن مقصد جاری + تازه‌سازی بج دراور.
- */
-export async function markDestinationRead() {
-    const dest = getDestination();
-    try {
-        if (dest.type === 'peer') {
-            await markDmRead(dest.peerId);
-            const u = await getDmUnread();
-            updateDrawerBadges({ messages: u.ok ? u.unread.total || 0 : 0 });
-        } else if (dest.type === 'group') {
-            await apiFetch('/api/groups/' + encodeURIComponent(dest.groupId) + '/read', {
-                method: 'POST',
-                body: { type: 'all' },
-            });
-        }
-    } catch { /* best-effort */ }
-}
-
-/**
  * انتخاب مقصد مشترک از دراور (صفحه عوض نمی‌شود — همان چیدمان وظایف شخصی).
+ * خواندن با دید تدریجی است (نه mark-all): بعد از رندر، دیده‌شده‌ها ثبت می‌شوند.
  * @returns مقصد نرمال‌شده
  */
 export async function selectDestination(dest) {
     const norm = setDestination(dest);
     const { render, resetRenderSignature } = await import('../ui.js');
+    const { resetReadCursor, refreshDestCount } = await import('./readtrack.js');
     resetRenderSignature();
+    resetReadCursor();
     await refreshSharedList();
     render();
     await refreshDestBanner();
     await scrollToFirstUnread(norm);
-    await markDestinationRead();
+    try {
+        await refreshDestCount(norm);
+    } catch { /* silent */ }
     return norm;
 }
 

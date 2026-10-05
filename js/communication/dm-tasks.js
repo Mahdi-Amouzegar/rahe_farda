@@ -77,6 +77,8 @@ export async function getDmUnread() {
 /**
  * ثبت خواندن گفتگو با یک مخاطب.
  */
-export async function markDmRead(peerId) {
-    return apiFetch('/api/dm/read', { method: 'POST', body: { peerId } });
+export async function markDmRead(peerId, at) {
+    const body = { peerId };
+    if (at) body.at = at;
+    return apiFetch('/api/dm/read', { method: 'POST', body });
 }

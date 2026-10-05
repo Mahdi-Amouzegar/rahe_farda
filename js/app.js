@@ -2729,6 +2729,11 @@ initI18n().then(async () => {
     syncServerTime();
     startReminderLoop();
     bindWeatherModal();
+    // رهگیری خواندن تدریجی لیست مشترک با اسکرول
+    try {
+        const { startReadTracking } = await import('./tasks/readtrack.js');
+        startReadTracking();
+    } catch { /* silent */ }
 
     // ⚠️ پردازش callback تلگرام
     try {

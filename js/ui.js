@@ -1075,6 +1075,11 @@ export function render() {
             ...t,
             children: t.children ? t.children.map(c => ({ ...c })) : []
         }));
+        if (!isLocalView()) {
+            try {
+                checkVisibleReads();
+            } catch { /* silent */ }
+        }
         return;
     }
 
@@ -1085,6 +1090,11 @@ export function render() {
             ...t,
             children: t.children ? t.children.map(c => ({ ...c })) : []
         }));
+        if (!isLocalView()) {
+            try {
+                checkVisibleReads();
+            } catch { /* silent */ }
+        }
         return;
     }
 
@@ -1092,6 +1102,12 @@ export function render() {
         ...t,
         children: t.children ? t.children.map(c => ({ ...c })) : []
     }));
+    // نمای مشترک: آیتم‌های دیده‌شده را خوانده حساب کن
+    if (!isLocalView()) {
+        try {
+            checkVisibleReads();
+        } catch { /* silent */ }
+    }
 }
 
 function updateTaskListStatus(msg) {
