@@ -177,6 +177,21 @@ describe('sidebar — logged in', () => {
         expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
     });
 
+    it('removeDrawerRow ردیف را درجا جمع می‌کند (بدون رفرش کل)', async () => {
+        const { removeDrawerRow } = await import('../js/navigation/sidebar.js');
+        setRecentConversations([
+            { userId: 'u2', name: 'سارا', avatarUrl: null, unread: 0 },
+            { userId: 'u3', name: 'رضا', avatarUrl: null, unread: 0 },
+        ]);
+        openDrawer();
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(2);
+        expect(removeDrawerRow('peer', 'u2')).toBe(true);
+        expect(document.querySelectorAll('#drawer .drawer-recent').length).toBe(1);
+        expect(document.getElementById('drawer').textContent).not.toContain('سارا');
+        expect(document.getElementById('drawer').textContent).toContain('رضا');
+        expect(removeDrawerRow('peer', 'nope')).toBe(true);
+    });
+
     it('جستجوی گفتگوی تازه: مخاطب موجود دکمه درخواست ندارد', async () => {
         initSidebar({
             onSearchUsers: async () => [

@@ -21,6 +21,7 @@ import {
     updateDrawerBadges,
     setRecentGroups,
     setGroupInvitations,
+    removeDrawerRow,
 } from '../navigation/sidebar.js';
 import { showInfoModal, showConfirmModal } from '../core.js';
 import { displayNameOf } from './conversations.js';
@@ -384,6 +385,7 @@ async function confirmGroupClose(forId) {
     if (!ok) return;
     await apiFetch('/api/groups/' + encodeURIComponent(targetId) + '/close', { method: 'POST' });
     if (targetId === _openGroupId) _openGroupId = null;
+    removeDrawerRow('group', targetId);
     await refreshGroupsHome();
 }
 
@@ -404,6 +406,7 @@ async function confirmGroupLeave(forId) {
         return;
     }
     if (targetId === _openGroupId) _openGroupId = null;
+    removeDrawerRow('group', targetId);
     await refreshGroupsHome();
 }
 
@@ -620,6 +623,7 @@ async function confirmGroupDelete(forId) {
     if (!ok) return;
     await apiFetch('/api/groups/' + encodeURIComponent(targetId), { method: 'DELETE' });
     if (targetId === _openGroupId) _openGroupId = null;
+    removeDrawerRow('group', targetId);
     await refreshGroupsHome();
 }
 

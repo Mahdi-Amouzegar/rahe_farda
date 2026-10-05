@@ -210,6 +210,7 @@ function renderContactsTab(aside) {
 
     for (const r of _recentConversations) {
         const row = el('div', 'drawer-item drawer-recent');
+        row.dataset.peerId = r.userId;
         const b = el('button', 'drawer-item-label-btn');
         b.type = 'button';
         b.appendChild(avatarNode(r.avatarUrl, r.name));
@@ -334,6 +335,7 @@ function renderGroupsTab(aside) {
 
     for (const g of _recentGroups) {
         const row = el('div', 'drawer-item drawer-recent');
+        row.dataset.groupId = g.id;
         const b = el('button', 'drawer-item-label-btn');
         b.type = 'button';
         b.appendChild(avatarNode(g.avatarUrl, g.name));
@@ -472,8 +474,46 @@ export function openDrawer(opener) {
 }
 
 /**
- * رندر دوباره‌ی دراور اگر باز است (بعد از تازه‌سازی پس‌زمینه).
+ * حذف پویای یک ردیف از دراور (با انیمیشن جمع‌شدن — بدون رفرش کل لیست).
+ * @param {'peer'|'group'} kind
+ * @param {string} id
+ * @returns {boolean} true اگر ردیفی پیدا و حذف شد
  */
+export function removeDrawerRow(kind, id) {
+    try {
+        const key = kind === 'peer' ? String(id || '') : null;
+        if (kind === 'peer') {
+            _recentConversations = _recentConversations.filter((r) => String(r.userId) !== key);
+        } else if (kind === 'group') {
+            _recentGroups = _recentGroups.filter((g) => String(g.id) !== String(id || ''));
+        } else {
+            return false;
+        }
+        const root = drawerEl();
+        if (!root) return true;
+        const esc = (v) => String(v || '').replace(/"/g, '');
+        const sel = kind === 'peer'
+            ? `.drawer-recent[data-peer-id="${esc(key)}"]`
+            : `.drawer-recent[data-group-id="${esc(id)}"]`;
+        const row = root.querySelector(sel);
+        if (!row) return true;
+        const h = row.offsetHeight || 0;
+        row.style.maxHeight = h + 'px';
+        row.style.overflow = 'hidden';
+        void row.offsetWidth;
+        row.classList.add('drawer-row-leaving');
+        row.style.maxHeight = '0px';
+        row.style.opacity = '0';
+        setTimeout(() => {
+            try {
+                if (row.parentNode) row.parentNode.removeChild(row);
+            } catch { /* silent */ }
+        }, 260);
+        return true;
+    } catch {
+        return false;
+    }
+}
 export function rerenderDrawer() {
     if (isDrawerOpen()) renderDrawer();
 }

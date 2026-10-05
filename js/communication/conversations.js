@@ -18,7 +18,7 @@ import { t as i18nT } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { isLoggedIn } from '../auth.js';
 import { openMenu } from '../ui/menu.js';
-import { updateDrawerBadges, setRecentConversations } from '../navigation/sidebar.js';
+import { updateDrawerBadges, setRecentConversations, removeDrawerRow } from '../navigation/sidebar.js';
 import { getDestination } from '../tasks/destination.js';
 import { refreshSharedList } from '../tasks/source.js';
 import { getDmUnread } from './dm-tasks.js';
@@ -193,6 +193,7 @@ async function openConversationMenu(otherUserId, anchor) {
             if (id === 'profile') showUserProfile(otherUserId);
             else if (id === 'block') {
                 await blockUser(otherUserId);
+                removeDrawerRow('peer', otherUserId);
                 await listConversations();
                 await refreshConversationBadges();
             } else if (id === 'unblock' && blocked) {
@@ -204,6 +205,18 @@ async function openConversationMenu(otherUserId, anchor) {
                 if (connRes.ok && connRes.connection) {
                     await closeConnection(connRes.connection.id);
                 }
+                removeDrawerRow('peer', otherUserId);
+                try {
+                    const { getDestination, setDestination } = await import('../tasks/destination.js');
+                    const dest = getDestination();
+                    if (dest.type === 'peer' && String(dest.peerId) === String(otherUserId)) {
+                        setDestination({ type: 'local' });
+                        const { refreshSharedList } = await import('../tasks/source.js');
+                        const { render } = await import('../ui.js');
+                        await refreshSharedList();
+                        render();
+                    }
+                } catch { /* best-effort */ }
                 await listConversations();
                 await refreshConversationBadges();
             }
