@@ -132,7 +132,7 @@ export function pushRecentConversations() {
             unread: c.unread || 0,
         })).filter((r) => r.userId);
         rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
-        setRecentConversations(rows.slice(0, 3));
+        setRecentConversations(rows);
     } catch { /* best-effort */ }
 }
 // ─── درخواست‌های ورودی دوستی (برای زیربخش مخاطبان دراور) ───

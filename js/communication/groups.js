@@ -734,7 +734,7 @@ export async function refreshGroupBadges() {
             unread: unreadByGroup.get(String(g.id)) || 0,
         }));
         rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
-        setRecentGroups(rows.slice(0, 3));
+        setRecentGroups(rows);
     } catch { /* best-effort */ }
 }
 

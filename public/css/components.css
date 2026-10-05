@@ -1042,6 +1042,50 @@
         color: var(--accent-pink);
     }
 
+    /* ═══ منوی شناور ⋯ (menu-pop) — هم‌سبک operation-list برای یکدستی ═══ */
+    .menu-pop {
+        min-width: 190px;
+        display: grid;
+        gap: 3px;
+        padding: 6px;
+        border: 1px solid var(--border-medium);
+        border-radius: 12px;
+        background: var(--surface-raised);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        min-height: 42px;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-primary);
+        font: inherit;
+        font-size: .78rem;
+        text-align: start;
+        cursor: pointer;
+    }
+
+    .menu-item:hover,
+    .menu-item:focus-visible {
+        background: var(--surface-soft);
+        outline: none;
+    }
+
+    .menu-item--danger {
+        color: var(--accent-pink);
+    }
+
+    .menu-item-icon {
+        display: inline-flex;
+        align-items: center;
+    }
+
     .child-actions .operation-trigger {
         min-width: 72px;
         min-height: 36px;
