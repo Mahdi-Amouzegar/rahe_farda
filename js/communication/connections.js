@@ -83,16 +83,6 @@ export async function getOutgoingRequests() {
 }
 
 /**
- * ارسال درخواست اتصال.
- */
-export async function requestConnection(targetUserId) {
-    return apiFetch('/api/connections/request', {
-        method: 'POST',
-        body: { targetUserId },
-    });
-}
-
-/**
  * پذیرش درخواست.
  */
 export async function acceptConnection(connectionId) {

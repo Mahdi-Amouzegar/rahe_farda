@@ -40,7 +40,6 @@ import {
     getIncomingRequests,
     getOutgoingRequests,
     getRelationshipMap,
-    requestConnection,
     acceptConnection,
     rejectConnection,
     closeConnection,
@@ -73,13 +72,11 @@ describe('connections — requests', () => {
         expect(rel.get('u7') || 'none').toBe('none');
     });
 
-    it('request/accept/reject/close مسیر درست را صدا می‌زنند', async () => {
-        await requestConnection('u9');
+    it('accept/reject/close مسیر درست را صدا می‌زنند', async () => {
         await acceptConnection('c2');
         await rejectConnection('c3');
         await closeConnection('c1');
         const paths = apiCalls.map((c) => [c.path, c.opts && c.opts.method]);
-        expect(paths).toContainEqual(['/api/connections/request', 'POST']);
         expect(paths).toContainEqual(['/api/connections/c2/accept', 'POST']);
         expect(paths).toContainEqual(['/api/connections/c3/reject', 'POST']);
         expect(paths).toContainEqual(['/api/connections/c1', 'DELETE']);
