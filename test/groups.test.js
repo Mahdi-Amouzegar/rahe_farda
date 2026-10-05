@@ -18,6 +18,13 @@ vi.mock('../js/net.js', async (importOriginal) => {
     return { ...actual, isOnline: () => netState.online };
 });
 
+vi.mock('../js/auth.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return { ...actual, isLoggedIn: () => authState.loggedIn };
+});
+
+const authState = { loggedIn: true };
+
 const apiCalls = [];
 vi.mock('../js/api.js', async () => ({
     apiFetch: vi.fn(async (path, opts) => {
@@ -162,9 +169,38 @@ beforeEach(() => {
     __resetGroupsForTest();
     apiCalls.length = 0;
     netState.online = true;
+    authState.loggedIn = true;
     state.sync.userId = 'u1';
     buildShell();
-    closeModalShell();
+});
+
+describe('groups — drawer preload (رگرسیون لود اولیه)', () => {
+    it('listGroups + refreshGroupBadges → ردیف گروه زیر سرفصل گروه‌ها', async () => {
+        const { listGroups, refreshGroupBadges } = await import('../js/communication/groups.js');
+        const sb = await import('../js/navigation/sidebar.js');
+        const res = await listGroups();
+        expect(res.ok).toBe(true);
+        await refreshGroupBadges();
+        document.body.innerHTML = `
+            <button id="opener">☰</button>
+            <div class="drawer-root" id="drawerRoot" hidden>
+                <div class="drawer-scrim" id="drawerScrim"></div>
+                <aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
+            </div>`;
+        sb.initSidebar({});
+        sb.openDrawer();
+        const drawerText = document.getElementById('drawer').textContent;
+        expect(drawerText).toContain('سفر');
+        // زیر سرفصل گروه‌ها، نه مخاطبان
+        const html = document.getElementById('drawer').innerHTML;
+        const contactsIdx = html.indexOf('مخاطبان');
+        const groupsIdx = html.indexOf('گروه‌ها');
+        const travelIdx = html.indexOf('سفر');
+        expect(groupsIdx).toBeGreaterThan(-1);
+        expect(travelIdx).toBeGreaterThan(groupsIdx);
+        expect(contactsIdx).toBeGreaterThan(-1);
+        expect(travelIdx).not.toBeLessThan(contactsIdx);
+    });
 });
 
 describe('groups — data', () => {
@@ -314,11 +350,13 @@ describe('groups — unread + leave', () => {
     });
 
     it('مهمان توکن deep-link را نگه می‌دارد (مصرف نمی‌کند)', async () => {
+        authState.loggedIn = false;
         const { takePendingJoinToken, processPendingJoin } = await import('../js/communication/groups.js');
         window.location.hash = '#/join/tok-123';
         expect(takePendingJoinToken()).toBe('tok-123');
         expect(await processPendingJoin()).toBe(false);
         expect(takePendingJoinToken()).toBe('tok-123');
         window.location.hash = '';
+        authState.loggedIn = true;
     });
 });

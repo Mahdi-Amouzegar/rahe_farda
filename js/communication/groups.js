@@ -443,6 +443,12 @@ export function openCreateGroupDialog() {
     input.setAttribute('maxlength', '100');
     input.setAttribute('autocomplete', 'off');
     box.appendChild(input);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            create.click();
+        }
+    });
     const visRow = el('div', 'conv-vis-row');
     const pubLabel = el('label', 'conv-vis-option');
     const pubRadio = el('input', null);
@@ -479,8 +485,9 @@ export function openCreateGroupDialog() {
         let res = null;
         try {
             res = await createGroup({ name: input.value, visibility: (vis && vis.value) || 'private' });
-        } catch {
-            res = { ok: false };
+        } catch (err) {
+            console.error('[groups] create failed:', err);
+            res = { ok: false, error: (err && err.code) ? err : { code: 'UNKNOWN' } };
         }
         create.disabled = false;
         if (res && res.ok && res.data && res.data.group) {
@@ -492,6 +499,7 @@ export function openCreateGroupDialog() {
                 name: res.data.group.name,
             });
         } else {
+            console.error('[groups] create rejected:', res);
             hint.textContent = apiErrorMessage(res ? res.error : null);
             hint.hidden = false;
         }

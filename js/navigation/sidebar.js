@@ -134,37 +134,7 @@ function renderDrawer() {
         // ─── تک‌صفحه: زیربخش مخاطبان (لیست + درخواست‌ها + گفتگوی تازه) ───
         aside.appendChild(el('div', 'drawer-section', i18nT('nav.contacts') !== 'nav.contacts' ? i18nT('nav.contacts') : 'مخاطبان'));
 
-        if (_recentGroups.length > 0) {
-            for (const g of _recentGroups.slice(0, 3)) {
-                const row = el('div', 'drawer-item drawer-recent');
-                const b = el('button', 'drawer-item-label-btn');
-                b.type = 'button';
-                b.appendChild(avatarNode(g.avatarUrl, g.name));
-                b.appendChild(el('span', 'drawer-item-label', String(g.name || '')));
-                b.addEventListener('click', () => {
-                    closeDrawer();
-                    if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id, g.name);
-                });
-                row.appendChild(b);
-                const badge = el('span', 'drawer-badge');
-                row.appendChild(badge);
-                setBadge(badge, g.unread || 0);
-                const more = el('button', 'drawer-more', '⋯');
-                more.type = 'button';
-                more.setAttribute('aria-label', '⋯');
-                more.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (_opts && typeof _opts.onGroupMenu === 'function') {
-                        _opts.onGroupMenu(g.id, more);
-                    }
-                });
-                row.appendChild(more);
-                aside.appendChild(row);
-            }
-        }
-
-        // ─── تک‌صفحه: زیربخش مخاطبان (لیست + درخواست‌ها + گفتگوی تازه) ───
-        aside.appendChild(el('div', 'drawer-section', i18nT('nav.contacts') !== 'nav.contacts' ? i18nT('nav.contacts') : 'مخاطبان'));
+        // ─── درخواست‌های ورودی دوستی (قبول/رد همین‌جا) ───
 
         // درخواست‌های ورودی دوستی (قبول/رد همین‌جا)
         for (const r of _incomingRequests.slice(0, 5)) {
@@ -280,6 +250,34 @@ function renderDrawer() {
         aside.appendChild(grpHead);
         if (_showCreateGroup) {
             aside.appendChild(buildCreateGroupForm());
+        }
+
+        // ردیف‌های گروه (نام + عدد نخوانده + ⋯)
+        for (const g of _recentGroups.slice(0, 3)) {
+            const row = el('div', 'drawer-item drawer-recent');
+            const b = el('button', 'drawer-item-label-btn');
+            b.type = 'button';
+            b.appendChild(avatarNode(g.avatarUrl, g.name));
+            b.appendChild(el('span', 'drawer-item-label', String(g.name || '')));
+            b.addEventListener('click', () => {
+                closeDrawer();
+                if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id, g.name);
+            });
+            row.appendChild(b);
+            const badge = el('span', 'drawer-badge');
+            row.appendChild(badge);
+            setBadge(badge, g.unread || 0);
+            const more = el('button', 'drawer-more', '⋯');
+            more.type = 'button';
+            more.setAttribute('aria-label', '⋯');
+            more.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (_opts && typeof _opts.onGroupMenu === 'function') {
+                    _opts.onGroupMenu(g.id, more);
+                }
+            });
+            row.appendChild(more);
+            aside.appendChild(row);
         }
 
         // دعوت‌های گروهی (قبول/رد همین‌جا)
@@ -474,31 +472,49 @@ function buildCreateGroupForm() {
     hint.hidden = true;
     create.addEventListener('click', async () => {
         const name = input.value.trim();
-        if (!name || !_opts || typeof _opts.onCreateGroup !== 'function') return;
+        if (!name) {
+            hint.textContent = i18nT('grp.createPlaceholder') !== 'grp.createPlaceholder' ? i18nT('grp.createPlaceholder') : 'نام گروه…';
+            hint.hidden = false;
+            input.focus();
+            return;
+        }
+        if (!_opts || typeof _opts.onCreateGroup !== 'function') {
+            console.error('[sidebar] onCreateGroup missing');
+            return;
+        }
         create.disabled = true;
         hint.hidden = true;
         let res = null;
         try {
             const vis = form.querySelector('input[name="drawer-grp-visibility"]:checked');
             res = await _opts.onCreateGroup({ name, visibility: (vis && vis.value) || 'private' });
-        } catch {
+        } catch (err) {
+            console.error('[sidebar] create group failed:', err);
             res = { ok: false };
         }
         create.disabled = false;
         if (res && res.ok) {
             _showCreateGroup = false;
             closeDrawer();
-            if (res.group && typeof _opts.onOpenGroup === 'function') {
-                _opts.onOpenGroup(res.group.id, res.group.name);
+            const created = (res && (res.group || (res.data && res.data.group))) || null;
+            if (created && typeof _opts.onOpenGroup === 'function') {
+                _opts.onOpenGroup(created.id, created.name);
             } else {
                 rerenderDrawer();
             }
         } else {
+            console.error('[sidebar] create group rejected:', res);
             hint.textContent = i18nT('errors.serverError');
             hint.hidden = false;
         }
     });
     form.appendChild(input);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            create.click();
+        }
+    });
     form.appendChild(visRow);
     form.appendChild(create);
     form.appendChild(hint);

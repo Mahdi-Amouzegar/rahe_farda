@@ -2628,7 +2628,10 @@ initI18n().then(async () => {
             const res = await requestConnection(userId).catch(() => ({ ok: false }));
             return res;
         },
-        onCreateGroup: async ({ name, visibility }) => createGroup({ name, visibility }),
+        onCreateGroup: async ({ name, visibility }) => {
+            const r = await createGroup({ name, visibility }).catch(() => ({ ok: false }));
+            return { ok: !!(r && r.ok), group: r && r.data ? r.data.group : null };
+        },
         onRespondGroupInvitation: async (inv, accept) => {
             const res = await respondGroupInvitation(inv, accept).catch(() => ({ ok: false }));
             await preloadDrawerLists().catch(() => {});
