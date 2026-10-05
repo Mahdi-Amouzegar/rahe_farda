@@ -14,9 +14,9 @@
 import { events, EV } from '../events.js';
 import { isLoggedIn } from '../auth.js';
 
-export const WORKSPACES = ['tasks', 'messages', 'groups', 'search', 'notifications'];
+export const WORKSPACES = ['tasks', 'search'];
 
-const AUTH_GATED = ['messages', 'groups', 'search', 'notifications'];
+const AUTH_GATED = ['search'];
 
 let _active = 'tasks';
 let _started = false;

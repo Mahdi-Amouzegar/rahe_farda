@@ -67,20 +67,56 @@ describe('sidebar — guest', () => {
 });
 
 describe('sidebar — logged in', () => {
-    it('هر ۵ مقصد + تنظیمات + حساب رندر می‌شود', () => {
+    it('جستجو + وظایف + تنظیمات + حساب (بدون دکمه قدیمی پیام/گروه/اعلان)', () => {
         openDrawer();
         const labels = [...document.querySelectorAll('#drawer [data-workspace]')]
             .map((b) => b.getAttribute('data-workspace'));
-        expect(labels).toEqual(['search', 'tasks', 'messages', 'groups', 'notifications']);
+        expect(labels).toEqual(['search', 'tasks']);
     });
 
-    it('بج‌ها اعمال می‌شوند', () => {
-        updateDrawerBadges({ messages: 3, groups: 0, notifications: 12 });
+    it('زیربخش مخاطبان و گروه‌ها با سرفصل جدا', () => {
+        setRecentConversations([{ userId: 'u2', name: 'سارا', avatarUrl: null, unread: 1 }]);
+        setRecentGroups([{ id: 'g1', name: 'سفر', avatarUrl: null, unread: 0 }]);
         openDrawer();
-        const msgBtn = document.querySelector('#drawer [data-workspace="messages"] .drawer-badge');
-        expect(msgBtn.hidden).toBe(false);
-        const grpBtn = document.querySelector('#drawer [data-workspace="groups"] .drawer-badge');
-        expect(grpBtn.hidden).toBe(true);
+        const text = document.getElementById('drawer').textContent;
+        expect(text).toContain('مخاطبان');
+        expect(text).toContain('گروه‌ها');
+    });
+
+    it('درخواست ورودی با قبول/رد', async () => {
+        const { setIncomingRequests } = await import('../js/navigation/sidebar.js');
+        setIncomingRequests([{ id: 'c9', userId: 'u9', name: 'تازه', avatarUrl: null }]);
+        const seen = [];
+        initSidebar({
+            onAcceptRequest: (id) => seen.push(['accept', id]),
+            onRejectRequest: (id) => seen.push(['reject', id]),
+        });
+        openDrawer();
+        const btns = [...document.querySelectorAll('#drawer .conv-mini-btn')];
+        expect(btns.length).toBe(2);
+        btns[0].click();
+        await vi.advanceTimersByTimeAsync(10);
+        expect(seen).toEqual([['accept', 'c9']]);
+    });
+
+    it('دکمه ＋ فرم ساخت گروه را باز می‌کند', () => {
+        openDrawer();
+        const addBtns = [...document.querySelectorAll('#drawer .drawer-section-head .drawer-more')];
+        expect(addBtns.length).toBe(1);
+        addBtns[0].click();
+        expect(document.querySelector('#drawer .conv-search .conv-input')).not.toBeNull();
+    });
+
+    it('بج‌ها روی ردیف‌های اخیر اعمال می‌شوند', () => {
+        setRecentConversations([
+            { userId: 'u2', name: 'سارا', avatarUrl: null, unread: 3 },
+            { userId: 'u3', name: 'رضا', avatarUrl: null, unread: 0 },
+        ]);
+        openDrawer();
+        const badges = [...document.querySelectorAll('#drawer .drawer-recent .drawer-badge')];
+        expect(badges.length).toBe(2);
+        expect(badges[0].hidden).toBe(false);
+        expect(badges[1].hidden).toBe(true);
     });
 
     it('حداکثر ۳ گروه اخیر', () => {
@@ -131,8 +167,8 @@ describe('sidebar — logged in', () => {
         const seen = [];
         initSidebar({ onNavigate: (ws) => seen.push(ws) });
         openDrawer();
-        document.querySelector('#drawer [data-workspace="groups"]').click();
-        expect(seen).toEqual(['groups']);
+        document.querySelector('#drawer [data-workspace="search"]').click();
+        expect(seen).toEqual(['search']);
         vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
     });
@@ -160,13 +196,14 @@ describe('sidebar — logged in', () => {
         expect(document.activeElement.closest('#drawer')).not.toBeNull();
     });
 
-    it('رندر تازه در هر بازشدن (بج جدید دیده می‌شود)', () => {
+    it('رندر تازه در هر بازشدن (ردیف جدید دیده می‌شود)', () => {
         openDrawer();
         closeDrawer();
-        updateDrawerBadges({ messages: 7 });
+        setRecentConversations([{ userId: 'u7', name: 'تازه', avatarUrl: null, unread: 7 }]);
         openDrawer();
-        const msgBtn = document.querySelector('#drawer [data-workspace="messages"] .drawer-badge');
-        expect(msgBtn.hidden).toBe(false);
+        const rows = [...document.querySelectorAll('#drawer .drawer-recent')];
+        expect(rows.length).toBe(1);
+        expect(rows[0].querySelector('.drawer-badge').hidden).toBe(false);
     });
 
     it('گفتگوهای اخیر: نام + بج نخوانده + ⋯ (حداکثر ۳)', () => {

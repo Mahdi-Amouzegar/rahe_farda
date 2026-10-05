@@ -76,6 +76,7 @@
     "notifications": "🔔 Notifications",
     "recentGroups": "Recent groups",
     "recentMessages": "Recent messages",
+    "contacts": "Contacts",
     "settings": "⚙ Settings",
     "account": "👤 My account",
     "login": "🔐 Log in / Sign up",
@@ -1322,6 +1323,7 @@
     "newTask": "New task",
     "newPlan": "New plan",
     "newSeries": "New series",
+    "newGroup": "New group",
     "settings": "Settings",
     "ariaQuickAccess": "Quick access"
   },

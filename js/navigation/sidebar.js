@@ -25,6 +25,10 @@ const _ANIM_MS = 260;
 const _badges = { messages: 0, groups: 0, notifications: 0 };
 let _recentGroups = [];
 let _recentConversations = [];
+let _incomingRequests = [];
+let _groupInvitations = [];
+let _showNewConv = false;
+let _showCreateGroup = false;
 
 function drawerRoot() {
     return document.getElementById('drawerRoot');
@@ -126,12 +130,11 @@ function renderDrawer() {
         aside.appendChild(searchBtn);
 
         aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks' }));
-        aside.appendChild(navButton({ labelKey: 'nav.messages', fallback: '💬 پیام‌ها', workspace: 'messages', badgeKey: 'messages' }));
-        aside.appendChild(navButton({ labelKey: 'nav.groups', fallback: '👥 گروه‌ها', workspace: 'groups', badgeKey: 'groups' }));
-        aside.appendChild(navButton({ labelKey: 'nav.notifications', fallback: '🔔 اعلان‌ها', workspace: 'notifications', badgeKey: 'notifications' }));
+
+        // ─── تک‌صفحه: زیربخش مخاطبان (لیست + درخواست‌ها + گفتگوی تازه) ───
+        aside.appendChild(el('div', 'drawer-section', i18nT('nav.contacts') !== 'nav.contacts' ? i18nT('nav.contacts') : 'مخاطبان'));
 
         if (_recentGroups.length > 0) {
-            aside.appendChild(el('div', 'drawer-section', i18nT('nav.recentGroups') !== 'nav.recentGroups' ? i18nT('nav.recentGroups') : 'گروه‌های اخیر'));
             for (const g of _recentGroups.slice(0, 3)) {
                 const row = el('div', 'drawer-item drawer-recent');
                 const b = el('button', 'drawer-item-label-btn');
@@ -141,7 +144,6 @@ function renderDrawer() {
                 b.addEventListener('click', () => {
                     closeDrawer();
                     if (_opts && typeof _opts.onOpenGroup === 'function') _opts.onOpenGroup(g.id, g.name);
-                    else switchWorkspace('groups');
                 });
                 row.appendChild(b);
                 const badge = el('span', 'drawer-badge');
@@ -161,37 +163,151 @@ function renderDrawer() {
             }
         }
 
-        // ─── Phase 9 قدم ۲: پیام‌های اخیر — نام + عدد نخوانده + ⋯ ───
-        // کلیک روی نام → رفتن به گفتگو؛ ⋯ → مدیریت همان سطح.
-        if (_recentConversations.length > 0) {
-            aside.appendChild(el('div', 'drawer-section', i18nT('nav.recentMessages') !== 'nav.recentMessages' ? i18nT('nav.recentMessages') : 'پیام‌های اخیر'));
-            for (const r of _recentConversations.slice(0, 3)) {
-                const row = el('div', 'drawer-item drawer-recent');
-                const b = el('button', 'drawer-item-label-btn');
-                b.type = 'button';
-                b.appendChild(avatarNode(r.avatarUrl, r.name));
-                b.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
-                b.addEventListener('click', () => {
-                    closeDrawer();
-                    if (_opts && typeof _opts.onOpenConversation === 'function') _opts.onOpenConversation(r.userId, r.name);
-                    else switchWorkspace('messages');
-                });
-                row.appendChild(b);
-                const badge = el('span', 'drawer-badge');
-                row.appendChild(badge);
-                setBadge(badge, r.unread || 0);
-                const more = el('button', 'drawer-more', '⋯');
-                more.type = 'button';
-                more.setAttribute('aria-label', '⋯');
-                more.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (_opts && typeof _opts.onConversationMenu === 'function') {
-                        _opts.onConversationMenu(r.userId, more);
+        // ─── تک‌صفحه: زیربخش مخاطبان (لیست + درخواست‌ها + گفتگوی تازه) ───
+        aside.appendChild(el('div', 'drawer-section', i18nT('nav.contacts') !== 'nav.contacts' ? i18nT('nav.contacts') : 'مخاطبان'));
+
+        // درخواست‌های ورودی دوستی (قبول/رد همین‌جا)
+        for (const r of _incomingRequests.slice(0, 5)) {
+            const row = el('div', 'drawer-item drawer-recent');
+            row.appendChild(avatarNode(r.avatarUrl, r.name));
+            row.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
+            const okBtn = el('button', 'conv-mini-btn', i18nT('conn.accept') !== 'conn.accept' ? i18nT('conn.accept') : 'قبول');
+            okBtn.type = 'button';
+            okBtn.addEventListener('click', async () => {
+                okBtn.disabled = true;
+                if (_opts && typeof _opts.onAcceptRequest === 'function') await _opts.onAcceptRequest(r.id);
+                rerenderDrawer();
+            });
+            const noBtn = el('button', 'conv-mini-btn', i18nT('conn.reject') !== 'conn.reject' ? i18nT('conn.reject') : 'رد');
+            noBtn.type = 'button';
+            noBtn.addEventListener('click', async () => {
+                noBtn.disabled = true;
+                if (_opts && typeof _opts.onRejectRequest === 'function') await _opts.onRejectRequest(r.id);
+                rerenderDrawer();
+            });
+            row.appendChild(okBtn);
+            row.appendChild(noBtn);
+            aside.appendChild(row);
+        }
+
+        for (const r of _recentConversations.slice(0, 3)) {
+            const row = el('div', 'drawer-item drawer-recent');
+            const b = el('button', 'drawer-item-label-btn');
+            b.type = 'button';
+            b.appendChild(avatarNode(r.avatarUrl, r.name));
+            b.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
+            b.addEventListener('click', () => {
+                closeDrawer();
+                if (_opts && typeof _opts.onOpenConversation === 'function') _opts.onOpenConversation(r.userId, r.name);
+            });
+            row.appendChild(b);
+            const badge = el('span', 'drawer-badge');
+            row.appendChild(badge);
+            setBadge(badge, r.unread || 0);
+            const more = el('button', 'drawer-more', '⋯');
+            more.type = 'button';
+            more.setAttribute('aria-label', '⋯');
+            more.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (_opts && typeof _opts.onConversationMenu === 'function') {
+                    _opts.onConversationMenu(r.userId, more);
+                }
+            });
+            row.appendChild(more);
+            aside.appendChild(row);
+        }
+
+        // گفتگوی تازه (جستجو + درخواست دوستی)
+        const newConvBtn = el('button', 'drawer-item drawer-mini-btn', i18nT('conn.newConversation') !== 'conn.newConversation' ? i18nT('conn.newConversation') : '＋ گفتگوی تازه');
+        newConvBtn.type = 'button';
+        newConvBtn.addEventListener('click', () => {
+            _showNewConv = !_showNewConv;
+            rerenderDrawer();
+        });
+        aside.appendChild(newConvBtn);
+        if (_showNewConv) {
+            const wrap = el('div', 'conv-search');
+            const searchInput = el('input', 'conv-input');
+            searchInput.setAttribute('placeholder', i18nT('conn.searchPlaceholder') !== 'conn.searchPlaceholder' ? i18nT('conn.searchPlaceholder') : '…');
+            searchInput.setAttribute('maxlength', '50');
+            searchInput.setAttribute('autocomplete', 'off');
+            const results = el('div', 'conv-search-results');
+            wrap.appendChild(searchInput);
+            wrap.appendChild(results);
+            let searchTimer = null;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(async () => {
+                    const q = searchInput.value.trim();
+                    results.replaceChildren();
+                    if (q.length < 3) return;
+                    if (!_opts || typeof _opts.onSearchUsers !== 'function') return;
+                    let users = [];
+                    try {
+                        users = await _opts.onSearchUsers(q);
+                    } catch { users = []; }
+                    for (const u of users || []) {
+                        const urow = el('div', 'conv-row');
+                        urow.appendChild(el('span', 'conv-name', String((u && (u.displayName || u.username)) || '')));
+                        const req = el('button', 'conv-mini-btn', i18nT('conn.request') !== 'conn.request' ? i18nT('conn.request') : 'درخواست');
+                        req.type = 'button';
+                        req.addEventListener('click', async () => {
+                            req.disabled = true;
+                            if (_opts && typeof _opts.onRequestConnection === 'function') {
+                                await _opts.onRequestConnection(u.id);
+                            }
+                            req.textContent = i18nT('conn.requestSent') !== 'conn.requestSent' ? i18nT('conn.requestSent') : 'فرستاده شد';
+                        });
+                        urow.appendChild(req);
+                        results.appendChild(urow);
                     }
-                });
-                row.appendChild(more);
-                aside.appendChild(row);
-            }
+                }, 350);
+            });
+            aside.appendChild(wrap);
+        }
+
+        // ─── تک‌صفحه: زیربخش گروه‌ها (ساخت + لیست) ───
+        const grpHead = el('div', 'drawer-section-head');
+        grpHead.appendChild(el('span', 'drawer-section', i18nT('nav.recentGroups') !== 'nav.recentGroups' ? i18nT('nav.recentGroups') : 'گروه‌ها'));
+        const grpAdd = el('button', 'drawer-more', '＋');
+        grpAdd.type = 'button';
+        grpAdd.setAttribute('aria-label', '＋');
+        grpAdd.addEventListener('click', () => {
+            _showCreateGroup = !_showCreateGroup;
+            rerenderDrawer();
+        });
+        grpHead.appendChild(grpAdd);
+        aside.appendChild(grpHead);
+        if (_showCreateGroup) {
+            aside.appendChild(buildCreateGroupForm());
+        }
+
+        // دعوت‌های گروهی (قبول/رد همین‌جا)
+        for (const inv of _groupInvitations.slice(0, 5)) {
+            const row = el('div', 'drawer-item drawer-recent');
+            row.appendChild(avatarNode(null, inv.name));
+            row.appendChild(el('span', 'drawer-item-label', String(inv.name || '')));
+            const okBtn = el('button', 'conv-mini-btn', i18nT('conn.accept') !== 'conn.accept' ? i18nT('conn.accept') : 'قبول');
+            okBtn.type = 'button';
+            okBtn.addEventListener('click', async () => {
+                okBtn.disabled = true;
+                if (_opts && typeof _opts.onRespondGroupInvitation === 'function') {
+                    await _opts.onRespondGroupInvitation(inv, true);
+                }
+                rerenderDrawer();
+            });
+            const noBtn = el('button', 'conv-mini-btn', i18nT('conn.reject') !== 'conn.reject' ? i18nT('conn.reject') : 'رد');
+            noBtn.type = 'button';
+            noBtn.addEventListener('click', async () => {
+                noBtn.disabled = true;
+                if (_opts && typeof _opts.onRespondGroupInvitation === 'function') {
+                    await _opts.onRespondGroupInvitation(inv, false);
+                }
+                rerenderDrawer();
+            });
+            row.appendChild(okBtn);
+            row.appendChild(noBtn);
+            aside.appendChild(row);
         }
     }
 
@@ -295,18 +411,98 @@ export function updateDrawerBadges({ messages, groups, notifications }) {
 }
 
 /**
- * ست کردن گروه‌های اخیر (حداکثر ۳ نمایش داده می‌شود).
+ * ست کردن گفتگوهای اخیر (حداکثر ۳ — با عدد نخوانده).
+ * ردیف‌ها: { userId, name, avatarUrl, unread }.
+ */
+export function setRecentConversations(list) {
+    _recentConversations = Array.isArray(list) ? list.slice(0, 10) : [];
+}
+
+/**
+ * ست کردن گروه‌های اخیر (حداکثر ۳ — با عدد نخوانده).
+ * ردیف‌ها: { id, name, avatarUrl, unread }.
  */
 export function setRecentGroups(list) {
     _recentGroups = Array.isArray(list) ? list.slice(0, 10) : [];
 }
 
 /**
- * ست کردن گفتگوهای اخیر (حداکثر ۳ — با عدد نخوانده).
- * ردیف‌ها: { userId, name, avatarUrl, unread } (نام از قبل محاسبه شده — بدون import چرخه‌ای).
+ * ست کردن دعوت‌های گروهی: { id, groupId, name }.
  */
-export function setRecentConversations(list) {
-    _recentConversations = Array.isArray(list) ? list.slice(0, 10) : [];
+export function setGroupInvitations(list) {
+    _groupInvitations = Array.isArray(list) ? list.slice(0, 10) : [];
+}
+
+/**
+ * ست کردن درخواست‌های ورودی دوستی: { id, userId, name, avatarUrl }.
+ */
+export function setIncomingRequests(list) {
+    _incomingRequests = Array.isArray(list) ? list.slice(0, 10) : [];
+}
+
+/**
+ * فرم جمع‌وجور ساخت گروه داخل دراور (نام + عمومی/خصوصی).
+ * ارسال → onCreateGroup({ name, visibility }) → { ok, group? }.
+ */
+function buildCreateGroupForm() {
+    const form = el('div', 'conv-search');
+    const input = el('input', 'conv-input');
+    input.setAttribute('placeholder', i18nT('grp.createPlaceholder') !== 'grp.createPlaceholder' ? i18nT('grp.createPlaceholder') : 'نام گروه…');
+    input.setAttribute('maxlength', '100');
+    input.setAttribute('autocomplete', 'off');
+    const visRow = el('div', 'conv-vis-row');
+    const pubLabel = el('label', 'conv-vis-option');
+    const pubRadio = el('input', null);
+    pubRadio.type = 'radio';
+    pubRadio.name = 'drawer-grp-visibility';
+    pubRadio.value = 'public';
+    pubLabel.appendChild(pubRadio);
+    pubLabel.appendChild(document.createTextNode(i18nT('grp.visibilityPublic') !== 'grp.visibilityPublic' ? i18nT('grp.visibilityPublic') : 'عمومی'));
+    const privLabel = el('label', 'conv-vis-option');
+    const privRadio = el('input', null);
+    privRadio.type = 'radio';
+    privRadio.name = 'drawer-grp-visibility';
+    privRadio.value = 'private';
+    privRadio.checked = true;
+    privLabel.appendChild(privRadio);
+    privLabel.appendChild(document.createTextNode(i18nT('grp.visibilityPrivate') !== 'grp.visibilityPrivate' ? i18nT('grp.visibilityPrivate') : 'خصوصی'));
+    visRow.appendChild(pubLabel);
+    visRow.appendChild(privLabel);
+    const create = el('button', 'conv-send', i18nT('grp.createGo') !== 'grp.createGo' ? i18nT('grp.createGo') : 'ساخت');
+    create.type = 'button';
+    const hint = el('div', 'drawer-hint');
+    hint.hidden = true;
+    create.addEventListener('click', async () => {
+        const name = input.value.trim();
+        if (!name || !_opts || typeof _opts.onCreateGroup !== 'function') return;
+        create.disabled = true;
+        hint.hidden = true;
+        let res = null;
+        try {
+            const vis = form.querySelector('input[name="drawer-grp-visibility"]:checked');
+            res = await _opts.onCreateGroup({ name, visibility: (vis && vis.value) || 'private' });
+        } catch {
+            res = { ok: false };
+        }
+        create.disabled = false;
+        if (res && res.ok) {
+            _showCreateGroup = false;
+            closeDrawer();
+            if (res.group && typeof _opts.onOpenGroup === 'function') {
+                _opts.onOpenGroup(res.group.id, res.group.name);
+            } else {
+                rerenderDrawer();
+            }
+        } else {
+            hint.textContent = i18nT('errors.serverError');
+            hint.hidden = false;
+        }
+    });
+    form.appendChild(input);
+    form.appendChild(visRow);
+    form.appendChild(create);
+    form.appendChild(hint);
+    return form;
 }
 
 /**
@@ -343,4 +539,8 @@ export function __resetSidebarForTest() {
     _badges.notifications = 0;
     _recentGroups = [];
     _recentConversations = [];
+    _incomingRequests = [];
+    _groupInvitations = [];
+    _showNewConv = false;
+    _showCreateGroup = false;
 }

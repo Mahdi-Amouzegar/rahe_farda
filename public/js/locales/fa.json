@@ -76,6 +76,7 @@
     "notifications": "🔔 اعلان‌ها",
     "recentGroups": "گروه‌های اخیر",
     "recentMessages": "پیام‌های اخیر",
+    "contacts": "مخاطبان",
     "settings": "⚙ تنظیمات",
     "account": "👤 حساب من",
     "login": "🔐 ورود / ساخت حساب",
@@ -1321,6 +1322,7 @@
     "newTask": "کار جدید",
     "newPlan": "برنامه جدید",
     "newSeries": "دوره جدید",
+    "newGroup": "گروه تازه",
     "settings": "تنظیمات",
     "ariaQuickAccess": "دسترسی سریع"
   },

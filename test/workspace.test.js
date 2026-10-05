@@ -1,5 +1,5 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// test/workspace.test.js — تست‌های رجیستری Workspace (T3)
+// test/workspace.test.js — تست‌های رجیستری Workspace (تک‌صفحه: tasks + search)
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -32,10 +32,7 @@ function buildShell() {
         </div>
         <div class="panel" id="panelMap"></div>
         <div class="workspace-root" id="workspaceRoot" hidden>
-            <section id="ws-messages" hidden></section>
-            <section id="ws-groups" hidden></section>
             <section id="ws-search" hidden></section>
-            <section id="ws-notifications" hidden></section>
         </div>`;
 }
 
@@ -57,21 +54,27 @@ describe('workspace — registry', () => {
         expect(getActiveWorkspace()).toBe('tasks');
     });
 
-    it('سوییچ به messages: layout مخفی، سکشن نمایان، رویداد فرستاده می‌شود', () => {
+    it('فضاهای قدیمی messages/groups/notifications دیگر معتبر نیستند', () => {
+        expect(isWorkspace('messages')).toBe(false);
+        expect(isWorkspace('groups')).toBe(false);
+        expect(isWorkspace('notifications')).toBe(false);
+        expect(switchWorkspace('messages')).toBe(false);
+    });
+
+    it('سوییچ به search: layout مخفی، سکشن نمایان، رویداد فرستاده می‌شود', () => {
         const seen = [];
         events.on(EV.WORKSPACE_CHANGED, (p) => seen.push(p));
-        expect(switchWorkspace('messages')).toBe(true);
-        expect(getActiveWorkspace()).toBe('messages');
+        expect(switchWorkspace('search')).toBe(true);
+        expect(getActiveWorkspace()).toBe('search');
         expect(document.querySelector('.layout').hidden).toBe(true);
         expect(document.querySelector('.mobile-tabs').hidden).toBe(true);
         expect(document.getElementById('workspaceRoot').hidden).toBe(false);
-        expect(document.getElementById('ws-messages').hidden).toBe(false);
-        expect(document.getElementById('ws-groups').hidden).toBe(true);
-        expect(seen).toEqual([{ from: 'tasks', to: 'messages' }]);
+        expect(document.getElementById('ws-search').hidden).toBe(false);
+        expect(seen).toEqual([{ from: 'tasks', to: 'search' }]);
     });
 
     it('برگشت به tasks همه را برمی‌گرداند', () => {
-        switchWorkspace('groups');
+        switchWorkspace('search');
         switchWorkspace('tasks');
         expect(getActiveWorkspace()).toBe('tasks');
         expect(document.querySelector('.layout').hidden).toBe(false);
@@ -80,14 +83,14 @@ describe('workspace — registry', () => {
 });
 
 describe('workspace — guest gate', () => {
-    it('مهمان نمی‌تواند به messages برود و AUTH_REQUIRED می‌آید', () => {
+    it('مهمان نمی‌تواند به search برود و AUTH_REQUIRED می‌آید', () => {
         authState.loggedIn = false;
         const seen = [];
         events.on(EV.AUTH_REQUIRED, (p) => seen.push(p));
-        expect(switchWorkspace('messages')).toBe(false);
+        expect(switchWorkspace('search')).toBe(false);
         expect(getActiveWorkspace()).toBe('tasks');
         expect(seen.length).toBe(1);
-        expect(seen[0].workspace).toBe('messages');
+        expect(seen[0].workspace).toBe('search');
     });
 
     it('مهمان در tasks می‌ماند (مجاز)', () => {

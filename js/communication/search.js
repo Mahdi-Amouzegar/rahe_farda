@@ -12,7 +12,6 @@ import { avatarNode } from '../ui/avatar.js';
 import { showInfoModal } from '../core.js';
 import { switchWorkspace } from '../navigation/workspace.js';
 import { displayNameOf } from './conversations.js';
-import { openGroup } from './groups.js';
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -72,7 +71,8 @@ function groupRow(g, isMember) {
     row.appendChild(el('span', 'conv-name', g.name || '…'));
     row.addEventListener('click', async () => {
         if (isMember) {
-            if (switchWorkspace('groups')) openGroup(g.id);
+            const { selectDestination } = await import('../tasks/composer.js');
+            await selectDestination({ type: 'group', groupId: String(g.id), name: g.name });
         } else {
             showInfoModal({
                 title: g.name || '',

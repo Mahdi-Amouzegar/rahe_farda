@@ -1,25 +1,19 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// js/navigation/header.js -- اسلات‌های هدر Shell (Phase 8 — T4)
+// js/navigation/header.js -- اسلات‌های هدر Shell (تک‌صفحه)
 //
-// ⚠️ قرارداد UI-SHELL §۲.۱: حداکثر ۵ اسلات
-//    fa: ☰ | لوگو/زمینه | سینک | 🔔 | 👤 (موبایل: همان ساختار فشرده)
-//    - زمینه = نام فضای فعال (به‌روزرسانی با WORKSPACE_CHANGED + تعویض زبان)
-//    - 🔔 → فضای اعلان‌ها (بج از setNotifBadge؛ داده‌ی واقعی در 8-2/8-3)
+// ⚠️ قرارداد: حداکثر ۳ اسلات (☰ | لوگو/زمینه | 👤)
+//    - زمینه = نام فضای فعال یا نام مقصد مشترک (مخاطب/گروه)
 //    - 👤 → مودال حساب (منطق موجود در app.js)
-//    - چرخ‌دنده حذف شده؛ تنظیمات فقط در دراور
+//    - زنگ اعلان‌ها حذف شد — اعلان فقط عدد کنار نام در دراور + toast زنده
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { events, EV } from '../events.js';
 import { t as i18nT } from '../i18n.js';
-import { setBadge } from '../ui/badge.js';
 import { getActiveWorkspace } from './workspace.js';
 
 const CONTEXT_KEYS = {
     tasks: 'nav.tasks',
-    messages: 'nav.messages',
-    groups: 'nav.groups',
     search: 'nav.search',
-    notifications: 'nav.notifications',
 };
 
 function tr(key, fallback) {
@@ -29,10 +23,6 @@ function tr(key, fallback) {
 
 function contextEl() {
     return document.getElementById('headerContext');
-}
-
-function notifBadge() {
-    return document.getElementById('notifBellBadge');
 }
 
 /**
@@ -46,18 +36,10 @@ export function refreshHeaderContext() {
 }
 
 /**
- * ست کردن بج اعلان‌های هدر.
- */
-export function setNotifBadge(count) {
-    setBadge(notifBadge(), count);
-}
-
-/**
  * راه‌اندازی هدر (idempotent).
  *
  * @param {Object} opts
  * @param {() => void} opts.onDrawer - باز کردن دراور
- * @param {() => void} opts.onBell - رفتن به فضای اعلان‌ها
  * @param {() => void} opts.onAccount - باز کردن مودال حساب
  */
 export function initHeader(opts) {
@@ -67,13 +49,6 @@ export function initHeader(opts) {
         drawerBtn.dataset.bound = '1';
         drawerBtn.addEventListener('click', (e) => {
             if (typeof o.onDrawer === 'function') o.onDrawer(e.currentTarget);
-        });
-    }
-    const bell = document.getElementById('notifBell');
-    if (bell && !bell.dataset.bound) {
-        bell.dataset.bound = '1';
-        bell.addEventListener('click', () => {
-            if (typeof o.onBell === 'function') o.onBell();
         });
     }
     const account = document.getElementById('accountBtn');

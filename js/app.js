@@ -143,8 +143,10 @@ async function preloadDrawerLists() {
         if (!isLoggedIn()) return;
         await listConversations().catch(() => {});
         await refreshConversationBadges().catch(() => {});
+        await refreshIncomingRequests().catch(() => {});
         await listGroups().catch(() => {});
         await refreshGroupBadges().catch(() => {});
+        await refreshGroupInbox().catch(() => {});
     } catch { /* best-effort */ }
 }
 
@@ -231,10 +233,16 @@ import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation
 import { initSidebar, openDrawer, rerenderDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
-import { openMessagesWorkspace, refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations } from './communication/conversations.js';
+import { openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupsWorkspace, openGroupMenuFor, listGroups, refreshGroupBadges } from './communication/groups.js';
+import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog } from './communication/groups.js';
+import {
+    searchUsers,
+    requestConnection,
+    acceptConnection,
+    rejectConnection,
+} from './communication/connections.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
@@ -1504,16 +1512,28 @@ function startNewKind(kind) {
     }, 400);
 }
 
-// ⚠️ فاز ۸ (T4): اکشن‌های شیت ⊕ در فضای وظایف
+// ⚠️ اکشن‌های شیت ⊕ (وظایف + گروه تازه برای واردشده‌ها)
 function openQuickSheet(opener) {
+    const actions = [
+        { id: 'task', icon: '📝', label: i18nT('bottomActions.newTask') },
+        { id: 'plan', icon: '📂', label: i18nT('bottomActions.newPlan') },
+        { id: 'series', icon: '📅', label: i18nT('bottomActions.newSeries') },
+    ];
+    try {
+        if (isLoggedIn()) {
+            actions.push({ id: 'new-group', icon: '👥', label: i18nT('bottomActions.newGroup') });
+        }
+    } catch { /* silent */ }
     openSheet({
         title: i18nT('nav.bottom.add') !== 'nav.bottom.add' ? i18nT('nav.bottom.add') : '➕',
-        actions: [
-            { id: 'task', icon: '📝', label: i18nT('bottomActions.newTask') },
-            { id: 'plan', icon: '📂', label: i18nT('bottomActions.newPlan') },
-            { id: 'series', icon: '📅', label: i18nT('bottomActions.newSeries') },
-        ],
-        onSelect: (id) => startNewKind(id),
+        actions,
+        onSelect: (id) => {
+            if (id === 'new-group') {
+                openCreateGroupDialog();
+                return;
+            }
+            startNewKind(id);
+        },
         opener,
     });
 }
@@ -1529,10 +1549,6 @@ document.querySelector('.bottom-actions')?.addEventListener('click', e => {
     }
     if (action === 'nav-add') {
         openQuickSheet(btn);
-        return;
-    }
-    if (action === 'nav-notifications') {
-        switchWorkspace('notifications');
         return;
     }
 });
@@ -2578,10 +2594,6 @@ initI18n().then(async () => {
                 resetToLocal().then(() => applyDestinationLabel());
                 return;
             }
-            // ⚠️ فاز ۸ (8.2-A): ورود به فضای پیام‌ها = لود لیست + بج
-            if (ws === 'messages') openMessagesWorkspace();
-            // ⚠️ فاز ۸ (8.3-A): ورود به فضای گروه‌ها = لود لیست
-            if (ws === 'groups') openGroupsWorkspace();
             // ⚠️ 8.3-D: ورود به فضای جستجو
             if (ws === 'search') openSearchWorkspace();
             applyDestinationLabel();
@@ -2596,6 +2608,33 @@ initI18n().then(async () => {
             applyDestinationLabel();
         },
         onConversationMenu: (userId, anchor) => openConversationMenuFor(userId, anchor),
+        onAcceptRequest: async (connectionId) => {
+            await acceptConnection(connectionId);
+            await refreshIncomingRequests().catch(() => {});
+            await listConversations().catch(() => {});
+            await refreshConversationBadges().catch(() => {});
+            rerenderDrawer();
+        },
+        onRejectRequest: async (connectionId) => {
+            await rejectConnection(connectionId);
+            await refreshIncomingRequests().catch(() => {});
+            rerenderDrawer();
+        },
+        onSearchUsers: async (q) => {
+            const res = await searchUsers(q).catch(() => null);
+            return (res && res.ok && res.users) || [];
+        },
+        onRequestConnection: async (userId) => {
+            const res = await requestConnection(userId).catch(() => ({ ok: false }));
+            return res;
+        },
+        onCreateGroup: async ({ name, visibility }) => createGroup({ name, visibility }),
+        onRespondGroupInvitation: async (inv, accept) => {
+            const res = await respondGroupInvitation(inv, accept).catch(() => ({ ok: false }));
+            await preloadDrawerLists().catch(() => {});
+            rerenderDrawer();
+            return res;
+        },
         // ⚠️ تک‌صفحه: نام گروه در دراور → همان صفحه با مقصد گروه (بدون تغییر فضا)
         onOpenGroup: async (groupId, name) => {
             if (!switchWorkspace('tasks')) return;
@@ -2606,7 +2645,6 @@ initI18n().then(async () => {
     });
     initHeader({
         onDrawer: (opener) => openDrawer(opener),
-        onBell: () => switchWorkspace('notifications'),
         onAccount: () => openAuthModal(),
     });
     initSheet();
