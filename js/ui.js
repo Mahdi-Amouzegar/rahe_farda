@@ -881,6 +881,17 @@ export function showToast(text, durationMs) {
 /**
  * رندر کامل — innerHTML-based.
  */
+/**
+ * راهنمای شروع خالی: دو خطی (خط دوم بعد از — می‌آید).
+ */
+export function splitHintLines(hint) {
+    const text = String(hint || '');
+    const sep = ' — ';
+    const idx = text.indexOf(sep);
+    if (idx < 0) return escapeHtml(text);
+    return escapeHtml(text.slice(0, idx)) + '<br>' + escapeHtml(text.slice(idx + sep.length));
+}
+
 function renderFull(filtered, total, done) {
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
@@ -900,7 +911,7 @@ function renderFull(filtered, total, done) {
             <div class="empty-state">
                 <div class="icon">✦</div>
                 <p>${msg}</p>
-                ${state.tasks.length === 0 && !state.searchQuery ? `<p class="empty-hint">${i18nT('tasks.empty.startHint')}</p>` : ''}
+                ${state.tasks.length === 0 && !state.searchQuery ? `<p class="empty-hint">${splitHintLines(i18nT('tasks.empty.startHint'))}</p>` : ''}
             </div>`;
         state.justAddedId = null;
         updateTaskListStatus('');

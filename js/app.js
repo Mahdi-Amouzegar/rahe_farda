@@ -2722,6 +2722,9 @@ initI18n().then(async () => {
     if (state.prefs.proMode) state.tasks.forEach(t => { if (t.kind === 'plan') state.expandedPlans.add(String(t.id)); });
     updateDueChips();
     syncDisclosure();
+    // ⚠️ رندر دوم قطعی با امضای تازه: اگر اولین رندر قبل از آماده‌شدن کامل لوکال
+    // کلیدهای خام را نشانده باشد، اینجا اصلاح می‌شود (تغییر بصری ندارد اگر سالم بود)
+    resetRenderSignature();
     render();
     renderTrash();
     initMap();
