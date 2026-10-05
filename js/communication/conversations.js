@@ -56,13 +56,16 @@ export function displayNameOf(user) {
  * ⚠️ قدم ۲: به‌جای N فراخوانی /api/messages، یک فراخوانی /api/dm/unread.
  */
 export async function listConversations() {
-    const res = await apiFetch('/api/connections');
+    // ⚠️ موازی: لیست کانکشن‌ها و شمارنده‌ها مستقل‌اند
+    const [res, u] = await Promise.all([
+        apiFetch('/api/connections'),
+        getDmUnread().catch(() => ({ ok: false })),
+    ]);
     if (!res.ok) return { ok: false, error: res.error };
     const all = (res.data && res.data.connections) || [];
     const accepted = all.filter((c) => c && c.status === 'accepted');
-    let unreadByPeer = new Map();
+    const unreadByPeer = new Map();
     try {
-        const u = await getDmUnread();
         if (u.ok) {
             for (const row of u.unread.byPeer || []) {
                 unreadByPeer.set(String(row.peerId), row.count || 0);
