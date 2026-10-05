@@ -2632,8 +2632,9 @@ initI18n().then(async () => {
         },
         onSearchAll: async (q) => {
             try {
+                const clean = String(q || '').trim().replace(/^@+/, '');
                 const { apiFetch } = await import('./api.js');
-                const res = await apiFetch('/api/search?q=' + encodeURIComponent(q) + '&type=all');
+                const res = await apiFetch('/api/search?q=' + encodeURIComponent(clean) + '&type=all');
                 if (!res.ok) return { users: [], groups: [] };
                 return {
                     users: (res.data && res.data.users) || [],

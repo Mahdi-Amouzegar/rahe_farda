@@ -255,7 +255,7 @@ function buildUserSearchBox() {
     searchInput.addEventListener('input', () => {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(async () => {
-            const q = searchInput.value.trim();
+            const q = searchInput.value.trim().replace(/^@+/, '');
             results.replaceChildren();
             if (q.length < 3) return;
             if (!_opts || typeof _opts.onSearchUsers !== 'function') return;
@@ -376,7 +376,7 @@ function renderSearchTab(aside) {
         _searchQuery = searchInput.value;
         clearTimeout(searchTimer);
         searchTimer = setTimeout(async () => {
-            const q = searchInput.value.trim();
+            const q = searchInput.value.trim().replace(/^@+/, '');
             _searchResults = { users: [], groups: [] };
             if (q.length >= 3 && _opts && typeof _opts.onSearchAll === 'function') {
                 try {

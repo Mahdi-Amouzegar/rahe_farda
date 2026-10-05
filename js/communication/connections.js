@@ -159,8 +159,9 @@ export async function unblockUser(blockId) {
  * جستجوی کاربر برای شروع گفتگو (username + گروه عمومی).
  */
 export async function searchUsers(query) {
+    const clean = String(query || '').trim().replace(/^@+/, '');
     const res = await apiFetch(
-        '/api/search?q=' + encodeURIComponent(query) + '&type=user'
+        '/api/search?q=' + encodeURIComponent(clean) + '&type=user'
     );
     if (!res.ok) return res;
     return { ok: true, users: (res.data && res.data.users) || [] };
