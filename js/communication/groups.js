@@ -736,8 +736,14 @@ export async function refreshGroupBadges() {
             name: g.name || '…',
             avatarUrl: g.avatarUrl || null,
             unread: unreadByGroup.get(String(g.id)) || 0,
+            lastActivity: g.lastActivity || null,
         }));
-        rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
+        rows.sort((a, b) => {
+            const x = String(a.lastActivity || '');
+            const y = String(b.lastActivity || '');
+            if (x === y) return 0;
+            return x > y ? -1 : 1;
+        });
         setRecentGroups(rows);
     } catch { /* best-effort */ }
 }

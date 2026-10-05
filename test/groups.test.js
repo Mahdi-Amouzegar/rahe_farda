@@ -34,8 +34,8 @@ vi.mock('../js/api.js', async () => ({
                 ok: true,
                 data: {
                     groups: [
-                        { id: 'g1', name: 'سفر', ownerId: 'u1' },
-                        { id: 'g2', name: 'خانواده', ownerId: 'u9' },
+                        { id: 'g1', name: 'سفر', ownerId: 'u1', lastActivity: '2026-01-01T00:00:00Z' },
+                        { id: 'g2', name: 'خانواده', ownerId: 'u9', lastActivity: '2026-02-01T00:00:00Z' },
                     ],
                 },
             };
@@ -192,8 +192,10 @@ describe('groups — drawer preload (رگرسیون لود اولیه)', () => {
         document.querySelector('#drawer [data-dtab="groups"]').click();
         const drawerText = document.getElementById('drawer').textContent;
         expect(drawerText).toContain('سفر');
-        // زیر سرفصل گروه‌ها، نه مخاطبان
+        // مرتب بر آخرین فعالیت: خانواده (جدیدتر) بالاتر از سفر
         const html = document.getElementById('drawer').innerHTML;
+        expect(html.indexOf('خانواده')).toBeLessThan(html.indexOf('سفر'));
+        // زیر سرفصل گروه‌ها، نه مخاطبان
         const contactsIdx = html.indexOf('مخاطبان');
         const groupsIdx = html.indexOf('گروه‌ها');
         const travelIdx = html.indexOf('سفر');

@@ -59,10 +59,15 @@ export async function listConversations() {
     const all = (res.data && res.data.connections) || [];
     const accepted = all.filter((c) => c && c.status === 'accepted');
     const unreadByPeer = new Map();
+    const activityByPeer = new Map();
     try {
+        const u = await getDmUnread();
         if (u.ok) {
             for (const row of u.unread.byPeer || []) {
                 unreadByPeer.set(String(row.peerId), row.count || 0);
+            }
+            for (const row of u.unread.activity || []) {
+                activityByPeer.set(String(row.peerId), row.lastActivity || null);
             }
         }
     } catch { /* best-effort: بدون شمارنده */ }
@@ -79,6 +84,7 @@ export async function listConversations() {
                 avatarUrl: other.avatarUrl || null,
             },
             unread: unreadByPeer.get(otherId) || 0,
+            lastActivity: activityByPeer.get(otherId) || null,
         });
     }
     _conversations = conversations;
@@ -114,18 +120,23 @@ export async function refreshConversationBadges() {
 }
 
 /**
- * ردیف‌های اخیر دراور (حداکثر ۳، مثل گروه‌های اخیر).
- * خود نام → باز کردن گفتگو؛ ⋯ کنار نام → منوی همان سطح.
+ * ردیف‌های دراور — مرتب بر آخرین فعالیت (تازه‌ترین بالا).
  */
 export function pushRecentConversations() {
     try {
-        const rows = (_conversations || []).slice(0, 10).map((c) => ({
+        const rows = (_conversations || []).slice(0, 200).map((c) => ({
             userId: String((c.user && c.user.id) || ''),
             name: displayNameOf(c.user),
             avatarUrl: (c.user && c.user.avatarUrl) || null,
             unread: c.unread || 0,
+            lastActivity: c.lastActivity || null,
         })).filter((r) => r.userId);
-        rows.sort((a, b) => (b.unread || 0) - (a.unread || 0));
+        rows.sort((a, b) => {
+            const x = String(a.lastActivity || '');
+            const y = String(b.lastActivity || '');
+            if (x === y) return 0;
+            return x > y ? -1 : 1;
+        });
         setRecentConversations(rows);
     } catch { /* best-effort */ }
 }
