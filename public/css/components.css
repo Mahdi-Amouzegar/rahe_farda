@@ -869,6 +869,30 @@
         font-weight: 700;
     }
 
+    .dest-banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border: 1px solid var(--border-medium);
+        border-radius: 12px;
+        background: var(--surface-soft);
+        font-size: 0.82rem;
+    }
+
+    .dest-banner[hidden] {
+        display: none;
+    }
+
+    .dest-banner-text {
+        flex: 1;
+        min-width: 140px;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
     .priority-badge.p-high {
         color: var(--accent-pink);
         border-color: var(--accent-pink-border);

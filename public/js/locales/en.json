@@ -121,7 +121,10 @@
   "dm": {
     "taskPlaceholder": "New task…",
     "empty": "No tasks yet — create the first one.",
-    "toast": "New task from {name}"
+    "toast": "New task from {name}",
+    "reqTitle": "Friend request",
+    "waiting": "Waiting for acceptance — {n} more messages",
+    "rejected": "Friend request declined"
   },
 
   "conn": {

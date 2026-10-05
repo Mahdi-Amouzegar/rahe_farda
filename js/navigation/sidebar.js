@@ -265,25 +265,21 @@ function buildUserSearchBox() {
                 users = await _opts.onSearchUsers(q);
             } catch { users = []; }
                     for (const u of users || []) {
-                        const urow = el('div', 'conv-row');
+                        const urow = el('button', 'conv-row');
+                        urow.type = 'button';
+                        urow.appendChild(avatarNode(u.avatarUrl, (u.displayName || u.username)));
                         urow.appendChild(el('span', 'conv-name', String((u && (u.displayName || u.username)) || '')));
-                        // رابطه‌ی موجود → دکمه‌ی درخواست نشان نده (سرور 409 می‌داد)
                         if (!u || u.rel === 'accepted') {
                             urow.appendChild(el('span', 'drawer-hint', i18nT('conn.connected') !== 'conn.connected' ? i18nT('conn.connected') : 'مخاطب'));
                         } else if (u.rel === 'pending-in' || u.rel === 'pending-out') {
                             urow.appendChild(el('span', 'drawer-hint', i18nT('conn.pending') !== 'conn.pending' ? i18nT('conn.pending') : 'در انتظار'));
-                        } else {
-                            const req = el('button', 'conv-mini-btn', i18nT('conn.request') !== 'conn.request' ? i18nT('conn.request') : 'درخواست');
-                            req.type = 'button';
-                            req.addEventListener('click', async () => {
-                                req.disabled = true;
-                                if (_opts && typeof _opts.onRequestConnection === 'function') {
-                                    await _opts.onRequestConnection(u.id);
-                                }
-                                req.textContent = i18nT('conn.requestSent') !== 'conn.requestSent' ? i18nT('conn.requestSent') : 'فرستاده شد';
-                            });
-                            urow.appendChild(req);
                         }
+                        urow.addEventListener('click', () => {
+                            closeDrawer();
+                            if (_opts && typeof _opts.onStartConversation === 'function') {
+                                _opts.onStartConversation(u);
+                            }
+                        });
                         results.appendChild(urow);
                     }
         }, 350);

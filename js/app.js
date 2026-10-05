@@ -244,10 +244,8 @@ import { renderAvatarSettings } from './ui/avatar-settings.js';
 import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog } from './communication/groups.js';
 import {
     searchUsers,
-    requestConnection,
     acceptConnection,
     rejectConnection,
-    findActiveConnectionWith,
     getRelationshipMap,
 } from './communication/connections.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
@@ -2652,22 +2650,23 @@ initI18n().then(async () => {
                 return { users: [], groups: [] };
             }
         },
+        onStartConversation: async (u) => {
+            if (!u || !u.id) return;
+            await selectDestination({
+                type: 'peer',
+                peerId: String(u.id),
+                name: u.displayName || u.username,
+            });
+            applyDestinationLabel();
+        },
         onOpenSearchUser: async (u) => {
             if (!u || !u.id) return;
-            try {
-                const c = await findActiveConnectionWith(u.id).catch(() => null);
-                if (c && c.ok && c.connection) {
-                    await selectDestination({
-                        type: 'peer',
-                        peerId: String(u.id),
-                        name: u.displayName || u.username,
-                    });
-                    applyDestinationLabel();
-                    return;
-                }
-            } catch { /* silent */ }
-            const res = await requestConnection(u.id).catch(() => ({ ok: false }));
-            showToast(res && res.ok ? t('conn.requestSent') : t('errors.serverError'));
+            await selectDestination({
+                type: 'peer',
+                peerId: String(u.id),
+                name: u.displayName || u.username,
+            });
+            applyDestinationLabel();
         },
         onOpenSearchGroup: async (g) => {
             if (!g || !g.id) return;
@@ -2686,10 +2685,6 @@ initI18n().then(async () => {
                 title: g.name || '',
                 paragraphs: [t('search.inviteOnly')],
             });
-        },
-        onRequestConnection: async (userId) => {
-            const res = await requestConnection(userId).catch(() => ({ ok: false }));
-            return res;
         },
         onCreateGroup: async ({ name, visibility }) => {
             const r = await createGroup({ name, visibility }).catch(() => ({ ok: false }));

@@ -197,12 +197,14 @@ describe('sidebar — logged in', () => {
         expect(removeDrawerRow('peer', 'nope')).toBe(true);
     });
 
-    it('جستجوی گفتگوی تازه: مخاطب موجود دکمه درخواست ندارد', async () => {
+    it('جستجوی گفتگوی تازه: مخاطب موجود دکمه درخواست ندارد؛ غریبه با کلیک باز می‌شود', async () => {
+        const opened = [];
         initSidebar({
             onSearchUsers: async () => [
                 { id: 'u2', username: 'sara', rel: 'accepted' },
                 { id: 'u9', username: 'newguy', rel: 'none' },
             ],
+            onStartConversation: (u) => opened.push(u.id),
         });
         openDrawer();
         document.querySelector('#drawer .drawer-mini-btn').click();
@@ -214,7 +216,8 @@ describe('sidebar — logged in', () => {
         expect(rows.length).toBe(2);
         expect(rows[0].querySelector('.conv-mini-btn')).toBeNull();
         expect(rows[0].textContent).toContain('مخاطب');
-        expect(rows[1].querySelector('.conv-mini-btn')).not.toBeNull();
+        rows[1].click();
+        expect(opened).toEqual(['u9']);
     });
 
     it('تب جستجو: input + نتایج قابل کلیک', async () => {

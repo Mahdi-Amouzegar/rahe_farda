@@ -25,6 +25,7 @@ import { updateDrawerBadges } from '../navigation/sidebar.js';
 import { apiFetch, apiErrorMessage } from '../api.js';
 import { showToast } from '../ui.js';
 import { t as i18nT } from '../i18n.js';
+import { refreshDestBanner, hideDestBanner } from './banner.js';
 
 export {
     refreshSharedList,
@@ -116,6 +117,7 @@ export async function selectDestination(dest) {
     resetRenderSignature();
     await refreshSharedList();
     render();
+    await refreshDestBanner();
     await markDestinationRead();
     return norm;
 }
@@ -126,6 +128,7 @@ export async function selectDestination(dest) {
 export async function resetToLocal() {
     const { render, resetRenderSignature } = await import('../ui.js');
     setDestination({ type: 'local' });
+    hideDestBanner();
     resetRenderSignature();
     await refreshSharedList();
     render();
