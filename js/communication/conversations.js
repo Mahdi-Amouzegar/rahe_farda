@@ -15,12 +15,8 @@ import { apiFetch } from '../api.js';
 import { state, escapeHtml } from '../core.js';
 import { showInfoModal } from '../core.js';
 import { t as i18nT } from '../i18n.js';
-import { isOnline } from '../net.js';
-import { isLoggedIn } from '../auth.js';
 import { openMenu } from '../ui/menu.js';
 import { updateDrawerBadges, setRecentConversations, removeDrawerRow } from '../navigation/sidebar.js';
-import { getDestination } from '../tasks/destination.js';
-import { refreshSharedList } from '../tasks/source.js';
 import { getDmUnread } from './dm-tasks.js';
 import {
     getIncomingRequests,
@@ -33,8 +29,6 @@ import {
 
 let _conversations = [];
 let _loading = false;
-let _pollTimer = null;
-let _lastPollTotal = null;
 
 function tr(key, fallback) {
     const v = i18nT(key);
@@ -239,97 +233,16 @@ function showUserProfile(otherUserId) {
     });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Toast زنده‌ی DM (Phase 9 قدم ۲ — §۱۳.۲)
-//
-// polling سبک /api/dm/unread (بدون WebSocket). با بیشتر شدن total نسبت به
-// baseline، یک toast درون‌برنامه‌ای + تازه‌سازی بج. یادآورهای زمانی تسک‌ها
-// در موتور reminder موجود می‌مانند (دست‌نخورده).
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── polling قدیمی حذف شد — موتور واحد js/tasks/live.js جایگزین شد ───
+// (toast تکراری می‌داد؛ startDmPoll/stopDmPoll به‌عنوان API سازگار ماندند)
+import { startLiveEngine, stopLiveEngine } from '../tasks/live.js';
 
-const POLL_MS = 20000;
-let _toastTimer = null;
-
-function showDmToast(text) {
-    try {
-        const bar = document.getElementById('photoSnackbar');
-        const msgEl = document.getElementById('photoSnackbarMsg');
-        if (!bar || !msgEl) return;
-        msgEl.textContent = text;
-        bar.classList.add('show');
-        clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(() => bar.classList.remove('show'), 5000);
-    } catch { /* silent */ }
-}
-
-function nameOfPeer(peerId) {
-    const conv = (_conversations || []).find((c) => String(c.user && c.user.id) === String(peerId));
-    return conv ? displayNameOf(conv.user) : String(peerId).slice(0, 8);
-}
-
-async function pollDmOnce() {
-    if (!isLoggedIn()) return;
-    if (!isOnline()) return;
-    let u;
-    try {
-        u = await getDmUnread();
-    } catch {
-        return;
-    }
-    if (!u.ok) return;
-    const total = u.unread.total || 0;
-    if (_lastPollTotal === null) {
-        _lastPollTotal = total;
-        updateDrawerBadges({ messages: total });
-        return;
-    }
-    if (total > _lastPollTotal) {
-        const top = (u.unread.byPeer || []).slice().sort((a, b) => (b.count || 0) - (a.count || 0))[0];
-        const who = top ? nameOfPeer(top.peerId) : '…';
-        showDmToast(i18nT('dm.toast', { name: who }));
-        try {
-            const res = await listConversations();
-            if (res.ok) pushRecentConversations();
-        } catch { /* best-effort */ }
-        // اگر مخاطب همین گفتگو باز است و جزئیات باز نیست، لیست صفحه را هم تازه کن
-        try {
-            const dest = getDestination();
-            if (dest.type === 'peer' && top && String(top.peerId) === String(dest.peerId)) {
-                let detailOpen = false;
-                try {
-                    detailOpen = !!(state && state.currentDetailId);
-                } catch { /* silent */ }
-                if (!detailOpen) {
-                    await refreshSharedList();
-                    const { render } = await import('../ui.js');
-                    render();
-                }
-            }
-        } catch { /* best-effort */ }
-    }
-    _lastPollTotal = total;
-    updateDrawerBadges({ messages: total });
-}
-
-/**
- * شروع polling (idempotent؛ بعد از boot صدا زده می‌شود).
- */
 export function startDmPoll() {
-    if (_pollTimer) return;
-    _pollTimer = setInterval(() => {
-        pollDmOnce().catch(() => {});
-    }, POLL_MS);
-    if (typeof _pollTimer.unref === 'function') {
-        try { _pollTimer.unref(); } catch { /* silent */ }
-    }
+    startLiveEngine();
 }
 
 export function stopDmPoll() {
-    if (_pollTimer) {
-        clearInterval(_pollTimer);
-        _pollTimer = null;
-    }
-    _lastPollTotal = null;
+    stopLiveEngine();
 }
 
 // ⚠️ فقط برای تست

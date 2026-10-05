@@ -47,6 +47,8 @@ function baseLocalShape() {
         phone: '',
         address: '',
         url: '',
+        updatedAt: null,
+        revision: 1,
     };
 }
 
@@ -58,6 +60,8 @@ function normalizeRemote(parsed, extra) {
     }
     task.id = extra.serverId;
     task.createdAt = extra.createdAt || task.createdAt || new Date().toISOString();
+    if (extra.updatedAt) task.updatedAt = extra.updatedAt;
+    if (extra.revision !== undefined && extra.revision !== null) task.revision = extra.revision;
     task._shared = {
         mine: extra.mine,
         dest: extra.dest,
@@ -80,11 +84,13 @@ export async function fetchPeerTasks(peerId, myId, peerName) {
         if (!res.hasMore || !res.nextCursor) break;
         cursor = res.nextCursor;
     }
-    const items = all.reverse().map((t) => {
+    const items = all.map((t) => {
         const mine = String(t.creatorId || t.creator_id || '') === String(myId || '');
         return normalizeRemote(parsePayload(t.payload), {
             serverId: t.id,
             createdAt: t.createdAt || t.created_at,
+            updatedAt: t.updatedAt || t.updated_at,
+            revision: t.revision,
             mine,
             dest: { type: 'peer', peerId },
             senderName: mine ? null : (peerName || null),
@@ -175,6 +181,13 @@ export function __resetSharedForTest() {
 
 // ⚠️ فقط برای تست
 export function __setSharedItemsForTest(items) {
+    setSharedItems(items);
+}
+
+/**
+ * جایگزینی کل آیتم‌های نمای مشترک (برای موتور زنده).
+ */
+export function setSharedItems(items) {
     _items = Array.isArray(items) ? items : [];
 }
 
@@ -375,6 +388,8 @@ export async function fetchGroupTasks(groupId, myId) {
         const task = normalizeRemote(parsePayload(t.payload), {
             serverId: t.id,
             createdAt: t.createdAt || t.created_at,
+            updatedAt: t.updatedAt || t.updated_at,
+            revision: t.revision,
             mine,
             dest: { type: 'group', groupId },
             senderName: mine ? null : nameOf(creator),

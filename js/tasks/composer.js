@@ -118,8 +118,43 @@ export async function selectDestination(dest) {
     await refreshSharedList();
     render();
     await refreshDestBanner();
+    await scrollToFirstUnread(norm);
     await markDestinationRead();
     return norm;
+}
+
+/**
+ * اسکرول به اولین پیام خوانده‌نشده‌ی مخاطب (نه آخرین پیام).
+ */
+async function scrollToFirstUnread(dest) {
+    try {
+        if (!dest || dest.type === 'local') return;
+        let cursor = null;
+        if (dest.type === 'peer' && dest.peerId) {
+            const u = await getDmUnread();
+            const row = u.ok ? (u.unread.byPeer || []).find((r) => String(r.peerId) === String(dest.peerId)) : null;
+            cursor = (row && row.lastReadAt) || null;
+        } else if (dest.type === 'group' && dest.groupId) {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(dest.groupId) + '/unread');
+            cursor = (res.ok && res.data && res.data.unread && res.data.unread.lastReadAt) || null;
+        }
+        if (!cursor) return;
+        const { getSharedItems } = await import('./source.js');
+        const byId = new Map(getSharedItems().map((t) => [String(t.id), t]));
+        const list = document.getElementById('taskList');
+        if (!list) return;
+        const cards = [...list.querySelectorAll('.task-item[data-id]')];
+        for (let i = cards.length - 1; i >= 0; i--) {
+            const t = byId.get(String(cards[i].dataset.id));
+            if (!t || (t._shared && t._shared.mine)) continue;
+            if (String(t.updatedAt || '') > String(cursor)) {
+                try {
+                    cards[i].scrollIntoView({ block: 'center' });
+                } catch { /* silent */ }
+                return;
+            }
+        }
+    } catch { /* best-effort */ }
 }
 
 /**

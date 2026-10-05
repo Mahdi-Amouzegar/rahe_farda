@@ -25,7 +25,8 @@ export async function listDmTasks(peerId, cursor) {
     let nextCursor = null;
     if (tasks.length > 0) {
         const last = tasks[tasks.length - 1];
-        nextCursor = { createdAt: last.createdAt || last.created_at, id: last.id };
+        // کرسر بر مبنای updated_at است (مرتب‌سازی سرور) — نام فیلد برای سازگاری می‌ماند
+        nextCursor = { createdAt: last.updatedAt || last.updated_at || last.createdAt || last.created_at, id: last.id };
     }
     return { ok: true, tasks, nextCursor, hasMore: tasks.length >= PAGE_LIMIT };
 }

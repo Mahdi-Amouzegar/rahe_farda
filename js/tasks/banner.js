@@ -94,6 +94,7 @@ async function respondToRequest(connectionId, accept, dest) {
         await refreshSharedList();
         render();
         await refreshDestBanner();
+        await refreshDestBanner();
         try {
             const { getDmUnread } = await import('../communication/dm-tasks.js');
             const u = await getDmUnread();
