@@ -356,7 +356,12 @@ export function sanitizeTask(t) {
                 .filter(id => typeof id === 'string' && id.length > 0 && id.length < 100)
                 .slice(0, MAX_PHOTOS_PER_TASK)
             : [],
-        location: validLoc(t.location)
+        location: validLoc(t.location),
+        // ⚠️ Phase 10: مهر سینک شخصی (ملاک برد updatedAt است؛ revision فقط تصادم همزمان)
+        updatedAt: (typeof t.updatedAt === 'string' && !isNaN(new Date(t.updatedAt)))
+            ? t.updatedAt
+            : (typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString()),
+        revision: (Number.isFinite(+t.revision) && +t.revision >= 1) ? Math.floor(+t.revision) : 1
     };
 }
 
@@ -497,6 +502,10 @@ async function saveTaskAndEnqueue(task, parent) {
 
     // ─── IDB Transactional ───
     const db = await idbOpen();
+    // ⚠️ Phase 10: مهر سینک روی آبجکت ذخیره‌شده (op.timestamp = همین مهر)
+    const nowIso = new Date().toISOString();
+    target.updatedAt = nowIso;
+    if (!Number.isFinite(+target.revision) || +target.revision < 1) target.revision = 1;
     return new Promise((resolve, reject) => {
         const tx = db.transaction([IDB_STORE, 'sync_queue'], 'readwrite');
         const taskStore = tx.objectStore(IDB_STORE);
@@ -509,11 +518,12 @@ async function saveTaskAndEnqueue(task, parent) {
         const op = {
             id: uid(),
             type: 'save',
+            // ⚠️ Phase 10: همیشه کل تسک سطح‌بالا ذخیره می‌شود (فرزندان تودرتو)
             entityId: String(target.id),
-            entityType: parent ? 'child' : 'task',
+            entityType: 'task',
             data: target,
-            parentId: parent ? String(parent.id) : null,
-            timestamp: new Date().toISOString(),
+            parentId: null,
+            timestamp: nowIso,
             deviceId: state.sync?.deviceId || 'unknown',
             schemaVersion: SCHEMA_VERSION,
             retries: 0,
@@ -526,6 +536,15 @@ async function saveTaskAndEnqueue(task, parent) {
         tx.oncomplete = () => {
             events.emit(EV.TASK_SAVED, { task, parent: parent || null });
             events.emit(EV.SYNC_ENQUEUED, { op });
+
+            // ⚠️ Phase 10 مرحله ۱: push فوری صف به سرور (فقط واردشده+آنلاین؛ وگرنه صف می‌ماند)
+            import('./personal-sync.js').then(m => {
+                m.pushPendingNow().catch(err => {
+                    console.warn('[store] personal push failed:', err);
+                });
+            }).catch(err => {
+                console.warn('[store] personal-sync import failed:', err);
+            });
 
             // ⚠️ Stage E: enqueue عکس‌های آپلودنشده در صف media
             // (اگر task عکس‌های جدید دارد که هنوز mediaId ندارند)
@@ -654,6 +673,14 @@ export function deleteTaskFromStore(id) {
 
     p.then(() => {
         enqueueChange({ type: 'delete', id });
+        // ⚠️ Phase 10 مرحله ۱: حذف هم بلافاصله به سرور می‌رود (وگرنه بعد رفرش برمی‌گردد)
+        import('./personal-sync.js').then(m => {
+            m.pushPendingNow().catch(err => {
+                console.warn('[store] personal push after delete failed:', err);
+            });
+        }).catch(err => {
+            console.warn('[store] personal-sync import failed:', err);
+        });
     }).catch(err => {
         console.error('deleteTaskFromStore failed', err);
     });
@@ -1280,6 +1307,8 @@ export function buildTaskFromComposer(forceKind) {
         recurDays,
         description: document.getElementById('descInput').value.trim().slice(0, 1000),
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        revision: 1,
         phone: '',
         address: '',
         url: '',
@@ -1453,13 +1482,16 @@ export const PLAN_TEMPLATES = [
 ];
 
 export function blankTask(text) {
+    const nowIso = new Date().toISOString();
     return {
         id: uid(),
         text: text.slice(0, MAX_LENGTH),
         completed: false,
         completedAt: null,
         priority: 'medium',
-        createdAt: new Date().toISOString(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        revision: 1,
         description: '',
         phone: '',
         address: '',
@@ -1512,12 +1544,15 @@ export function addChild(gid) {
         return;
     }
     state.justAddedId = uid();
+    const childNow = new Date().toISOString();
     g.children.unshift({
         id: state.justAddedId,
         text: text.slice(0, MAX_LENGTH),
         completed: false,
         priority: prio && ['high', 'medium', 'low'].includes(prio.value) ? prio.value : 'medium',
-        createdAt: new Date().toISOString(),
+        createdAt: childNow,
+        updatedAt: childNow,
+        revision: 1,
         description: '',
         phone: '',
         address: '',

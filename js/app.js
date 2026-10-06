@@ -630,6 +630,14 @@ function wireEvents() {
     events.on('auth:login', () => {
         updateAccountStatusText();
         preloadDrawerLists();
+        // ⚠️ Phase 10 مرحله ۱: بعد از ورود، صف معقب‌مانده فوراً به سرور می‌رود
+        import('./personal-sync.js').then(m => {
+            m.pushPendingNow().catch(err => {
+                console.warn('[app] personal push after login failed:', err);
+            });
+        }).catch(err => {
+            console.warn('[app] personal-sync import failed:', err);
+        });
     });
     events.on('auth:logout', () => {
         updateAccountStatusText();
@@ -2757,6 +2765,15 @@ initI18n().then(async () => {
         const restored = await restoreSession();
         if (restored.restored) {
             console.log('[auth] session restored for user:', restored.user?.id);
+            // ⚠️ Phase 10 مرحله ۱: بعد از بازیابی نشست، بک‌لاگ آفلاین به سرور می‌رود
+            try {
+                const m = await import('./personal-sync.js');
+                m.pushPendingNow().catch(err => {
+                    console.warn('[app] personal push after restore failed:', err);
+                });
+            } catch (err) {
+                console.warn('[app] personal-sync import failed:', err);
+            }
         }
         await preloadDrawerLists();
     } catch (err) {
