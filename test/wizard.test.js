@@ -77,27 +77,19 @@ describe('wizard — flow (8B)', () => {
         expect(document.getElementById('welcomeOverlay').hidden).toBe(true);
     });
 
-    it('قدم نام کاربری برای مهمان قفل است', () => {
+    it('قدم تم بعد از خوش‌آمد می‌آید (قدم یوزرنیم حذف شده)', () => {
         initWelcomeWizard({});
         clickNext(); // → 1 خوش‌آمد
         clickNext(); // → 2 تم
-        clickNext(); // → 3 نام کاربری
+        clickNext(); // → 3 ساده/پیشرفته (نه یوزرنیم)
         expect(__getStepForTest()).toBe(3);
-        expect(document.getElementById('wizardRoot').textContent).toContain('بعد از ورود');
-    });
-
-    it('قدم نام کاربری برای واردشده نام را نشان می‌دهد', () => {
-        authState.loggedIn = true;
-        authState.user = { id: 'u1', username: 'ali' };
-        initWelcomeWizard({});
-        clickNext(); clickNext(); clickNext();
-        expect(document.getElementById('wizardRoot').textContent).toContain('@ali');
+        expect(document.getElementById('wizardRoot').textContent).not.toContain('بعد از ورود');
     });
 
     it('قدم آخر دکمه‌ی شروع دارد و تمام می‌کند', () => {
         initWelcomeWizard({});
-        for (let i = 0; i < 6; i++) clickNext();
-        expect(__getStepForTest()).toBe(6);
+        for (let i = 0; i < 5; i++) clickNext();
+        expect(__getStepForTest()).toBe(5);
         const done = [...document.querySelectorAll('#wizardRoot .btn-add')].pop();
         done.click();
         expect(state.prefs.tourSeen).toBe(true);

@@ -1,14 +1,15 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // js/welcome-wizard.js -- ویزارد خوش‌آمد چندمرحله‌ای (Phase 8 — 8B)
 //
-// ⚠️ ۷ قدم (همه اختیاری — بستن در هر قدم = ورود با پیش‌فرض‌ها):
+// ⚠️ ۶ قدم (همه اختیاری — بستن در هر قدم = ورود با پیش‌فرض‌ها):
 //    ۰ زبان (پیش‌انتخاب از locale مرورگر، اعمال فوری)
 //    ۱ خوش‌آمد (متن + هشدار ذخیره‌سازی موجود)
 //    ۲ حالت نمایش (auto/light/dark)
-//    ۳ نام کاربری (فقط نمایشی/قفل — بک‌اند endpoint برای تغییر ندارد)
-//    ۴ ساده/پیشرفته (proMode)
-//    ۵ مجوزها (فقط اعلان، با توضیح + قابل رد)
-//    ۶ حساب آنلاین (تلگرام / کد → مودال حساب موجود)
+//    ۳ ساده/پیشرفته (proMode)
+//    ۴ مجوزها (اعلان/موقعیت/میکروفون، با توضیح + قابل رد)
+//    ۵ حساب آنلاین (تلگرام / کد → مودال حساب موجود)
+//
+// ⚠️ قدم نام کاربری در فاز ۱۱ حذف شد (نمایشی و بی‌کاربرد بود).
 //
 // ⚠️ بدون innerHTML — فقط DOM API و textContent (به‌جز رشته‌های استاتیک لوکال
 //    که از همان الگوی data-i18n-html استفاده می‌کنند — در اینجا textContent).
@@ -17,7 +18,7 @@
 import { state } from './core.js';
 import { savePrefs } from './map.js';
 import { getLang, setLang, applyToDOM, t as i18nT } from './i18n.js';
-import { isLoggedIn, getCurrentUser } from './auth.js';
+import { isLoggedIn } from './auth.js';
 import { ensureNotifPerm, notifSupported } from './notify.js';
 import { refreshHeaderContext } from './navigation/header.js';
 
@@ -26,7 +27,7 @@ import { refreshHeaderContext } from './navigation/header.js';
 
 let _step = 0;
 let _opts = null;
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 function tr(key, fallback) {
     const v = i18nT(key);
@@ -136,9 +137,8 @@ function renderStep() {
     if (_step === 0) renderLangStep(sec);
     else if (_step === 1) renderWelcomeStep(sec);
     else if (_step === 2) renderThemeStep(sec);
-    else if (_step === 3) renderUsernameStep(sec);
-    else if (_step === 4) renderProStep(sec);
-    else if (_step === 5) renderPermStep(sec);
+    else if (_step === 3) renderProStep(sec);
+    else if (_step === 4) renderPermStep(sec);
     else renderAccountStep(sec);
 
     box.appendChild(sec);
@@ -206,24 +206,7 @@ function renderThemeStep(sec) {
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 
-// ─── قدم ۳: نام کاربری (نمایشی/قفل — بک‌اند endpoint تغییر ندارد) ───
-function renderUsernameStep(sec) {
-    stepTitle(sec, tr('wiz.usernameTitle', 'نام کاربری'));
-    if (isLoggedIn()) {
-        let name = '';
-        try {
-            const u = getCurrentUser();
-            name = (u && (u.username || u.displayName)) || '';
-        } catch { /* silent */ }
-        sec.appendChild(el('p', 'wizard-text', name ? '@' + name : '—'));
-        sec.appendChild(el('p', 'wizard-hint', tr('wiz.usernameFromTelegram', 'نام کاربری از تلگرام گرفته شده است.')));
-    } else {
-        sec.appendChild(el('p', 'wizard-text', tr('wiz.usernameLocked', 'بعد از ورود، نام کاربری اینجا نمایش داده می‌شود.')));
-    }
-    renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
-}
-
-// ─── قدم ۴: ساده/پیشرفته ───
+// ─── قدم ۳: ساده/پیشرفته ───
 function renderProStep(sec) {
     stepTitle(sec, tr('wiz.proTitle', 'حالت کاری'));
     const row = el('div', 'welcome-settings-buttons');
@@ -239,7 +222,7 @@ function renderProStep(sec) {
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 
-// ─── قدم ۵: مجوزها (فقط اعلان) ───
+// ─── قدم ۴: مجوزها (فقط اعلان) ───
 function renderPermStep(sec) {
     stepTitle(sec, tr('wiz.permTitle', 'مجوزها'));
     sec.appendChild(el('p', 'wizard-text', tr('wiz.permDesc', 'برای یادآورها، اعلان مرورگر لازم است. بدون آن هم برنامه کامل کار می‌کند.')));
@@ -263,7 +246,7 @@ function renderPermStep(sec) {
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 
-// ─── قدم ۶: حساب آنلاین ───
+// ─── قدم ۵: حساب آنلاین ───
 function renderAccountStep(sec) {
     stepTitle(sec, tr('wiz.accountTitle', 'حساب آنلاین'));
     if (isLoggedIn()) {
