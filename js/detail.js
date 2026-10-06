@@ -14,7 +14,7 @@
 import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
-import { faShort, hasSessionAt, parseDateText } from './sessions.js';
+import { faShort, hasSessionAt, parseDateText, validatePlanRange } from './sessions.js';
 import {
     processImageFile,
     validateImageFile,
@@ -1071,8 +1071,12 @@ export function bindDetailInputs() {
             const t = getDetailTask();
             if (!t || t.kind !== 'plan') return;
             openPicker('tpldate', iso => {
+                // ⚠️ فاز ۱۱ آیتم ۷: رد با پیام (به‌جای پاک‌سازی خاموش پایان)
+                if (!validatePlanRange(iso, t.endAt).ok) {
+                    flashSaved(i18nT('detail.planDates.rangeInvalid'));
+                    return;
+                }
                 t.startAt = iso;
-                if (t.endAt && new Date(t.endAt) < new Date(iso)) t.endAt = null;
                 saveTasks();
                 renderPlanDates();
                 call('render');
@@ -1086,6 +1090,11 @@ export function bindDetailInputs() {
             const t = getDetailTask();
             if (!t || t.kind !== 'plan') return;
             openPicker('tpldate', iso => {
+                // ⚠️ فاز ۱۱ آیتم ۷: جهت دوم — پایانِ کمتر از شروع رد می‌شود
+                if (!validatePlanRange(t.startAt, iso).ok) {
+                    flashSaved(i18nT('detail.planDates.rangeInvalid'));
+                    return;
+                }
                 t.endAt = iso;
                 saveTasks();
                 renderPlanDates();

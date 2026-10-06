@@ -11,7 +11,8 @@ import {
     taskMatches,
     normalizeForSearch,
     parseFaDateTime,
-    nearestUpcoming
+    nearestUpcoming,
+    validatePlanRange
 } from '../js/sessions.js';
 import { state } from '../js/core.js';
 
@@ -404,5 +405,36 @@ describe('sessions — parseFaDateTime', () => {
 
     it('«ساعت ۲۵» نامعتبر است', () => {
         expect(parseFaDateTime('فردا ساعت ۲۵', now)).toBe(null);
+    });
+});
+// ═══════════════════════════════════════════════════════════════════════════
+// validatePlanRange (فاز ۱۱ آیتم ۷)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('sessions — validatePlanRange', () => {
+    const S = '2026-10-01T00:00:00.000Z';
+    const E = '2026-10-05T00:00:00.000Z';
+
+    it('شروع اول + پایان کمتر → رد', () => {
+        const r = validatePlanRange(S, '2026-09-20T00:00:00.000Z');
+        expect(r.ok).toBe(false);
+        expect(r.error).toBe('detail.planDates.rangeInvalid');
+    });
+
+    it('پایان اول + شروع بیشتر → رد', () => {
+        const r = validatePlanRange('2026-10-10T00:00:00.000Z', E);
+        expect(r.ok).toBe(false);
+        expect(r.error).toBe('detail.planDates.rangeInvalid');
+    });
+
+    it('بازه سالم → قبول', () => {
+        expect(validatePlanRange(S, E).ok).toBe(true);
+        expect(validatePlanRange(S, S).ok).toBe(true);
+    });
+
+    it('یک‌طرفه (شروع یا پایان تنها) → قبول', () => {
+        expect(validatePlanRange(S, null).ok).toBe(true);
+        expect(validatePlanRange(null, E).ok).toBe(true);
+        expect(validatePlanRange(null, null).ok).toBe(true);
     });
 });

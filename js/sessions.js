@@ -73,6 +73,27 @@ export function nearestUpcoming(task) {
         .sort((a, b) => new Date(a.at) - new Date(b.at))[0] || null;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Plan range (فاز ۱۱ آیتم ۷: اعتبارسنجی دوسویه شروع/پایان)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * آیا ترکیب (شروع، پایان) معتبر است؟ هر دو nullable (بازه‌ی باز).
+ * نامعتبر فقط وقتی که هر دو موجود و پایان < شروع باشد — مستقل از ترتیب ورود.
+ *
+ * @param {string|null} startIso
+ * @param {string|null} endIso
+ * @returns {{ok: boolean, error?: string}} — error کلید لوکال است
+ */
+export function validatePlanRange(startIso, endIso) {
+    if (!startIso || !endIso) return { ok: true };
+    const s = new Date(startIso).getTime();
+    const e = new Date(endIso).getTime();
+    if (!Number.isFinite(s) || !Number.isFinite(e)) return { ok: true };
+    if (e < s) return { ok: false, error: 'detail.planDates.rangeInvalid' };
+    return { ok: true };
+}
+
 /**
  * ساخت HTML دکمه‌ی هوا با اسلات آیکن.
  *

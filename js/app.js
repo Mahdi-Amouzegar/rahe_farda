@@ -46,7 +46,8 @@ import {
     faShort,
     parseDateText,
     updateDueChips,
-    hasSessionAt
+    hasSessionAt,
+    validatePlanRange
 } from './sessions.js';
 import {
     loadTasks,
@@ -912,10 +913,12 @@ const planStartBtnForm = document.getElementById('planStartBtn');
 if (planStartBtnForm) {
     planStartBtnForm.addEventListener('click', () => {
         openPicker('tpldate', iso => {
-            state.planDraftStart = iso;
-            if (state.planDraftEnd && new Date(state.planDraftEnd) < new Date(iso)) {
-                state.planDraftEnd = null;
+            // ⚠️ فاز ۱۱ آیتم ۷: پایانِ کمتر از شروعِ تازه رد می‌شود (با پیام، نه پاک‌سازی خاموش)
+            if (!validatePlanRange(iso, state.planDraftEnd).ok) {
+                showToast(t('detail.planDates.rangeInvalid'));
+                return;
             }
+            state.planDraftStart = iso;
             renderPlanDatesForm();
         });
     });
@@ -924,6 +927,11 @@ const planEndBtnForm = document.getElementById('planEndBtn');
 if (planEndBtnForm) {
     planEndBtnForm.addEventListener('click', () => {
         openPicker('tpldate', iso => {
+            // ⚠️ فاز ۱۱ آیتم ۷: جهت دوم — شروعِ بیشتر از پایانِ تازه رد می‌شود
+            if (!validatePlanRange(state.planDraftStart, iso).ok) {
+                showToast(t('detail.planDates.rangeInvalid'));
+                return;
+            }
             state.planDraftEnd = iso;
             renderPlanDatesForm();
         });

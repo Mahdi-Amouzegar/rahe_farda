@@ -737,7 +737,8 @@
       "endWithDate": "📅 End: {date}",
       "startSet": "Start date saved",
       "endSet": "End date saved",
-      "cleared": "Dates cleared"
+      "cleared": "Dates cleared",
+      "rangeInvalid": "End date cannot be before start date"
     },
     "location": {
       "removed": "Location removed"
