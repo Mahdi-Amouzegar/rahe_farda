@@ -484,7 +484,9 @@ async function saveTaskAndEnqueue(task, parent) {
     const target = parent || task;
 
     if (!useIDB) {
-        // Fallback: بدون IDB
+        // Fallback: بدون IDB (⚠️ Phase 10: همان مهر سینک مسیر اصلی)
+        target.updatedAt = new Date().toISOString();
+        if (!Number.isFinite(+target.revision) || +target.revision < 1) target.revision = 1;
         try {
             localStorage.setItem('spaceTodoTasks', JSON.stringify(state.tasks));
         } catch (e) {
@@ -493,9 +495,10 @@ async function saveTaskAndEnqueue(task, parent) {
         await syncEnqueue({
             type: 'save',
             entityId: String(target.id),
-            entityType: parent ? 'child' : 'task',
+            entityType: 'task',
             data: target,
-            parentId: parent ? String(parent.id) : null,
+            parentId: null,
+            timestamp: target.updatedAt,
         });
         return;
     }
@@ -685,6 +688,33 @@ export function deleteTaskFromStore(id) {
         console.error('deleteTaskFromStore failed', err);
     });
     return p;
+}
+
+/**
+ * جایگزینی کل تسک‌های لوکال با لیست ادغام‌شده (Phase 10 مرحله ۲/۳).
+ * بعد از pull از سرور صدا زده می‌شود: sanitize + ذخیره + state + رندر.
+ *
+ * @param {object[]} tasks — لیست نهایی (خروجی mergeSnapshot)
+ * @returns {Promise<void>}
+ */
+export async function replaceLocalTasks(tasks) {
+    const clean = (Array.isArray(tasks) ? tasks : []).map(sanitizeTask);
+    invalidateTaskIndex();
+    state.tasks = clean;
+    try {
+        if (useIDB) {
+            await idbPutAll(IDB_STORE, clean, { allowEmptyClear: true });
+        } else {
+            localStorage.setItem('spaceTodoTasks', JSON.stringify(clean));
+        }
+    } catch (err) {
+        console.error('replaceLocalTasks failed', err);
+        events.emit(EV.STORAGE_ERROR, {
+            message: 'خطا در ذخیره‌سازی محلی. ممکن است حافظه مرورگر پر شده باشد.'
+        });
+        throw err;
+    }
+    events.emit(EV.TASK_SAVED, { bulk: true });
 }
 
 export function saveTasks() {

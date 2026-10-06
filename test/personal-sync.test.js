@@ -17,6 +17,8 @@ import {
     isTaskChanged,
     mergeSnapshot,
     pushPendingNow,
+    pullFullSnapshot,
+    syncOnLogin,
 } from '../js/personal-sync.js';
 
 let _savedSync;
@@ -190,5 +192,92 @@ describe('personal-sync — mergeSnapshot', () => {
             [{ entityId: 'x', data: { id: 'x', text: 'srv' }, revision: 1, createdAt: '2026-02-01T00:00:00.000Z' }],
         );
         expect(localWins[0].text).toBe('mine');
+    });
+});
+
+describe('personal-sync — syncOnLogin مرحله ۲ (مهمانِ تازه)', () => {
+    it('snapshot خالی + لوکال غیرخالی → push همه', async () => {
+        loggedIn();
+        const postSync = vi.fn(async () => ({ ok: true, data: { accepted: [], rejected: [] } }));
+        const r = await syncOnLogin({
+            readLocal: () => [
+                { id: 'a', text: 'one', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 },
+                { id: 'b', text: 'two', updatedAt: '2026-01-02T00:00:00.000Z', revision: 1 },
+            ],
+            postSync,
+            readQueue: async () => [],
+            removeOps: vi.fn(),
+            persist: vi.fn(),
+        });
+        // pull اول (ops خالی + fullSnapshot) + push دوم
+        expect(postSync).toHaveBeenCalledTimes(2);
+        expect(postSync.mock.calls[0][0].requestFullResync).toBe(true);
+        expect(postSync.mock.calls[0][0].ops).toHaveLength(0);
+        expect(postSync.mock.calls[1][0].ops).toHaveLength(2);
+        expect(r.ok).toBe(true);
+        expect(r.action).toBe('pushed-all');
+    });
+
+    it('هر دو خالی → هیچ POSTای', async () => {
+        loggedIn();
+        const postSync = vi.fn(async () => ({ ok: true, data: { fullSnapshot: [] } }));
+        const persist = vi.fn();
+        const r = await syncOnLogin({ readLocal: () => [], postSync, persist });
+        expect(postSync).toHaveBeenCalledTimes(1);
+        expect(persist).toHaveBeenCalled();
+        expect(r.action).toBe('merged');
+        expect(r.pushed).toBe(0);
+    });
+});
+
+describe('personal-sync — syncOnLogin مرحله ۳ (مهمانِ قبلی)', () => {
+    it('merge بدون overwrite + push فقط تازه/تغییرکرده', async () => {
+        loggedIn();
+        const serverOlder = { entityId: 'keep', data: { id: 'keep', text: 'srv-old', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 }, revision: 1, createdAt: '2026-01-01T00:00:00.000Z' };
+        const serverSame = { entityId: 'same', data: { id: 'same', text: 'same', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 }, revision: 1, createdAt: '2026-01-01T00:00:00.000Z' };
+        const postSync = vi.fn(async (body) => {
+            if (body.requestFullResync) return { ok: true, data: { fullSnapshot: [serverOlder, serverSame] } };
+            return { ok: true, data: { accepted: [], rejected: [] } };
+        });
+        const persist = vi.fn(async () => {});
+        const r = await syncOnLogin({
+            readLocal: () => [
+                { id: 'keep', text: 'mine-new', updatedAt: '2026-02-01T00:00:00.000Z', revision: 1 },
+                { id: 'same', text: 'same', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 },
+                { id: 'guest-new', text: 'g', updatedAt: '2026-02-01T00:00:00.000Z', revision: 1 },
+            ],
+            postSync,
+            persist,
+        });
+        // persist با merge: keep=نسخه لوکال (جدیدتر)، same=سرور، guest-new نگه داشته
+        const merged = persist.mock.calls[0][0];
+        expect(merged.find(t => String(t.id) === 'keep').text).toBe('mine-new');
+        expect(merged.find(t => String(t.id) === 'same').text).toBe('same');
+        expect(merged.find(t => String(t.id) === 'guest-new')).toBeTruthy();
+        // push فقط keep (تغییرکرده) + guest-new (تازه) — نه same
+        const pushBody = postSync.mock.calls[postSync.mock.calls.length - 1][0];
+        expect(pushBody.ops.map(o => o.entityId).sort()).toEqual(['guest-new', 'keep']);
+        expect(r.action).toBe('merged');
+    });
+
+    it('pull شکست خورد → fallback به push صف', async () => {
+        loggedIn();
+        const postSync = vi.fn(async () => ({ ok: false, error: { code: 'NETWORK_ERROR' } }));
+        const r = await syncOnLogin({
+            readLocal: () => [{ id: 'a', text: 'x', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 }],
+            postSync,
+            readQueue: async () => [],
+            removeOps: vi.fn(),
+        });
+        expect(r.ok).toBe(true);
+    });
+});
+
+describe('personal-sync — pullFullSnapshot', () => {
+    it('مهمان → بدون POST', async () => {
+        const postSync = vi.fn();
+        const r = await pullFullSnapshot({ postSync });
+        expect(r.ok).toBe(false);
+        expect(postSync).not.toHaveBeenCalled();
     });
 });

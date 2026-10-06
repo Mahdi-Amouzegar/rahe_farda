@@ -141,6 +141,90 @@ async function postSyncBatch(body) {
 }
 
 /**
+ * pull کامل از سرور (full-snapshot — تصمیم کاربر برای اولین ورود).
+ * @returns {Promise<{ok:boolean, snapshot?:Array, reason?:string}>}
+ */
+export async function pullFullSnapshot(deps) {
+    if (!canPushNow()) return { ok: false, reason: 'offline-or-guest' };
+    const post = (deps && deps.postSync) || postSyncBatch;
+    let deviceId = 'unknown';
+    try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback بالا */ }
+    const res = await post({
+        ops: [],
+        deviceId,
+        lastChangeSeq: null,
+        requestFullResync: true,
+    });
+    if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
+    const snap = Array.isArray(res.data.fullSnapshot) ? res.data.fullSnapshot : [];
+    return { ok: true, snapshot: snap };
+}
+
+/**
+ * سینک ورود (مرحله ۲/۳/۴):
+ * - snapshot خالی + لوکال غیرخالی → push همه‌ی لوکال (مهمانِ تازه).
+ * - snapshot غیرخالی → merge بدون overwrite + push فقط تازه/تغییرکرده.
+ * - هیچ‌کدام → هیچ‌کار.
+ */
+export async function syncOnLogin(deps) {
+    if (!canPushNow()) return { ok: false, reason: 'offline-or-guest' };
+    const d = deps || {};
+    const readLocal = d.readLocal || (() => state.tasks);
+    const persist = d.persist || (async (tasks) => {
+        const store = await import('./store.js');
+        return store.replaceLocalTasks(tasks);
+    });
+    const post = d.postSync || postSyncBatch;
+    const removeOps = d.removeOps || dequeue;
+
+    const pulled = await pullFullSnapshot({ postSync: post });
+    if (!pulled.ok) {
+        // pull شکست خورد → دست‌کم بک‌لاگ صف را push کن (بهتر از هیچی)
+        return pushPendingNow({ readQueue: d.readQueue, postSync: post, removeOps });
+    }
+
+    const local = readLocal() || [];
+    const snapshot = pulled.snapshot || [];
+    if (snapshot.length === 0 && local.length > 0) {
+        // ─── مهمانِ تازه: کل جدول لوکال به سرور ───
+        let deviceId = 'unknown';
+        try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback */ }
+        const ops = local.map(t => buildSaveOp(t, { deviceId }));
+        const res = await post({ ops, deviceId, lastChangeSeq: null, requestFullResync: false });
+        if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
+        try { await pushPendingNow({ readQueue: d.readQueue, postSync: post, removeOps }); } catch { /* silent */ }
+        return { ok: true, action: 'pushed-all', pushed: ops.length };
+    }
+
+    // ─── مهمانِ قبلی / ورود مجدد: merge + push هوشمند ───
+    const merged = mergeSnapshot(local, snapshot);
+    const serverById = new Map(snapshot.map(e => [String(e.entityId ?? e.id ?? ''), e]));
+    const toPush = local.filter(t => {
+        const s = serverById.get(String(t.id));
+        if (!s) return true;
+        let task = s.data;
+        if (typeof task === 'string') {
+            try { task = JSON.parse(task); } catch { task = null; }
+        }
+        const remote = { id: String(t.id), revision: (task && task.revision) ?? s.revision ?? 1, updatedAt: (task && task.updatedAt) || s.updatedAt || s.createdAt || null };
+        return isTaskChanged(t, remote);
+    });
+    try {
+        await persist(merged);
+    } catch {
+        return { ok: false, reason: 'persist-failed' };
+    }
+    if (toPush.length > 0) {
+        let deviceId = 'unknown';
+        try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback */ }
+        const res = await post({ ops: toPush.map(t => buildSaveOp(t, { deviceId })), deviceId, lastChangeSeq: null, requestFullResync: false });
+        if (!res || res.ok !== true || !res.data) return { ok: true, action: 'merged', pushed: 0, pullOk: true };
+        return { ok: true, action: 'merged', pushed: toPush.length };
+    }
+    return { ok: true, action: 'merged', pushed: 0 };
+}
+
+/**
  * ارسال فوری صف معلق به سرور (fire-and-forget از سمت caller).
  * فقط opهای accepted از صف حذف می‌شوند؛ بقیه برای تلاش بعدی می‌مانند.
  */

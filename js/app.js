@@ -630,10 +630,10 @@ function wireEvents() {
     events.on('auth:login', () => {
         updateAccountStatusText();
         preloadDrawerLists();
-        // ⚠️ Phase 10 مرحله ۱: بعد از ورود، صف معقب‌مانده فوراً به سرور می‌رود
+        // ⚠️ Phase 10 مرحله ۲: بعد از ورود، سینک ورود (pull + push/merge) اجرا می‌شود
         import('./personal-sync.js').then(m => {
-            m.pushPendingNow().catch(err => {
-                console.warn('[app] personal push after login failed:', err);
+            m.syncOnLogin().catch(err => {
+                console.warn('[app] personal sync after login failed:', err);
             });
         }).catch(err => {
             console.warn('[app] personal-sync import failed:', err);
@@ -2765,11 +2765,11 @@ initI18n().then(async () => {
         const restored = await restoreSession();
         if (restored.restored) {
             console.log('[auth] session restored for user:', restored.user?.id);
-            // ⚠️ Phase 10 مرحله ۱: بعد از بازیابی نشست، بک‌لاگ آفلاین به سرور می‌رود
+            // ⚠️ Phase 10 مرحله ۲: بعد از بازیابی نشست، سینک ورود اجرا می‌شود
             try {
                 const m = await import('./personal-sync.js');
-                m.pushPendingNow().catch(err => {
-                    console.warn('[app] personal push after restore failed:', err);
+                m.syncOnLogin().catch(err => {
+                    console.warn('[app] personal sync after restore failed:', err);
                 });
             } catch (err) {
                 console.warn('[app] personal-sync import failed:', err);
