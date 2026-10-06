@@ -108,6 +108,19 @@ export function apiErrorMessage(error, fallbackKey) {
             return i18nT('errors.unauthorized');
         case 'NETWORK_ERROR':
             return i18nT('errors.network');
+        // ⚠️ فاز ۱۲ — Username Policy (کدها از ورکر می‌آیند، متن‌ها لوکال‌اند)
+        case 'USERNAME_RESERVED':
+            return i18nT('errors.usernameReserved');
+        case 'USERNAME_PROTECTED':
+            return i18nT('errors.usernameProtected');
+        case 'USERNAME_RESTRICTED':
+            return i18nT('errors.usernameRestricted');
+        case 'USERNAME_PREMIUM_REVIEW':
+            return i18nT('errors.usernamePremiumReview');
+        case 'USERNAME_TAKEN':
+            return i18nT('errors.usernameTaken');
+        case 'USERNAME_INVALID':
+            return i18nT('errors.usernameInvalid');
         default:
             // پیام سرور (فارسی) قابل نمایش است؛ اگر خالی بود fallback
             return error.message || i18nT(fallbackKey || 'errors.serverError');

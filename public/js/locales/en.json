@@ -1376,7 +1376,13 @@
     "loginFailed": "Login failed",
     "payloadInvalid": "Invalid payload",
     "signatureMissing": "Telegram signature not found",
-    "saveFailed": "Save failed — try again"
+    "saveFailed": "Save failed — try again",
+    "usernameReserved": "This username is reserved for the system",
+    "usernameProtected": "This name is kept for official accounts",
+    "usernameRestricted": "This name is restricted due to impersonation risk",
+    "usernamePremiumReview": "This name is taken and may be transferable upon review — message rahefarda_support to request it",
+    "usernameTaken": "This username is already taken",
+    "usernameInvalid": "Username must start with a letter and be 3-20 characters (letters, digits, _)"
   },
 
   "warnings": {

@@ -1375,7 +1375,13 @@
     "loginFailed": "خطا در ورود",
     "payloadInvalid": "payload نامعتبر است",
     "signatureMissing": "امضای Telegram یافت نشد",
-    "saveFailed": "ذخیره ناموفق بود — دوباره تلاش کنید"
+    "saveFailed": "ذخیره ناموفق بود — دوباره تلاش کنید",
+    "usernameReserved": "این نام کاربری سیستمی است و قابل ثبت نیست",
+    "usernameProtected": "این نام برای حساب‌های رسمی نگه داشته شده است",
+    "usernameRestricted": "این نام به‌دلیل ریسک جعل هویت محدود شده است",
+    "usernamePremiumReview": "این نام اشغال شده و قابل بررسی برای واگذاری است — برای درخواست، به rahefarda_support پیام بدهید",
+    "usernameTaken": "این نام کاربری قبلاً گرفته شده است",
+    "usernameInvalid": "نام کاربری باید با حرف انگلیسی شروع شود و ۳ تا ۲۰ کاراکتر (حرف، عدد، _) باشد"
   },
 
   "warnings": {

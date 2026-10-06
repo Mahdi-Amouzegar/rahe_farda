@@ -83,6 +83,15 @@ describe('apiErrorMessage', () => {
         expect(apiErrorMessage({ code: 'X', message: 'سرور گفت' })).toBe('سرور گفت');
         expect(apiErrorMessage(null)).toBe('errors.serverError');
     });
+
+    it('کدهای Username Policy فاز ۱۲ نگاشت می‌شوند', () => {
+        expect(apiErrorMessage({ code: 'USERNAME_RESERVED' })).toBe('errors.usernameReserved');
+        expect(apiErrorMessage({ code: 'USERNAME_PROTECTED' })).toBe('errors.usernameProtected');
+        expect(apiErrorMessage({ code: 'USERNAME_RESTRICTED' })).toBe('errors.usernameRestricted');
+        expect(apiErrorMessage({ code: 'USERNAME_PREMIUM_REVIEW' })).toBe('errors.usernamePremiumReview');
+        expect(apiErrorMessage({ code: 'USERNAME_TAKEN' })).toBe('errors.usernameTaken');
+        expect(apiErrorMessage({ code: 'USERNAME_INVALID' })).toBe('errors.usernameInvalid');
+    });
 });
 
 describe('getApiEndpoint', () => {
