@@ -222,27 +222,83 @@ function renderProStep(sec) {
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 
-// ─── قدم ۴: مجوزها (فقط اعلان) ───
-function renderPermStep(sec) {
-    stepTitle(sec, tr('wiz.permTitle', 'مجوزها'));
-    sec.appendChild(el('p', 'wizard-text', tr('wiz.permDesc', 'برای یادآورها، اعلان مرورگر لازم است. بدون آن هم برنامه کامل کار می‌کند.')));
-    const row = el('div', 'welcome-settings-buttons');
-    const enable = el('button', 'btn-add picker-confirm', tr('wiz.permEnable', 'فعال‌سازی اعلان'));
-    enable.type = 'button';
-    enable.addEventListener('click', async () => {
-        await ensureNotifPerm();
-        renderStep();
-    });
-    row.appendChild(enable);
-    sec.appendChild(row);
-    let state_text = '';
+// ─── قدم ۴: مجوزها (هر ۳ مجوز، مثل صفحه تنظیمات) ───
+async function permState(kind) {
     try {
-        if (!notifSupported()) state_text = tr('wiz.permUnsupported', 'مرورگر اعلان پشتیبانی نمی‌کند.');
-        else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            state_text = tr('wiz.permGranted', 'اعلان‌ها فعال‌اند.');
+        if (kind === 'notif') {
+            if (!notifSupported()) return 'unsupported';
+            return (typeof Notification !== 'undefined' && Notification.permission) || 'unknown';
+        }
+        if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+            const name = kind === 'location' ? 'geolocation' : 'microphone';
+            const r = await navigator.permissions.query({ name });
+            return (r && r.state) || 'unknown';
         }
     } catch { /* silent */ }
-    if (state_text) sec.appendChild(el('p', 'wizard-hint', state_text));
+    return 'unknown';
+}
+
+function permStatusText(st) {
+    if (st === 'granted') return tr('wiz.permStatusGranted', 'فعال است.');
+    if (st === 'denied') return tr('wiz.permStatusDenied', 'رد شده است.');
+    if (st === 'unsupported') return tr('wiz.permUnsupported', 'مرورگر اعلان پشتیبانی نمی‌کند.');
+    return tr('wiz.permStatusUnknown', 'هنوز فعال نشده است.');
+}
+
+function renderPermStep(sec) {
+    stepTitle(sec, tr('wiz.permTitle', 'مجوزها'));
+    sec.appendChild(el('p', 'wizard-text', tr('wiz.permDesc3', 'یادآورها، موقعیت روی نقشه و ورودی صوتی هر کدام یک مجوز جدا می‌خواهند. همه اختیاری‌اند.')));
+    const rows = [
+        {
+            label: tr('wiz.permNotif', 'اعلان'),
+            kind: 'notif',
+            enable: async () => { await ensureNotifPerm(); },
+        },
+        {
+            label: tr('wiz.permLocation', 'موقعیت مکانی'),
+            kind: 'location',
+            enable: async () => {
+                if (!navigator.geolocation) return;
+                await new Promise((resolve) => {
+                    try {
+                        navigator.geolocation.getCurrentPosition(() => resolve(true), () => resolve(false), { timeout: 8000, maximumAge: 0 });
+                    } catch { resolve(false); }
+                });
+            },
+        },
+        {
+            label: tr('wiz.permMic', 'میکروفون'),
+            kind: 'mic',
+            enable: async () => {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach((track) => track.stop());
+                } catch { /* denied — وضعیت در رندر بعدی دیده می‌شود */ }
+            },
+        },
+    ];
+    const box = el('div', 'wizard-perms');
+    sec.appendChild(box);
+    const paint = async () => {
+        box.replaceChildren();
+        for (const r of rows) {
+            const st = await permState(r.kind);
+            const row = el('div', 'wizard-perm-row');
+            const name = el('strong', null, r.label);
+            row.appendChild(name);
+            row.appendChild(el('span', 'wizard-hint', permStatusText(st)));
+            const btn = el('button', 'btn-small', tr('wiz.permEnableBtn', 'فعال‌سازی'));
+            btn.type = 'button';
+            btn.addEventListener('click', async () => {
+                await r.enable();
+                await paint();
+            });
+            row.appendChild(btn);
+            box.appendChild(row);
+        }
+    };
+    paint().catch(() => {});
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 

@@ -86,6 +86,17 @@ describe('wizard — flow (8B)', () => {
         expect(document.getElementById('wizardRoot').textContent).not.toContain('بعد از ورود');
     });
 
+    it('قدم مجوزها هر ۳ مجوز را با دکمه فعال‌سازی نشان می‌دهد', async () => {
+        initWelcomeWizard({});
+        clickNext(); clickNext(); clickNext(); clickNext();
+        expect(__getStepForTest()).toBe(4);
+        await new Promise((r) => setTimeout(r, 20));
+        const rows = document.querySelectorAll('#wizardRoot .wizard-perm-row');
+        expect(rows.length).toBe(3);
+        const btns = document.querySelectorAll('#wizardRoot .wizard-perm-row .btn-small');
+        expect(btns.length).toBe(3);
+    });
+
     it('قدم آخر دکمه‌ی شروع دارد و تمام می‌کند', () => {
         initWelcomeWizard({});
         for (let i = 0; i < 5; i++) clickNext();
