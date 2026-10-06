@@ -631,10 +631,17 @@ function wireEvents() {
         updateAccountStatusText();
         preloadDrawerLists();
         // ⚠️ Phase 10 مرحله ۲: بعد از ورود، سینک ورود (pull + push/merge) اجرا می‌شود
-        import('./personal-sync.js').then(m => {
-            m.syncOnLogin().catch(err => {
+        import('./personal-sync.js').then(async (m) => {
+            try {
+                const r = await m.syncOnLogin();
+                // اگر استور محلی عوض شد، لیست همان لحظه رندر می‌شود (نه با رفرش دستی)
+                if (r && r.ok && r.persisted) {
+                    resetRenderSignature();
+                    render();
+                }
+            } catch (err) {
                 console.warn('[app] personal sync after login failed:', err);
-            });
+            }
         }).catch(err => {
             console.warn('[app] personal-sync import failed:', err);
         });
@@ -2768,9 +2775,15 @@ initI18n().then(async () => {
             // ⚠️ Phase 10 مرحله ۲: بعد از بازیابی نشست، سینک ورود اجرا می‌شود
             try {
                 const m = await import('./personal-sync.js');
-                m.syncOnLogin().catch(err => {
+                try {
+                    const r = await m.syncOnLogin();
+                    if (r && r.ok && r.persisted) {
+                        resetRenderSignature();
+                        render();
+                    }
+                } catch (err) {
                     console.warn('[app] personal sync after restore failed:', err);
-                });
+                }
             } catch (err) {
                 console.warn('[app] personal-sync import failed:', err);
             }

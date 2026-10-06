@@ -216,6 +216,7 @@ describe('personal-sync — syncOnLogin مرحله ۲ (مهمانِ تازه)', 
         expect(postSync.mock.calls[1][0].ops).toHaveLength(2);
         expect(r.ok).toBe(true);
         expect(r.action).toBe('pushed-all');
+        expect(r.persisted).toBe(false);
     });
 
     it('هر دو خالی → هیچ POSTای', async () => {
@@ -258,6 +259,7 @@ describe('personal-sync — syncOnLogin مرحله ۳ (مهمانِ قبلی)', 
         const pushBody = postSync.mock.calls[postSync.mock.calls.length - 1][0];
         expect(pushBody.ops.map(o => o.entityId).sort()).toEqual(['guest-new', 'keep']);
         expect(r.action).toBe('merged');
+        expect(r.persisted).toBe(true);
     });
 
     it('pull شکست خورد → fallback به push صف', async () => {

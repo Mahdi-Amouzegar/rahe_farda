@@ -61,7 +61,7 @@ export async function listConversations() {
     const unreadByPeer = new Map();
     const activityByPeer = new Map();
     try {
-        const u = await getDmUnread();
+        // ⚠️ همان نتیجه‌ی Promise.all بالا — فراخوانی دوم /api/dm/unread حذف شد (تکرار بیهوده)
         if (u.ok) {
             for (const row of u.unread.byPeer || []) {
                 unreadByPeer.set(String(row.peerId), row.count || 0);

@@ -132,18 +132,13 @@ async function refreshOpenDestination() {
 }
 
 async function refreshDrawerData() {
-    try {
-        await listConversations().catch(() => {});
-    } catch { /* silent */ }
-    try {
-        await listGroups().catch(() => {});
-    } catch { /* silent */ }
-    try {
-        await refreshConversationBadges().catch(() => {});
-    } catch { /* silent */ }
-    try {
-        await refreshGroupBadges().catch(() => {});
-    } catch { /* silent */ }
+    // ⚠️ موازی (نه ۴ await ترتیبی): هر کدام best-effort مستقل‌اند
+    await Promise.all([
+        listConversations().catch(() => {}),
+        listGroups().catch(() => {}),
+        refreshConversationBadges().catch(() => {}),
+        refreshGroupBadges().catch(() => {}),
+    ]);
 }
 
 function drawerSnapshot() {

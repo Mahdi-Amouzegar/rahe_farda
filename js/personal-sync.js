@@ -193,7 +193,7 @@ export async function syncOnLogin(deps) {
         const res = await post({ ops, deviceId, lastChangeSeq: null, requestFullResync: false });
         if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
         try { await pushPendingNow({ readQueue: d.readQueue, postSync: post, removeOps }); } catch { /* silent */ }
-        return { ok: true, action: 'pushed-all', pushed: ops.length };
+        return { ok: true, action: 'pushed-all', pushed: ops.length, persisted: false };
     }
 
     // ─── مهمانِ قبلی / ورود مجدد: merge + push هوشمند ───
@@ -218,10 +218,10 @@ export async function syncOnLogin(deps) {
         let deviceId = 'unknown';
         try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback */ }
         const res = await post({ ops: toPush.map(t => buildSaveOp(t, { deviceId })), deviceId, lastChangeSeq: null, requestFullResync: false });
-        if (!res || res.ok !== true || !res.data) return { ok: true, action: 'merged', pushed: 0, pullOk: true };
-        return { ok: true, action: 'merged', pushed: toPush.length };
+        if (!res || res.ok !== true || !res.data) return { ok: true, action: 'merged', pushed: 0, pullOk: true, persisted: true };
+        return { ok: true, action: 'merged', pushed: toPush.length, persisted: true };
     }
-    return { ok: true, action: 'merged', pushed: 0 };
+    return { ok: true, action: 'merged', pushed: 0, persisted: true };
 }
 
 /**

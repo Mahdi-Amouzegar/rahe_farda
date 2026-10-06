@@ -709,8 +709,25 @@ function isOwner() {
 
 /**
  * تازه‌سازی بج نخوانده‌ی همه‌ی گروه‌های لیست + بج دعوت‌های دراور + ردیف‌های اخیر دراور.
+ *
+ * ⚠️ singleflight: چند caller همزمان (preload + تیک زنده + readtrack) نباید هر کدام
+ *    N درخواست /unread بزنند — فراخوانی همزمان به همان promise وصل می‌شود.
  */
+let _badgesInflight = null;
+
 export async function refreshGroupBadges() {
+    if (_badgesInflight) return _badgesInflight;
+    _badgesInflight = (async () => {
+        try {
+            await _refreshGroupBadgesInner();
+        } finally {
+            _badgesInflight = null;
+        }
+    })();
+    return _badgesInflight;
+}
+
+async function _refreshGroupBadgesInner() {
     try {
         const [mineRes] = await Promise.all([
             apiFetch('/api/invitations/mine').catch(() => null),

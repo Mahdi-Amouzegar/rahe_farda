@@ -66,12 +66,38 @@ export async function deleteDmTask(taskId) {
 
 /**
  * شمارش نخوانده‌ها: { total, byPeer: [{peerId, count}] }.
+ *
+ * ⚠️ singleflight + کش کوتاه (۵ ثانیه): بوت/تیک زنده چند caller همزمان دارند
+ *    (لیست + بج + هدر) — بدون این، هر باز شدن صفحه N درخواست تکراری می‌زد.
+ *    با ثبت خواندن (markDmRead) کش باطل می‌شود تا عدد تازه بیاید.
  */
+let _unreadInflight = null;
+let _unreadCached = null;
+let _unreadCachedAt = 0;
+const UNREAD_TTL_MS = 5000;
+
 export async function getDmUnread() {
-    const res = await apiFetch('/api/dm/unread');
-    if (!res.ok) return res;
-    const unread = (res.data && res.data.unread) || { total: 0, byPeer: [] };
-    return { ok: true, unread };
+    const now = Date.now();
+    if (_unreadCached && (now - _unreadCachedAt) < UNREAD_TTL_MS) return _unreadCached;
+    if (_unreadInflight) return _unreadInflight;
+    _unreadInflight = (async () => {
+        try {
+            const res = await apiFetch('/api/dm/unread');
+            if (!res.ok) return res;
+            const unread = (res.data && res.data.unread) || { total: 0, byPeer: [] };
+            _unreadCached = { ok: true, unread };
+            _unreadCachedAt = Date.now();
+            return _unreadCached;
+        } finally {
+            _unreadInflight = null;
+        }
+    })();
+    return _unreadInflight;
+}
+
+function invalidateDmUnreadCache() {
+    _unreadCached = null;
+    _unreadCachedAt = 0;
 }
 
 /**
@@ -80,5 +106,14 @@ export async function getDmUnread() {
 export async function markDmRead(peerId, at) {
     const body = { peerId };
     if (at) body.at = at;
-    return apiFetch('/api/dm/read', { method: 'POST', body });
+    const res = await apiFetch('/api/dm/read', { method: 'POST', body });
+    if (res && res.ok) invalidateDmUnreadCache();
+    return res;
+}
+
+// ⚠️ فقط برای تست
+export function __resetDmUnreadForTest() {
+    _unreadInflight = null;
+    _unreadCached = null;
+    _unreadCachedAt = 0;
 }
