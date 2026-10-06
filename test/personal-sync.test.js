@@ -9,7 +9,7 @@ vi.mock('../js/i18n.js', async (importOriginal) => {
 });
 
 import { state } from '../js/core.js';
-import { sanitizeTask } from '../js/store.js';
+import { sanitizeTask, diffTasksForSync, rebaseTask } from '../js/store.js';
 import {
     canPushNow,
     toServerOp,
@@ -281,5 +281,37 @@ describe('personal-sync — pullFullSnapshot', () => {
         const r = await pullFullSnapshot({ postSync });
         expect(r.ok).toBe(false);
         expect(postSync).not.toHaveBeenCalled();
+    });
+});
+
+describe('store — diffTasksForSync (ویرایش bulk)', () => {
+    const t1 = () => ({ id: 'a', text: 'one', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 });
+    const t2 = () => ({ id: 'b', text: 'two', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 });
+
+    it('baseline خالی → همه changed', async () => {
+        const d = await diffTasksForSync([t1(), t2()], new Map());
+        expect(d.changed.map(t => t.id).sort()).toEqual(['a', 'b']);
+        expect(d.baseline.size).toBe(2);
+    });
+
+    it('بدون تغییر → هیچ‌کدام', async () => {
+        const first = await diffTasksForSync([t1(), t2()], new Map());
+        const second = await diffTasksForSync([t1(), t2()], first.baseline);
+        expect(second.changed).toHaveLength(0);
+    });
+
+    it('فقط ویرایش‌شده changed می‌شود', async () => {
+        const first = await diffTasksForSync([t1(), t2()], new Map());
+        const edited = t1();
+        edited.text = 'one-edited';
+        const second = await diffTasksForSync([edited, t2()], first.baseline);
+        expect(second.changed.map(t => t.id)).toEqual(['a']);
+    });
+
+    it('حذف‌شده از baseline هرس می‌شود', async () => {
+        const first = await diffTasksForSync([t1(), t2()], new Map());
+        const second = await diffTasksForSync([t1()], first.baseline);
+        expect(second.baseline.has('b')).toBe(false);
+        expect(second.changed).toHaveLength(0);
     });
 });

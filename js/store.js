@@ -396,6 +396,98 @@ function enqueueChange(entry) {
     });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Phase 10.1: dirty-diff برای saveTasks (ویرایش‌های detail/map/...) ───
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ مسئله: ده‌ها caller (detail.js و...) مستقیم saveTasks می‌زنند —
+//    ذخیره‌ی bulk بدون op. بدون این لایه، ویرایش شخصی هرگز به سرور نمی‌رسید.
+//    baseline checksum می‌گوید کدام تسک سطح‌بالا واقعاً عوض شده؛ فقط همان
+//    مهر updatedAt می‌خورد و enqueue می‌شود (نه کل لیست).
+
+/** @type {Map<string, string>} id → checksum آخرین وضعیت enqueueشده */
+let _taskChecksums = new Map();
+
+/**
+ * مقایسه‌ی لیست با baseline — خالص و تست‌پذیر (بدون IO).
+ * @returns {Promise<{changed: object[], baseline: Map<string,string>}>}
+ */
+export async function diffTasksForSync(tasks, baseline) {
+    const base = baseline instanceof Map ? baseline : new Map();
+    const next = new Map();
+    const changed = [];
+    for (const t of Array.isArray(tasks) ? tasks : []) {
+        if (!t || typeof t.id === 'undefined') continue;
+        const id = String(t.id);
+        let cs = '';
+        try {
+            cs = await computeChecksum(JSON.stringify(t));
+        } catch {
+            cs = '';
+        }
+        next.set(id, cs);
+        if (base.get(id) !== cs) changed.push(t);
+    }
+    return { changed, baseline: next };
+}
+
+/**
+ * ثبت baseline یک تسک (بعد از enqueue مستقیم — تا dirty-diff دوباره نفرستدش).
+ */
+export async function rebaseTask(task) {
+    if (!task || typeof task.id === 'undefined') return;
+    try {
+        _taskChecksums.set(String(task.id), await computeChecksum(JSON.stringify(task)));
+    } catch { /* best-effort */ }
+}
+
+/**
+ * enqueue تسک‌های تغییرکرده + push فوری (fire-and-forget از سمت caller).
+ * @returns {Promise<number>} تعداد enqueueشده
+ */
+export async function enqueueDirtyTasks() {
+    let diff;
+    try {
+        diff = await diffTasksForSync(state.tasks, _taskChecksums);
+    } catch (err) {
+        console.warn('[store] dirty-diff failed:', err);
+        return 0;
+    }
+    _taskChecksums = diff.baseline;
+    if (diff.changed.length === 0) return 0;
+    const nowIso = new Date().toISOString();
+    let n = 0;
+    for (const t of diff.changed) {
+        try {
+            t.updatedAt = nowIso;
+            if (!Number.isFinite(+t.revision) || +t.revision < 1) t.revision = 1;
+            const cs = await computeChecksum(JSON.stringify(t));
+            _taskChecksums.set(String(t.id), cs);
+            await syncEnqueue({
+                type: 'save',
+                entityId: String(t.id),
+                entityType: 'task',
+                data: t,
+                parentId: null,
+                timestamp: nowIso,
+            });
+            n++;
+        } catch (err) {
+            console.warn('[store] dirty-enqueue failed:', err);
+        }
+    }
+    if (n > 0) {
+        import('./personal-sync.js').then(m => {
+            m.pushPendingNow().catch(err => {
+                console.warn('[store] personal push after dirty-enqueue failed:', err);
+            });
+        }).catch(err => {
+            console.warn('[store] personal-sync import failed:', err);
+        });
+    }
+    return n;
+}
+
 /**
  * پاک کردن صف (برای بعد از import موفق).
  */
@@ -448,6 +540,10 @@ export async function loadTasks() {
     state.tasks = raw
         .filter(t => t && typeof t.id !== 'undefined' && typeof t.text === 'string' && t.text.trim() !== '')
         .map(sanitizeTask);
+    // ⚠️ Phase 10.1: baseline checksum تا saveTasks بعدی فقط واقعاً تغییرکرده‌ها را enqueue کند
+    try {
+        _taskChecksums = (await diffTasksForSync(state.tasks, new Map())).baseline;
+    } catch { /* best-effort */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -548,6 +644,8 @@ async function saveTaskAndEnqueue(task, parent) {
             }).catch(err => {
                 console.warn('[store] personal-sync import failed:', err);
             });
+            // ⚠️ Phase 10.1: baseline تا saveTasks بعدی همین تسک را دوباره نفرستد
+            rebaseTask(target).catch(() => {});
 
             // ⚠️ Stage E: enqueue عکس‌های آپلودنشده در صف media
             // (اگر task عکس‌های جدید دارد که هنوز mediaId ندارند)
@@ -715,6 +813,10 @@ export async function replaceLocalTasks(tasks) {
         throw err;
     }
     events.emit(EV.TASK_SAVED, { bulk: true });
+    // ⚠️ Phase 10.1: baseline تازه تا saveTasks بعدی همین‌ها را دوباره نفرستد
+    try {
+        diffTasksForSync(clean, new Map()).then(d => { _taskChecksums = d.baseline; }).catch(() => {});
+    } catch { /* best-effort */ }
 }
 
 export function saveTasks() {
@@ -733,6 +835,10 @@ export function saveTasks() {
         })();
     p.then(() => {
         events.emit(EV.TASK_SAVED, { bulk: true });
+        // ⚠️ Phase 10.1: ویرایش‌های bulk (detail/map/...) هم به صف + سرور می‌روند
+        enqueueDirtyTasks().catch(err => {
+            console.warn('[store] enqueueDirtyTasks failed:', err);
+        });
     }).catch(() => {
         console.error('storage save failed (bulk)');
         events.emit(EV.STORAGE_ERROR, {
