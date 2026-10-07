@@ -1197,6 +1197,7 @@
 
   "welcome": {
     "title": "👋 Welcome",
+    "textShort": "Your personal planner — offline and private.",
     "text": "This is your task assistant — fully offline and private.<br>• Type a title and press Enter<br>• Add 📅 date or 📍 location<br>• Use \"+ Add\" to create a task, plan, or series",
     "storageGuidance": "Your data is stored on this device and browser only. If your browser is set to auto-clear site data, your tasks and plans may be lost.",
     "themeLabel": "Display mode:",
