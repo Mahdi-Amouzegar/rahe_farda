@@ -250,6 +250,11 @@
       "syncCodeButton": "ورود با کد همگام‌سازی",
       "syncCodeSoon": "به‌زودی",
       "syncCodeDisabledTitle": "به‌زودی در گام بعدی فعال می‌شود",
+      "syncCodePlaceholder": "کد ۱۲ رقمی (مثل X7K9-2MNP-8QRS)",
+      "syncCodeSubmit": "ورود",
+      "syncCodeBack": "بازگشت به روش‌ها",
+      "syncCodeEmpty": "کد را وارد کنید",
+      "syncCodeInvalid": "کد نامعتبر یا منقضی شده است",
       "note": "💡 کد همگام‌سازی برای ورود سریع در دستگاه‌های بعدی است و پس از اولین ورود با تلگرام در دسترس قرار می‌گیرد."
     },
     "loggedIn": {
@@ -257,7 +262,10 @@
       "usernameLabel": "نام کاربری:",
       "syncCodeLabel": "کد همگام‌سازی:",
       "syncCodeActive": "✓ فعال",
-      "syncCodeUnavailable": "— در گام بعدی قابل ساخت",
+      "syncCodeUnavailable": "— هنوز کدی ساخته نشده",
+      "syncCodeGenerate": "ساخت کد اتصال",
+      "syncCodeNewLabel": "کد تازه (۱۰ دقیقه معتبر):",
+      "syncCodeExpiresAt": "انقضا: {date}",
       "ttlLabel": "مدت اعتبار توکن:",
       "ttlApplyButton": "اعمال",
       "remainingLabel": "⏳ زمان باقی‌مانده:",

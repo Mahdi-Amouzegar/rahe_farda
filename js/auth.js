@@ -504,6 +504,129 @@ export async function loginWithTelegram(telegramPayload, options) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Login with Sync Code (فاز ۱۱ آیتم ۳/۵: جریان سرتاسری ورود با کد)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ورود با کد همگام‌سازی (ساخته‌شده روی دستگاهِ واردشده‌ی دیگر).
+ *
+ * @param {string} code — کد ۱۲ رقمی (مثل X7K9-2MNP-8QRS)
+ * @param {object} [options]
+ * @returns {Promise<{ ok: boolean, user?: object, error?: string, code?: string }>}
+ */
+export async function loginWithSyncCode(code, options) {
+    const opts = options || {};
+    const endpoint = opts.endpoint || state.sync.endpoint || DEFAULT_ENDPOINT;
+    const clean = typeof code === 'string' ? code.trim().toUpperCase().replace(/\s+/g, '') : '';
+    if (!clean) {
+        return { ok: false, error: i18nT('auth.login.syncCodeEmpty') };
+    }
+
+    try {
+        const response = await fetch(`${endpoint}/api/auth/sync-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: clean,
+                deviceId: getDeviceId(),
+                deviceName: opts.deviceName || _guessDeviceName(),
+            }),
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || !data || data.ok !== true) {
+            const errMsg = (data && data.error && data.error.message)
+                || i18nT('auth.login.syncCodeInvalid');
+            events.emit('auth:error', { stage: 'sync-code', message: errMsg });
+            return { ok: false, error: errMsg, code: data && data.error && data.error.code };
+        }
+
+        const session = {
+            token: data.data.token,
+            user: data.data.user,
+            expiresAt: data.data.expiresAt,
+        };
+
+        _persistSession(session);
+        events.emit('auth:login', { user: session.user, expiresAt: session.expiresAt });
+
+        return { ok: true, user: session.user };
+    } catch (err) {
+        const errMsg = err?.message === 'Failed to fetch'
+            ? i18nT('errors.network')
+            : i18nT('errors.loginFailed');
+        events.emit('auth:error', { stage: 'sync-code', message: errMsg });
+        return { ok: false, error: errMsg };
+    }
+}
+
+/**
+ * ساخت کد اتصال جدید (فاز ۱۱ آیتم ۶ — روی دستگاهِ واردشده).
+ *
+ * @param {object} [options]
+ * @returns {Promise<{ ok: boolean, code?: string, hint?: string, expiresAt?: string, error?: string }>}
+ */
+export async function generateSyncCode(options) {
+    const opts = options || {};
+    const endpoint = opts.endpoint || state.sync.endpoint || DEFAULT_ENDPOINT;
+    const token = state.sync.authToken;
+    if (!token) {
+        return { ok: false, error: i18nT('errors.unauthorized') };
+    }
+
+    try {
+        const response = await fetch(`${endpoint}/api/devices/link/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({}),
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || !data || data.ok !== true) {
+            const errMsg = (data && data.error && data.error.message)
+                || i18nT('errors.serverError');
+            return { ok: false, error: errMsg };
+        }
+
+        setStoredHasSyncCode(true);
+        return {
+            ok: true,
+            code: data.data.code,
+            hint: data.data.hint,
+            expiresAt: data.data.expiresAt,
+        };
+    } catch (err) {
+        const errMsg = err?.message === 'Failed to fetch'
+            ? i18nT('errors.network')
+            : i18nT('errors.serverError');
+        return { ok: false, error: errMsg };
+    }
+}
+
+/**
+ * به‌روزرسانی پرچم hasSyncCode در session ذخیره‌شده (کش محلی).
+ */
+export function setStoredHasSyncCode(value) {
+    try {
+        const session = _readSession();
+        if (!session || !session.user) return;
+        session.user.hasSyncCode = Boolean(value);
+        const payload = {
+            token: session.token,
+            user: session.user,
+            expiresAt: session.expiresAt,
+            savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
+    } catch { /* silent */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Refresh Token
 // ═══════════════════════════════════════════════════════════════════════════
 

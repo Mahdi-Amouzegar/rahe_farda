@@ -250,6 +250,11 @@
       "syncCodeButton": "Sign in with sync code",
       "syncCodeSoon": "Soon",
       "syncCodeDisabledTitle": "Will be enabled in the next step",
+      "syncCodePlaceholder": "12-character code (e.g. X7K9-2MNP-8QRS)",
+      "syncCodeSubmit": "Sign in",
+      "syncCodeBack": "Back to methods",
+      "syncCodeEmpty": "Enter the code",
+      "syncCodeInvalid": "Code is invalid or expired",
       "note": "💡 The sync code lets you sign in quickly on additional devices after your first Telegram login."
     },
     "loggedIn": {
@@ -257,7 +262,10 @@
       "usernameLabel": "Username:",
       "syncCodeLabel": "Sync code:",
       "syncCodeActive": "✓ Active",
-      "syncCodeUnavailable": "— Available in the next step",
+      "syncCodeUnavailable": "— No code created yet",
+      "syncCodeGenerate": "Generate link code",
+      "syncCodeNewLabel": "New code (valid 10 minutes):",
+      "syncCodeExpiresAt": "Expires: {date}",
       "ttlLabel": "Token validity:",
       "ttlApplyButton": "Apply",
       "remainingLabel": "⏳ Time remaining:",

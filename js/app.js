@@ -269,6 +269,8 @@ import {
     handleTelegramRedirect,
     buildTelegramLoginUrl,
     loginWithTelegram,
+    loginWithSyncCode,
+    generateSyncCode,
     logout as logoutAuth,
     getAuthState,
     getCurrentUser,
@@ -406,11 +408,19 @@ function renderAuthModal() {
                     <span aria-hidden="true">📱</span>
                     <span>${i18nT('auth.login.telegramButton')}</span>
                 </button>
-                <button type="button" class="btn-small auth-option-btn auth-option-btn--disabled" id="authSyncCodeBtn" disabled aria-disabled="true" title="${i18nT('auth.login.syncCodeDisabledTitle')}">
+                <button type="button" class="btn-small auth-option-btn" id="authSyncCodeBtn">
                     <span aria-hidden="true">🔑</span>
                     <span>${i18nT('auth.login.syncCodeButton')}</span>
-                    <small class="auth-option-soon">${i18nT('auth.login.syncCodeSoon')}</small>
                 </button>
+            </div>
+            <div class="auth-sync-code-form" id="authSyncCodeForm" hidden>
+                <label class="auth-ttl-label" for="authSyncCodeInput">${i18nT('auth.login.syncCodeButton')}</label>
+                <div class="auth-ttl-row">
+                    <input id="authSyncCodeInput" class="sort-select" dir="ltr" autocomplete="off" spellcheck="false"
+                        placeholder="${i18nT('auth.login.syncCodePlaceholder')}" aria-label="${i18nT('auth.login.syncCodeButton')}">
+                    <button type="button" class="btn-small" id="authSyncCodeSubmit">${i18nT('auth.login.syncCodeSubmit')}</button>
+                </div>
+                <button type="button" class="btn-clear" id="authSyncCodeBack">${i18nT('auth.login.syncCodeBack')}</button>
             </div>
             <p class="auth-note">
                 ${i18nT('auth.login.note')}
@@ -423,6 +433,56 @@ function renderAuthModal() {
             tgBtn.addEventListener('click', () => {
                 const url = buildTelegramLoginUrl();
                 window.location.href = url;
+            });
+        }
+        // ─── فاز ۱۱ آیتم ۵: ورود با کد همگام‌سازی (سرتاسری و فعال) ───
+        const codeBtn = document.getElementById('authSyncCodeBtn');
+        const codeForm = document.getElementById('authSyncCodeForm');
+        const codeInput = document.getElementById('authSyncCodeInput');
+        const codeSubmit = document.getElementById('authSyncCodeSubmit');
+        const codeBack = document.getElementById('authSyncCodeBack');
+        const authError = document.getElementById('authError');
+        const showCodeError = (msg) => {
+            if (!authError) return;
+            authError.textContent = msg;
+            authError.hidden = false;
+        };
+        if (codeBtn && codeForm) {
+            codeBtn.addEventListener('click', () => {
+                codeForm.hidden = false;
+                codeBtn.hidden = true;
+                if (authError) authError.hidden = true;
+                if (codeInput) codeInput.focus();
+            });
+        }
+        if (codeBack && codeForm && codeBtn) {
+            codeBack.addEventListener('click', () => {
+                codeForm.hidden = true;
+                codeBtn.hidden = false;
+            });
+        }
+        if (codeSubmit && codeInput) {
+            const submitCode = async () => {
+                const v = codeInput.value || '';
+                codeSubmit.disabled = true;
+                try {
+                    const result = await loginWithSyncCode(v);
+                    if (result.ok) {
+                        renderAuthModal();
+                        updateAccountStatusText();
+                    } else {
+                        showCodeError(result.error || i18nT('auth.login.syncCodeInvalid'));
+                    }
+                } finally {
+                    codeSubmit.disabled = false;
+                }
+            };
+            codeSubmit.addEventListener('click', submitCode);
+            codeInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitCode();
+                }
             });
         }
         return;
@@ -464,6 +524,11 @@ function renderAuthModal() {
 
         <div class="auth-user-info">
             <div class="auth-user-row"><span>${i18nT('auth.loggedIn.syncCodeLabel')}</span> <strong>${user.hasSyncCode ? i18nT('auth.loggedIn.syncCodeActive') : i18nT('auth.loggedIn.syncCodeUnavailable')}</strong></div>
+            <div class="auth-ttl-row">
+                <button type="button" class="btn-small" id="authGenCodeBtn">${i18nT('auth.loggedIn.syncCodeGenerate')}</button>
+            </div>
+            <div class="auth-user-row" id="authNewCodeRow" hidden><span>${i18nT('auth.loggedIn.syncCodeNewLabel')}</span> <strong dir="ltr" id="authNewCodeValue"></strong></div>
+            <div class="auth-remaining" id="authNewCodeExp" hidden></div>
         </div>
 
         ${warning}
@@ -537,6 +602,37 @@ function renderAuthModal() {
                 ],
                 buttonText: i18nT('auth.disconnect.buttonText')
             });
+        });
+    }
+
+    // ─── فاز ۱۱ آیتم ۶: ساخت کد همگام‌سازی (فعال، نه «به‌زودی») ───
+    const genCodeBtn = document.getElementById('authGenCodeBtn');
+    if (genCodeBtn) {
+        genCodeBtn.addEventListener('click', async () => {
+            genCodeBtn.disabled = true;
+            try {
+                const result = await generateSyncCode();
+                if (!result.ok) {
+                    alert(result.error || i18nT('errors.serverError'));
+                    return;
+                }
+                // اول وضعیت (✓ فعال) تازه شود، بعد کد تازه نمایش داده شود
+                renderAuthModal();
+                const row = document.getElementById('authNewCodeRow');
+                const val = document.getElementById('authNewCodeValue');
+                const exp = document.getElementById('authNewCodeExp');
+                if (val) val.textContent = result.code || '';
+                if (exp) {
+                    exp.textContent = result.expiresAt
+                        ? i18nT('auth.loggedIn.syncCodeExpiresAt', { date: result.expiresAt })
+                        : '';
+                    exp.hidden = !result.expiresAt;
+                }
+                if (row) row.hidden = false;
+            } finally {
+                const b = document.getElementById('authGenCodeBtn');
+                if (b) b.disabled = false;
+            }
         });
     }
 }
