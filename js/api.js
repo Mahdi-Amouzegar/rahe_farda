@@ -121,6 +121,9 @@ export function apiErrorMessage(error, fallbackKey) {
             return i18nT('errors.usernameTaken');
         case 'USERNAME_INVALID':
             return i18nT('errors.usernameInvalid');
+        // ⚠️ فاز ۱۳ — حذف حساب
+        case 'ACCOUNT_HAS_GROUPS':
+            return i18nT('errors.accountHasGroups');
         default:
             // پیام سرور (فارسی) قابل نمایش است؛ اگر خالی بود fallback
             return error.message || i18nT(fallbackKey || 'errors.serverError');

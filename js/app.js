@@ -1228,9 +1228,72 @@ settingsModal?.addEventListener('click', event => {
 // ═══════════════════════════════════════════════════════════════════════════
 // حساب من — دکمه و مودال
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * فلوی حذف حساب (Phase 13): preview ← بلاک/تأیید ← DELETE ← wipe محلی.
+ */
+async function runAccountDeletionFlow() {
+    const { isLoggedIn: loggedIn } = await import('./auth.js');
+    if (!loggedIn()) {
+        showToast(t('settings.sections.account.deleteLoginRequired'));
+        return;
+    }
+    const { fetchDeletionPreview, requestAccountDeletion, buildDeleteConfirm, performLocalWipeout } =
+        await import('./account-delete.js');
+    const { apiErrorMessage } = await import('./api.js');
+
+    let preview;
+    try {
+        preview = await fetchDeletionPreview();
+    } catch {
+        preview = { ok: false };
+    }
+    if (!preview || !preview.ok) {
+        showToast(apiErrorMessage(preview && preview.error, 'errors.serverError'));
+        return;
+    }
+    const confirm = buildDeleteConfirm(preview.data);
+    if (!confirm.canDelete) {
+        // ⚠️ نام گروه‌ها داده‌ی کاربرساز است و showInfoModal innerHTML می‌زند — escape شود
+        await showInfoModal({
+            title: confirm.title,
+            paragraphs: confirm.lines.map((l) => escapeHtml(l)),
+            buttonText: t('common.ok'),
+        });
+        return;
+    }
+    const ok = await showConfirmModal({
+        title: confirm.title,
+        message: confirm.lines.join('\n'),
+        confirmText: t('accountDelete.confirmOk'),
+        cancelText: t('common.cancel'),
+        danger: true,
+    });
+    if (!ok) return;
+
+    let result;
+    try {
+        result = await requestAccountDeletion();
+    } catch {
+        result = { ok: false };
+    }
+    if (!result || !result.ok) {
+        showToast(apiErrorMessage(result && result.error, 'accountDelete.deleteFailed'));
+        return;
+    }
+    await performLocalWipeout();
+    updateAccountStatusText();
+    showToast(t('accountDelete.deletedToast'));
+}
+
 document.getElementById('authOpenBtn')?.addEventListener('click', () => {
     toggleSettings(false);
     setTimeout(() => openAuthModal(), 100);
+});
+// ─── فاز ۱۳: حذف حساب از تنظیمات ───
+document.getElementById('accountDeleteBtn')?.addEventListener('click', () => {
+    toggleSettings(false);
+    setTimeout(() => runAccountDeletionFlow(), 100);
 });
 document.getElementById('authModalClose')?.addEventListener('click', closeAuthModal);
 document.getElementById('authModal')?.addEventListener('click', e => {

@@ -615,6 +615,7 @@
 
     #confirmModal .modal-message {
         color: var(--text-primary);
+        white-space: pre-line;
     }
 
     #infoModal .modal-body {

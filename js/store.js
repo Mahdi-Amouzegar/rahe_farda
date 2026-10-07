@@ -10,6 +10,7 @@
 import {
     state,
     MAX_LENGTH,
+    STORAGE_KEY,
     uid,
     escapeHtml,
     SCHEMA_VERSION,
@@ -817,6 +818,37 @@ export async function replaceLocalTasks(tasks) {
     try {
         diffTasksForSync(clean, new Map()).then(d => { _taskChecksums = d.baseline; }).catch(() => {});
     } catch { /* best-effort */ }
+}
+
+/**
+ * پاک‌سازی کامل داده‌ی محلی حساب (Phase 13: بعد از حذف حساب در سرور).
+ * IDB stores tasks/trash/sync_queue/media_uploads خالی + state ریست می‌شود.
+ * تنظیمات (prefs) و زبان دست نمی‌خورند.
+ */
+export async function wipeLocalAccountData() {
+    invalidateTaskIndex();
+    state.tasks = [];
+    state.trash = [];
+    _taskChecksums = new Map();
+    if (useIDB) {
+        try {
+            const db = await idbOpen();
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction([IDB_STORE, IDB_TRASH, 'sync_queue', 'media_uploads'], 'readwrite');
+                for (const name of [IDB_STORE, IDB_TRASH, 'sync_queue', 'media_uploads']) {
+                    if (db.objectStoreNames.contains(name)) tx.objectStore(name).clear();
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (err) {
+            console.warn('[store] wipe IDB failed (best-effort):', err);
+        }
+    }
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch { /* silent */ }
+    events.emit(EV.TASK_SAVED, { bulk: true });
 }
 
 export function saveTasks() {

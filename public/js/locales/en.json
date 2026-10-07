@@ -343,7 +343,9 @@
         "title": "Account & sync",
         "statusLabel": "Account status",
         "openButton": "👤 My Account",
-        "note": "To sync across devices, first sign in with Telegram. Your data stays on this device."
+        "note": "To sync across devices, first sign in with Telegram. Your data stays on this device.",
+        "deleteButton": "🗑 Delete account",
+        "deleteLoginRequired": "Sign in first to delete your account"
       },
       "reminders": {
         "title": "Reminders & notifications",
@@ -1375,6 +1377,17 @@
       "unsupportedExtension": "File extension not supported ({ext})"
     }
   },
+  "accountDelete": {
+    "confirmTitle": "Delete account",
+    "confirmMessage": "This is irreversible: sessions close, personal tasks and media are permanently deleted, and your messages stay with others anonymously.",
+    "confirmCounts": "Personal: {personal} — DM: {dm} — Group: {group} — Media: {media}",
+    "confirmOk": "Yes, delete my account",
+    "blockedTitle": "Resolve your groups first",
+    "blockedMessage": "You own these open groups. Transfer each or close it, then delete your account:",
+    "deletedToast": "Your account has been deleted",
+    "deleteFailed": "Account deletion failed — try again"
+  },
+
   "errors": {
     "network": "Couldn't connect to the server",
     "unauthorized": "You must sign in for this operation",
@@ -1400,7 +1413,8 @@
     "usernameRestricted": "This name is restricted due to impersonation risk",
     "usernamePremiumReview": "This name is taken and may be transferable upon review — message rahefarda_support to request it",
     "usernameTaken": "This username is already taken",
-    "usernameInvalid": "Username must start with a letter and be 3-20 characters (letters, digits, _)"
+    "usernameInvalid": "Username must start with a letter and be 3-20 characters (letters, digits, _)",
+    "accountHasGroups": "Transfer or close your open groups first"
   },
 
   "warnings": {
