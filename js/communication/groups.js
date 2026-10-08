@@ -273,16 +273,39 @@ export async function openGroup(groupId) {
     return { ok: true };
 }
 
-async function openTransferPicker() {
-    if (!_group) return;
-    const candidates = _members.filter(
-        (m) => m.status === 'active' && m.userId !== _group.ownerId
+async function openTransferPicker(groupId, anchor) {
+    const gid = groupId || _openGroupId;
+    if (!gid) return;
+    // اعضا را تازه بخوان تا کاندیداها به‌روز باشند
+    let members = _members;
+    let ownerId = _group ? _group.ownerId : null;
+    if (gid === _openGroupId && members && members.length > 0) {
+        // همان کش کافی است
+    } else {
+        try {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(gid) + '/members');
+            if (res.ok) members = (res.data && res.data.members) || [];
+        } catch { members = []; }
+        try {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(gid));
+            if (res.ok) ownerId = (res.data && res.data.group && res.data.group.ownerId) || null;
+        } catch { /* silent */ }
+    }
+    const candidates = (members || []).filter(
+        (m) => m && m.status === 'active' && String(m.userId) !== String(ownerId)
     );
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+        showInfoModal({
+            title: tr('grp.transfer', 'انتقال مالکیت'),
+            paragraphs: [tr('grp.transferNoCandidate', 'عضو فعالی برای انتقال مالکیت نیست.')],
+        });
+        return;
+    }
     openMenu({
+        anchor: anchor || document.body,
         items: candidates.map((m) => ({
-            id: m.userId,
-            label: m.username || String(m.userId).slice(0, 8),
+            id: String(m.userId),
+            label: m.username || m.displayName || String(m.userId).slice(0, 8),
         })),
         onSelect: async (newOwnerId) => {
             const ok = await showConfirmModal({
@@ -291,11 +314,19 @@ async function openTransferPicker() {
                 danger: true,
             });
             if (!ok) return;
-            await apiFetch('/api/groups/' + encodeURIComponent(_openGroupId) + '/transfer', {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(gid) + '/transfer', {
                 method: 'POST',
                 body: { newOwnerId },
             });
-            if (o && typeof o.onChanged === 'function') await o.onChanged();
+            if (!res.ok) {
+                showInfoModal({ title: tr('grp.transfer', 'انتقال مالکیت'), paragraphs: [apiErrorMessage(res.error)] });
+                return;
+            }
+            try {
+                const { showToast } = await import('../ui.js');
+                showToast(tr('grp.transferDone', 'مالکیت منتقل شد — حالا عضو عادی هستی و می‌توانی ترک کنی.'));
+            } catch { /* silent */ }
+            await refreshGroupsHome();
         },
     });
 }
@@ -324,6 +355,7 @@ export async function openGroupMenuFor(groupId, anchor) {
     ];
     if (manager) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
     if (owner) {
+        items.push({ id: 'transfer', label: tr('grp.transfer', 'انتقال مالکیت') });
         items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
         items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
     } else {
@@ -340,6 +372,8 @@ export async function openGroupMenuFor(groupId, anchor) {
                 await openGroupMembersModal(groupId);
             } else if (id === 'leave') {
                 await confirmGroupLeave(groupId);
+            } else if (id === 'transfer') {
+                await openTransferPicker(groupId, anchor);
             } else if (id === 'close') {
                 await confirmGroupClose(groupId);
             } else if (id === 'delete') {

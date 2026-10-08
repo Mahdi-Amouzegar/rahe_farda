@@ -214,6 +214,8 @@
     "invite": "Invite member",
     "transfer": "Transfer ownership",
     "transferConfirm": "Transfer ownership to this member?",
+    "transferNoCandidate": "No active member to transfer ownership to.",
+    "transferDone": "Ownership transferred — you are a regular member now and can leave.",
     "close": "Close group",
     "closeConfirm": "The group will be closed and its tasks deleted. Continue?",
     "delete": "Delete group",

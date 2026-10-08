@@ -265,7 +265,7 @@ describe('groups — drawer menu', () => {
         await openGroupMenuFor('g1', document.getElementById('anchor'));
         await sleep(10);
         const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
-        expect(ids).toEqual(expect.arrayContaining(['open', 'members', 'invite', 'close', 'delete']));
+        expect(ids).toEqual(expect.arrayContaining(['open', 'members', 'invite', 'transfer', 'close', 'delete']));
         expect(ids).not.toContain('leave');
     });
 
@@ -283,6 +283,26 @@ describe('groups — drawer menu', () => {
             .find((b) => b.dataset.menuId === 'members').click();
         await sleep(30);
         expect(document.getElementById('groupModalOverlay')).not.toBeNull();
+    });
+
+    it('انتقال مالکیت: انتخاب عضو + تأیید → POST transfer', async () => {
+        await openGroupMenuFor('g1', document.getElementById('anchor'));
+        await sleep(10);
+        [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.dataset.menuId === 'transfer').click();
+        await sleep(30);
+        const transfers = apiCalls.filter((c) => c.path === '/api/groups/g1/transfer');
+        expect(transfers.length).toBe(0);
+        const cand = [...document.querySelectorAll('[data-menu-id]')]
+            .find((b) => b.textContent.includes('sara'));
+        expect(cand).toBeTruthy();
+        cand.click();
+        await sleep(10);
+        document.getElementById('confirmModalOk').click();
+        await sleep(30);
+        const posts = apiCalls.filter((c) => c.path === '/api/groups/g1/transfer');
+        expect(posts.length).toBe(1);
+        expect(posts[0].opts.body).toMatchObject({ newOwnerId: 'u2' });
     });
 });
 
