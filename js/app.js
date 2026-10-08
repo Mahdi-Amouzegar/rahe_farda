@@ -248,6 +248,7 @@ import {
     acceptConnection,
     rejectConnection,
     getRelationshipMap,
+    listBlocks,
 } from './communication/connections.js';
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
@@ -2828,6 +2829,28 @@ initI18n().then(async () => {
                     if (u && u.id) u.rel = rel.get(String(u.id)) || 'none';
                 }
             } catch { /* silent */ }
+            // ⚠️ بلاک‌شده‌ها در نتایج سرور نیستند — از لیست بلاک محلی اضافه می‌شوند تا فراموش نشوند
+            try {
+                const clean = String(q || '').trim().replace(/^@+/, '').toLowerCase();
+                const seen = new Set(users.map((u) => u && String(u.id)));
+                const blocks = await listBlocks().catch(() => null);
+                const list = (blocks && blocks.ok && blocks.blocks) || [];
+                for (const b of list) {
+                    const bu = (b && b.blockedUser) || {};
+                    const id = String((b && b.blockedId) || bu.id || '');
+                    if (!id || seen.has(id)) continue;
+                    const name = String(bu.displayName || bu.username || '');
+                    const uname = String(bu.username || '');
+                    if (clean && !name.toLowerCase().includes(clean) && !uname.toLowerCase().includes(clean)) continue;
+                    users.push({
+                        id: b.blockedId || bu.id,
+                        username: bu.username || null,
+                        displayName: bu.displayName || null,
+                        avatarUrl: bu.avatarUrl || null,
+                        rel: 'blocked',
+                    });
+                }
+            } catch { /* silent */ }
             return users;
         },
         onSearchAll: async (q) => {
@@ -2852,6 +2875,11 @@ initI18n().then(async () => {
                 name: u.displayName || u.username,
             });
             applyDestinationLabel();
+        },
+        // ⚠️ کلیک روی ردیف بلاک‌شده → منوی همان مخاطب (شامل رفع بلاک)، نه شروع گفتگو
+        onOpenBlockedUser: async (u, anchor) => {
+            if (!u || !u.id) return;
+            openConversationMenuFor(String(u.id), anchor || null);
         },
         onOpenSearchUser: async (u) => {
             if (!u || !u.id) return;

@@ -238,6 +238,15 @@ html[dir="ltr"] .drawer {
     padding: 2px 12px;
 }
 
+/* بج «بلاک شده» در نتایج جستجو — هشدار با رنگ مناسب */
+.blocked-tag {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent-pink);
+    padding: 2px 12px;
+    white-space: nowrap;
+}
+
 .drawer-login {
     font-weight: 700;
 }

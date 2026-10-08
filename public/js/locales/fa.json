@@ -150,7 +150,8 @@
     "closeChat": "بستن گفتگو",
     "profile": "پروفایل",
     "connected": "مخاطب",
-    "pending": "در انتظار"
+    "pending": "در انتظار",
+    "blocked": "🚫 بلاک شده"
   },
 
   "share": {

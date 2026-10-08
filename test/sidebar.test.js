@@ -234,6 +234,30 @@ describe('sidebar — logged in', () => {
         expect(opened).toEqual(['u9']);
     });
 
+    it('کاربر بلاک‌شده با بج هشدار دیده می‌شود و کلیک منوی او را باز می‌کند', async () => {
+        const opened = [];
+        const blockedOpened = [];
+        initSidebar({
+            onSearchUsers: async () => [
+                { id: 'u7', username: 'blockedguy', displayName: 'مسدود', rel: 'blocked' },
+            ],
+            onStartConversation: (u) => opened.push(u.id),
+            onOpenBlockedUser: (u) => blockedOpened.push(u.id),
+        });
+        openDrawer();
+        document.querySelector('#drawer .drawer-mini-btn').click();
+        const input = document.querySelector('#drawer .conv-search input');
+        input.value = 'blo';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(500);
+        const rows = [...document.querySelectorAll('#drawer .conv-search-results .conv-row')];
+        expect(rows.length).toBe(1);
+        expect(rows[0].querySelector('.blocked-tag')).not.toBeNull();
+        rows[0].click();
+        expect(opened).toEqual([]);
+        expect(blockedOpened).toEqual(['u7']);
+    });
+
     it('تب جستجو: input + نتایج قابل کلیک', async () => {
         const seen = [];
         initSidebar({

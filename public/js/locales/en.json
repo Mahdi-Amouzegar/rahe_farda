@@ -150,7 +150,8 @@
     "closeChat": "Close conversation",
     "profile": "Profile",
     "connected": "Contact",
-    "pending": "Pending"
+    "pending": "Pending",
+    "blocked": "🚫 Blocked"
   },
 
   "share": {

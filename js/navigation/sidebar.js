@@ -275,9 +275,16 @@ function buildUserSearchBox() {
                             urow.appendChild(el('span', 'drawer-hint', i18nT('conn.connected') !== 'conn.connected' ? i18nT('conn.connected') : 'مخاطب'));
                         } else if (u.rel === 'pending-in' || u.rel === 'pending-out') {
                             urow.appendChild(el('span', 'drawer-hint', i18nT('conn.pending') !== 'conn.pending' ? i18nT('conn.pending') : 'در انتظار'));
+                        } else if (u.rel === 'blocked') {
+                            // ⚠️ بلاک‌شده دیده می‌شود تا کاربر فراموش نکند — با بج هشدار
+                            urow.appendChild(el('span', 'blocked-tag', i18nT('conn.blocked') !== 'conn.blocked' ? i18nT('conn.blocked') : '🚫 بلاک شده'));
                         }
                         urow.addEventListener('click', () => {
                             closeDrawer();
+                            if (u && u.rel === 'blocked' && _opts && typeof _opts.onOpenBlockedUser === 'function') {
+                                _opts.onOpenBlockedUser(u, urow);
+                                return;
+                            }
                             if (_opts && typeof _opts.onStartConversation === 'function') {
                                 _opts.onStartConversation(u);
                             }
