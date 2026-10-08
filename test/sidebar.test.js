@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('sidebar — guest', () => {
-    it('مهمان فقط tasks + ورود را می‌بیند (بدون پیام/گروه)', () => {
+    it('مهمان tasks + ورود + دوقلوی تنظیمات/حساب را می‌بیند (بدون پیام/گروه)', () => {
         authState.loggedIn = false;
         openDrawer();
         expect(isDrawerOpen()).toBe(true);
@@ -52,6 +52,7 @@ describe('sidebar — guest', () => {
             .map((b) => b.getAttribute('data-workspace'));
         expect(labels).toEqual(['tasks']);
         expect(document.querySelector('.drawer-login')).not.toBeNull();
+        expect(document.querySelectorAll('#drawer .drawer-duo-btn').length).toBe(2);
     });
 
     it('کلیک ورود، onLogin را صدا می‌زند و می‌بندد', () => {
@@ -63,6 +64,19 @@ describe('sidebar — guest', () => {
         expect(called).toBe(1);
         vi.advanceTimersByTime(300);
         expect(isDrawerOpen()).toBe(false);
+    });
+
+    it('کلیک حساب من در حالت مهمان، onOpenAccount را صدا می‌زند', () => {
+        authState.loggedIn = false;
+        let account = 0;
+        let settings = 0;
+        initSidebar({ onOpenAccount: () => { account += 1; }, onOpenSettings: () => { settings += 1; } });
+        openDrawer();
+        const btns = document.querySelectorAll('#drawer .drawer-duo-btn');
+        btns[1].click();
+        expect(account).toBe(1);
+        btns[0].click();
+        expect(settings).toBe(1);
     });
 });
 

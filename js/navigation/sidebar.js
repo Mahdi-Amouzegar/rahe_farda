@@ -4,7 +4,7 @@
 // ⚠️ قرارداد UI-SHELL §۲.۲:
 //   - دراور (اورلی)، نه ستون دائمی — در همه‌ی عرض‌ها
 //   - جهت بازشدن با logical CSS (fa از راست، en از چپ) — بخش ۴ قرارداد
-//   - مهمان: فقط «وظایف من» + ورود + تنظیمات محدود (بخش ۵ قرارداد)
+//   - مهمان: وظایف من + ورود + دوقلوی مشترک تنظیمات/حساب (بخش ۵ قرارداد)
 //   - ورودکرده: جستجو + ۴ فضای ارتباطی (با بج) + حداکثر ۳ گروه اخیر + تنظیمات/حساب
 //   - رندر تازه در هر بازشدن (زبان و بج همیشه به‌روز؛ بدون state کهنه)
 //   - هیچ innerHTML — فقط DOM API و textContent
@@ -104,8 +104,29 @@ function renderDrawer() {
     aside.setAttribute('aria-label', title.textContent);
     aside.appendChild(title);
 
+    // ─── دکمه‌های دوقلو: تنظیمات + حساب من (یک خط) — مشترک مهمان و واردشده ───
+    // مهمان با «حساب من» به مودال ورود می‌رسد (onOpenAccount → openAuthModal).
+    const duo = el('div', 'drawer-duo');
+    const settingsTop = el('button', 'drawer-item drawer-duo-btn');
+    settingsTop.type = 'button';
+    settingsTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.settings') !== 'nav.settings' ? i18nT('nav.settings') : '⚙ تنظیمات'));
+    settingsTop.addEventListener('click', () => {
+        closeDrawer();
+        if (_opts && typeof _opts.onOpenSettings === 'function') _opts.onOpenSettings();
+    });
+    const accountTop = el('button', 'drawer-item drawer-duo-btn');
+    accountTop.type = 'button';
+    accountTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.account') !== 'nav.account' ? i18nT('nav.account') : '👤 حساب من'));
+    accountTop.addEventListener('click', () => {
+        closeDrawer();
+        if (_opts && typeof _opts.onOpenAccount === 'function') _opts.onOpenAccount();
+    });
+    duo.appendChild(settingsTop);
+    duo.appendChild(accountTop);
+    aside.appendChild(duo);
+
     if (!loggedIn) {
-        // ─── حالت مهمان: فقط tasks + ورود + تنظیمات ───
+        // ─── حالت مهمان: tasks + ورود (+ تنظیمات/حساب مشترک بالا) ───
         aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks' }));
         const sep = el('div', 'drawer-sep');
         sep.setAttribute('aria-hidden', 'true');
@@ -120,25 +141,6 @@ function renderDrawer() {
         aside.appendChild(login);
         aside.appendChild(el('div', 'drawer-hint', i18nT('nav.loginHint') !== 'nav.loginHint' ? i18nT('nav.loginHint') : ''));
     } else {
-        // ─── دکمه‌های دوقلو: تنظیمات + حساب من (یک خط) ───
-        const duo = el('div', 'drawer-duo');
-        const settingsTop = el('button', 'drawer-item drawer-duo-btn');
-        settingsTop.type = 'button';
-        settingsTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.settings') !== 'nav.settings' ? i18nT('nav.settings') : '⚙ تنظیمات'));
-        settingsTop.addEventListener('click', () => {
-            closeDrawer();
-            if (_opts && typeof _opts.onOpenSettings === 'function') _opts.onOpenSettings();
-        });
-        const accountTop = el('button', 'drawer-item drawer-duo-btn');
-        accountTop.type = 'button';
-        accountTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.account') !== 'nav.account' ? i18nT('nav.account') : '👤 حساب من'));
-        accountTop.addEventListener('click', () => {
-            closeDrawer();
-            if (_opts && typeof _opts.onOpenAccount === 'function') _opts.onOpenAccount();
-        });
-        duo.appendChild(settingsTop);
-        duo.appendChild(accountTop);
-        aside.appendChild(duo);
 
         aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks' }));
 
