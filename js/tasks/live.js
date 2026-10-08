@@ -1,10 +1,13 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// js/tasks/live.js -- موتور زنده‌ی نمای مشترک (polling سبک، بدون WebSocket)
+// js/tasks/live.js -- موتور زنده‌ی نمای مشترک (polling تنبل، بدون WebSocket)
 //
 //   - پیام/ویرایش/حذف تازه‌ی مخاطب در مقصد باز → تطبیق لیست + toast
 //   - سطر تازه‌ی مخاطب/گروه → تازه‌سازی داده‌ی دراور (+ رندر اگر باز است و فوکوس روی input نیست)
 //   - نخوانده‌های گروه هم polling می‌شوند (قبلاً فقط DM بود)
 // ⚠️ تشخیص تغییر با (id → updatedAt) است، نه فقط شمارش — ویرایش/حذف هم گرفته می‌شود.
+// ⚠️ تنبل (lazy tick): تب مخفی = صفر درخواست؛ دراور بسته + مقصد محلی = صفر درخواست؛
+//    مقصد باز فقط با تغییر شمارش fetch کامل می‌زند (+ هر N تیک یک fetch دوره‌ای برای
+//    ویرایش/حذف بدون تغییر شمارش)؛ باز شدن دراور/برگشت فوکوس = تیک فوری.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch } from '../api.js';
@@ -24,12 +27,19 @@ import { listConversations, refreshConversationBadges } from '../communication/c
 import { listGroups, refreshGroupBadges } from '../communication/groups.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
 
-const LIVE_MS = 20000;
+const LIVE_MS = 60000;
+
+/** هر چند تیک، یک fetch کامل دوره‌ای (برای ویرایش/حذف بدون تغییر شمارش) */
+const FULL_FETCH_EVERY_TICKS = 5;
 
 let _timer = null;
 let _tick = 0;
+let _ticking = false;
+let _visBound = false;
 let _lastUnreadTotal = null;
 let _lastRowsKey = '';
+let _lastDestKey = '';
+let _lastDestCount = -1;
 
 function myId() {
     try {
@@ -91,17 +101,62 @@ export function diffSharedItems(oldItems, newItems) {
     return { added, updated, removed };
 }
 
-async function refreshOpenDestination() {
-    const dest = getDestination();
-    if (!dest || dest.type === 'local') return;
+/**
+ * شمارش نخوانده‌ی یک مقصد (ارزان — برای گیت fetch کامل).
+ * @returns {Promise<number|null>} — null یعنی نامشخص (fetch کامل بزن)
+ */
+export async function destUnreadCount(dest) {
+    try {
+        if (dest && dest.type === 'peer' && dest.peerId) {
+            const u = await getDmUnread();
+            if (!u.ok) return null;
+            const row = (u.unread.byPeer || []).find((r) => String(r.peerId) === String(dest.peerId));
+            updateDrawerBadges({ messages: u.unread.total || 0 });
+            return row ? row.count || 0 : 0;
+        }
+        if (dest && dest.type === 'group' && dest.groupId) {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(dest.groupId) + '/unread');
+            if (!res.ok) return null;
+            return Number((res.data && res.data.unread && res.data.unread.tasks) || 0);
+        }
+    } catch { /* silent */ }
+    return null;
+}
+
+/**
+ * تصمیم گیت fetch کامل — خالص و تست‌پذیر.
+ */
+export function shouldFullFetch(lastKey, lastCount, destKey, count, tickN) {
+    if (destKey !== lastKey) return true;
+    if (count === null || count !== lastCount) return true;
+    if (tickN % FULL_FETCH_EVERY_TICKS === 0) return true;
+    return false;
+}
+
+async function refreshOpenDestination(dest, opts) {
+    const o = opts || {};
+    const d = dest || getDestination();
+    if (!d || d.type === 'local') return;
     const me = myId();
+    // ─── گیت شمارش: بدون تغییر شمارش و بدون force، fetch کامل نمی‌زنیم ───
+    if (!o.force) {
+        try {
+            const n = await destUnreadCount(d);
+            const key = d.type + ':' + (d.peerId || d.groupId || '');
+            if (!shouldFullFetch(_lastDestKey, _lastDestCount, key, n, _tick)) return;
+            if (n !== null) {
+                _lastDestKey = key;
+                _lastDestCount = n;
+            }
+        } catch { /* در تردید، fetch کامل */ }
+    }
     let fresh = null;
     try {
-        if (dest.type === 'peer' && dest.peerId) {
-            const res = await fetchPeerTasks(dest.peerId, me, dest.name);
+        if (d.type === 'peer' && d.peerId) {
+            const res = await fetchPeerTasks(d.peerId, me, d.name);
             if (res.ok) fresh = res.items;
-        } else if (dest.type === 'group' && dest.groupId) {
-            const res = await fetchGroupTasks(dest.groupId, me);
+        } else if (d.type === 'group' && d.groupId) {
+            const res = await fetchGroupTasks(d.groupId, me);
             if (res.ok) fresh = res.items;
         }
     } catch { /* silent */ }
@@ -119,7 +174,7 @@ async function refreshOpenDestination() {
         resetRenderSignature();
         render();
     }
-    const label = dest.type === 'group' ? dest.name : null;
+    const label = d.type === 'group' ? d.name : null;
     for (const t of added) {
         showLiveToast(i18nT('dm.toast', { name: senderOf(t, label) }));
     }
@@ -162,29 +217,59 @@ function drawerInputFocused() {
     }
 }
 
+function isPageHidden() {
+    try {
+        return typeof document !== 'undefined' && document.hidden === true;
+    } catch {
+        return false;
+    }
+}
+
+async function isDrawerOpenSafe() {
+    try {
+        const { isDrawerOpen } = await import('../navigation/sidebar.js');
+        return !!isDrawerOpen();
+    } catch {
+        return false;
+    }
+}
+
 async function tick() {
+    if (_ticking) return;
     if (!isLoggedIn() || !isOnline()) return;
-    _tick += 1;
-    // نخوانده‌های DM (بج + baseline)
-    // نخوانده‌های DM (بج دراور) — تشخیص تازه‌ها با diff لیست است، نه شمارش
+    // ⚠️ تب مخفی = صفر درخواست (صرفه‌جویی باتری/ترافیک؛ با برگشت فوکوس تیک فوری می‌زنیم)
+    if (isPageHidden()) return;
+    _ticking = true;
     try {
-        const u = await getDmUnread();
-        if (u.ok) {
-            updateDrawerBadges({ messages: u.unread.total || 0 });
+        _tick += 1;
+        const dest = getDestination();
+        const drawerOpen = await isDrawerOpenSafe();
+        if (!drawerOpen && (!dest || dest.type === 'local')) {
+            // ⚠️ هیچ مصرف‌کننده‌ای نیست (بج‌ها و سطرها فقط دراورند) — سکوت کامل
+            return;
         }
-    } catch { /* silent */ }
-    // مقصد باز: تطبیق کامل لیست
-    await refreshOpenDestination().catch(() => {});
-    // داده‌ی دراور + رندر مشروط: فقط اگر سطرها/بج‌ها عوض شده‌اند و فوکوس روی input نیست
-    const beforeRows = drawerSnapshot();
-    await refreshDrawerData().catch(() => {});
+        if (drawerOpen) {
+            const beforeRows = drawerSnapshot();
+            await refreshDrawerData().catch(() => {});
+            try {
+                const { rerenderDrawer } = await import('../navigation/sidebar.js');
+                if (!drawerInputFocused() && drawerSnapshot() !== beforeRows) {
+                    rerenderDrawer();
+                }
+            } catch { /* silent */ }
+            if (!dest || dest.type === 'local') return;
+        }
+        // مقصد مشترک باز است (دراور باز یا بسته): تطبیق با گیت شمارش
+        await refreshOpenDestination(dest, {}).catch(() => {});
+    } finally {
+        _ticking = false;
+    }
+}
+
+function onVisibleTick() {
     try {
-        const { isDrawerOpen, rerenderDrawer } = await import('../navigation/sidebar.js');
-        if (isDrawerOpen() && !drawerInputFocused()) {
-            if (drawerSnapshot() !== beforeRows) {
-                rerenderDrawer();
-            }
-        }
+        if (isPageHidden()) return;
+        tick().catch(() => {});
     } catch { /* silent */ }
 }
 
@@ -196,6 +281,14 @@ export function startLiveEngine() {
     if (typeof _timer.unref === 'function') {
         try { _timer.unref(); } catch { /* silent */ }
     }
+    // ⚠️ تیک فوری با برگشت به صفحه (تازگی بدون polling تند)
+    if (!_visBound && typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        _visBound = true;
+        document.addEventListener('visibilitychange', onVisibleTick);
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('focus', onVisibleTick);
+        }
+    }
 }
 
 export function stopLiveEngine() {
@@ -203,9 +296,19 @@ export function stopLiveEngine() {
         clearInterval(_timer);
         _timer = null;
     }
+    if (_visBound && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        _visBound = false;
+        document.removeEventListener('visibilitychange', onVisibleTick);
+        if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('focus', onVisibleTick);
+        }
+    }
     _tick = 0;
+    _ticking = false;
     _lastUnreadTotal = null;
     _lastRowsKey = '';
+    _lastDestKey = '';
+    _lastDestCount = -1;
 }
 
 // ⚠️ فقط برای تست

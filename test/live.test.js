@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { diffSharedItems } from '../js/tasks/live.js';
+import { diffSharedItems, shouldFullFetch } from '../js/tasks/live.js';
 
 const mine = (id, updatedAt) => ({
     id, text: 'mine', updatedAt,
@@ -43,5 +43,26 @@ describe('live diff', () => {
         const b = [mine('d1', '2026-01-01')];
         const d = diffSharedItems(a, b);
         expect(d.removed.map((t) => t.id)).toEqual(['d2']);
+    });
+});
+
+describe('live gate', () => {
+    it('تغییر مقصد → fetch', () => {
+        expect(shouldFullFetch('', -1, 'peer:u2', 0, 1)).toBe(true);
+    });
+
+    it('شمارش نامشخص یا عوض‌شده → fetch', () => {
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', null, 1)).toBe(true);
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 4, 2)).toBe(true);
+    });
+
+    it('شمارش ثابت → سکوت', () => {
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 1)).toBe(false);
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 2)).toBe(false);
+    });
+
+    it('هر پنجمین تیک → fetch دوره‌ای', () => {
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 5)).toBe(true);
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 10)).toBe(true);
     });
 });
