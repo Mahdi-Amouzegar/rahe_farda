@@ -120,6 +120,9 @@ vi.mock('../js/api.js', async () => ({
         if (path === '/api/groups/g1' && opts && opts.method === 'DELETE') {
             return { ok: true, data: { deleted: true } };
         }
+        if (path === '/api/groups/g1' && opts && opts.method === 'PATCH') {
+            return { ok: true, data: { group: { id: 'g1', name: opts.body.name, ownerId: 'u1', closedAt: null } } };
+        }
         return { ok: false, error: { code: 'NOT_FOUND', message: 'x' } };
     }),
     apiErrorMessage: (e) => (e && e.message) || 'err',
@@ -136,6 +139,7 @@ import {
     openGroup,
     openGroupMenuFor,
     openGroupMembersModal,
+    openGroupSettingsModal,
     closeModalShell,
     createGroup,
     refreshGroupInbox,
@@ -303,6 +307,39 @@ describe('groups — drawer menu', () => {
         const posts = apiCalls.filter((c) => c.path === '/api/groups/g1/transfer');
         expect(posts.length).toBe(1);
         expect(posts[0].opts.body).toMatchObject({ newOwnerId: 'u2' });
+    });
+});
+
+describe('groups — settings', () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    it('منوی owner آیتم تنظیمات دارد', async () => {
+        await openGroupMenuFor('g1', document.getElementById('anchor'));
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toContain('settings');
+    });
+
+    it('مودال تنظیمات: نام + اعضا با دکمه حذف؛ ذخیره PATCH می‌زند', async () => {
+        await openGroupSettingsModal('g1');
+        await sleep(30);
+        const overlay = document.getElementById('groupModalOverlay');
+        expect(overlay).not.toBeNull();
+        const input = overlay.querySelector('.conv-new input');
+        expect(input).not.toBeNull();
+        expect(input.value).toBe('سفر');
+        input.value = 'سفر تازه';
+        const saveBtn = [...overlay.querySelectorAll('.conv-new button')]
+            .find((b) => b.textContent === 'ذخیره');
+        expect(saveBtn).toBeTruthy();
+        saveBtn.click();
+        await sleep(30);
+        const patches = apiCalls.filter((c) => c.path === '/api/groups/g1' && c.opts && c.opts.method === 'PATCH');
+        expect(patches.length).toBe(1);
+        expect(patches[0].opts.body).toMatchObject({ name: 'سفر تازه' });
+        closeModalShell();
+        await sleep(60);
+        closeModalShell();
     });
 });
 

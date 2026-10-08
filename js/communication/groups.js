@@ -235,6 +235,74 @@ export async function openGroupMembersModal(groupId) {
 }
 
 /**
+ * مودال تنظیمات گروه (فقط مالک): نام + اعضا/اخراج.
+ * هندل نام کاربری (username) در قدم بعدی همین‌جا اضافه می‌شود.
+ */
+export async function openGroupSettingsModal(groupId) {
+    if (!groupId) return;
+    const loaded = await loadGroupData(groupId);
+    if (!loaded.ok) {
+        showInfoModal({
+            title: tr('grp.settings', 'تنظیمات گروه'),
+            paragraphs: [apiErrorMessage(loaded.error)],
+        });
+        return;
+    }
+    if (_myRole !== 'owner') return;
+    const body = openModalShell(tr('grp.settings', 'تنظیمات گروه'));
+    // ─── نام گروه ───
+    const nameRow = el('div', 'conv-new');
+    const nameInput = el('input', 'conv-input');
+    nameInput.type = 'text';
+    nameInput.value = (_group && _group.name) || '';
+    nameInput.setAttribute('maxlength', '100');
+    nameInput.setAttribute('autocomplete', 'off');
+    const saveBtn = el('button', 'conv-mini-btn', tr('common.save', 'ذخیره'));
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', async () => {
+        const v = nameInput.value.trim().replace(/\s+/g, ' ');
+        if (!v) {
+            showInfoModal({
+                title: tr('grp.settings', 'تنظیمات گروه'),
+                paragraphs: [tr('grp.nameEmpty', 'نام گروه نمی‌تواند خالی باشد.')],
+            });
+            return;
+        }
+        saveBtn.disabled = true;
+        try {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(groupId), {
+                method: 'PATCH',
+                body: { name: v },
+            });
+            if (!res.ok) {
+                showInfoModal({
+                    title: tr('grp.settings', 'تنظیمات گروه'),
+                    paragraphs: [apiErrorMessage(res.error)],
+                });
+                return;
+            }
+            await loadGroupData(groupId);
+            await refreshGroupsHome();
+            closeModalShell();
+            openGroupSettingsModal(groupId);
+        } finally {
+            saveBtn.disabled = false;
+        }
+    });
+    nameRow.appendChild(nameInput);
+    nameRow.appendChild(saveBtn);
+    body.appendChild(nameRow);
+    // ─── اعضا + اخراج (همان نمای مودال اعضا) ───
+    renderMembersView(body, {
+        onChanged: async () => {
+            await loadGroupData(groupId);
+            closeModalShell();
+            openGroupSettingsModal(groupId);
+        },
+    });
+}
+
+/**
  * بارگذاری داده‌ی گروه (جزئیات + اعضا) بدون رندر فضا.
  */
 export async function loadGroupData(groupId) {
@@ -353,6 +421,7 @@ export async function openGroupMenuFor(groupId, anchor) {
         { id: 'open', label: tr('grp.open', 'باز کردن') },
         { id: 'members', label: tr('grp.members', 'اعضا') },
     ];
+    if (owner) items.push({ id: 'settings', label: tr('grp.settings', 'تنظیمات گروه') });
     if (manager) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
     if (owner) {
         items.push({ id: 'transfer', label: tr('grp.transfer', 'انتقال مالکیت') });
@@ -370,6 +439,8 @@ export async function openGroupMenuFor(groupId, anchor) {
                 await selectDestination({ type: 'group', groupId: String(groupId), name: group.name || undefined });
             } else if (id === 'members' || id === 'invite') {
                 await openGroupMembersModal(groupId);
+            } else if (id === 'settings') {
+                await openGroupSettingsModal(groupId);
             } else if (id === 'leave') {
                 await confirmGroupLeave(groupId);
             } else if (id === 'transfer') {
