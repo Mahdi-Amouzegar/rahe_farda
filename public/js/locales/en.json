@@ -218,6 +218,8 @@
     "transferDone": "Ownership transferred — you are a regular member now and can leave.",
     "settings": "Group settings",
     "nameEmpty": "Group name cannot be empty.",
+    "usernamePlaceholder": "public-handle",
+    "usernameHint": "Public handle is only for public groups and is used in links.",
     "close": "Close group",
     "closeConfirm": "The group will be closed and its tasks deleted. Continue?",
     "delete": "Delete group",

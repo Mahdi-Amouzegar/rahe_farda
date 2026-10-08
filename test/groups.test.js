@@ -341,6 +341,26 @@ describe('groups — settings', () => {
         await sleep(60);
         closeModalShell();
     });
+
+    it('مودال تنظیمات: سطر هندل با ذخیره جدا', async () => {
+        await openGroupSettingsModal('g1');
+        await sleep(30);
+        const overlay = document.getElementById('groupModalOverlay');
+        expect(overlay).not.toBeNull();
+        const unameInput = overlay.querySelector('input[dir="ltr"]');
+        expect(unameInput).not.toBeNull();
+        unameInput.value = 'safar_group';
+        const unameSave = [...overlay.querySelectorAll('.conv-new button')]
+            .find((b) => b.previousElementSibling === unameInput);
+        expect(unameSave).toBeTruthy();
+        unameSave.click();
+        await sleep(30);
+        const patches = apiCalls.filter((c) => c.path === '/api/groups/g1' && c.opts && c.opts.method === 'PATCH');
+        expect(patches.some((c) => c.opts.body && c.opts.body.username === 'safar_group')).toBe(true);
+        closeModalShell();
+        await sleep(60);
+        closeModalShell();
+    });
 });
 
 describe('groups — create', () => {

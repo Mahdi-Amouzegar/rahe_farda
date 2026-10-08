@@ -292,6 +292,46 @@ export async function openGroupSettingsModal(groupId) {
     nameRow.appendChild(nameInput);
     nameRow.appendChild(saveBtn);
     body.appendChild(nameRow);
+    // ─── هندل عمومی (فقط گروه عمومی — مثل t.me/name) ───
+    const unameRow = el('div', 'conv-new');
+    const unamePrefix = el('span', 'drawer-hint', '@');
+    const unameInput = el('input', 'conv-input');
+    unameInput.type = 'text';
+    unameInput.dir = 'ltr';
+    unameInput.value = (_group && _group.username) || '';
+    unameInput.setAttribute('maxlength', '20');
+    unameInput.setAttribute('autocomplete', 'off');
+    unameInput.setAttribute('placeholder', tr('grp.usernamePlaceholder', 'public-handle'));
+    const unameSave = el('button', 'conv-mini-btn', tr('common.save', 'ذخیره'));
+    unameSave.type = 'button';
+    unameSave.addEventListener('click', async () => {
+        const v = unameInput.value.trim().toLowerCase();
+        unameSave.disabled = true;
+        try {
+            const res = await apiFetch('/api/groups/' + encodeURIComponent(groupId), {
+                method: 'PATCH',
+                body: { username: v.length === 0 ? null : v },
+            });
+            if (!res.ok) {
+                showInfoModal({
+                    title: tr('grp.settings', 'تنظیمات گروه'),
+                    paragraphs: [apiErrorMessage(res.error)],
+                });
+                return;
+            }
+            await loadGroupData(groupId);
+            await refreshGroupsHome();
+            closeModalShell();
+            openGroupSettingsModal(groupId);
+        } finally {
+            unameSave.disabled = false;
+        }
+    });
+    unameRow.appendChild(unamePrefix);
+    unameRow.appendChild(unameInput);
+    unameRow.appendChild(unameSave);
+    body.appendChild(unameRow);
+    body.appendChild(el('p', 'wizard-hint', tr('grp.usernameHint', 'هندل عمومی فقط برای گروه عمومی است و در لینک استفاده می‌شود.')));
     // ─── اعضا + اخراج (همان نمای مودال اعضا) ───
     renderMembersView(body, {
         onChanged: async () => {
