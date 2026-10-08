@@ -109,6 +109,74 @@ let _db = null;
  */
 let _syncHandler = async () => ({ ok: true });
 
+/**
+ * نگاشت ردیف صف به op سرور (`POST /api/sync`) — مرجع واحد (Phase 13: E.5.3).
+ * ⚠️ `timestamp` همان مهر تسک است (نه `now`) تا conflict سرور درست کار کند.
+ */
+export function toServerOp(entry) {
+    return {
+        id: String(entry.id),
+        type: entry.type,
+        entityId: String(entry.entityId),
+        entityType: entry.entityType === 'child' ? 'child' : 'task',
+        data: entry.data || null,
+        parentId: entry.parentId ? String(entry.parentId) : null,
+        timestamp: entry.timestamp,
+        deviceId: entry.deviceId,
+        schemaVersion: entry.schemaVersion || SCHEMA_VERSION,
+        retries: entry.retries || 0,
+        lastError: entry.lastError || null,
+    };
+}
+
+/**
+ * فعال‌سازی Cloud Sync از روی state (E.5.3 — Phase 13).
+ * فقط وقتی توکن و userId هست (واردشده)؛ وگرنه false و هیچ‌کار.
+ * ⚠️ قبلش باید setCloudSyncHandler صدا شده باشد (وگرنه flush با handler جعلی موفق‌نمایی می‌کند).
+ */
+export function enableCloudSyncFromState() {
+    try {
+        if (!state.sync.authToken || !state.sync.userId) return false;
+        if (!state.sync.endpoint) return false;
+        state.sync.enabled = true;
+        events.emit('sync:enabled', { endpoint: state.sync.endpoint });
+        if (isOnline()) scheduleFlush();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * ارسال تکی یک op به `/api/sync` (تست‌پذیر؛ استفاده در handler ابری).
+ * @returns {Promise<{ ok: boolean }>}
+ */
+export async function postSingleOp(op) {
+    try {
+        const { apiFetch } = await import('./api.js');
+        const res = await apiFetch('/api/sync', {
+            method: 'POST',
+            body: {
+                ops: [toServerOp(op)],
+                deviceId: state.sync.deviceId || op.deviceId || 'unknown',
+                lastChangeSeq: null,
+                requestFullResync: false,
+            },
+        });
+        return { ok: !!(res && res.ok) };
+    } catch {
+        return { ok: false };
+    }
+}
+
+/**
+ * سیم‌کشی handler واقعی `/api/sync` برای flush legacy (E.5.3 — Phase 13).
+ * idempotent در سرور با op.id — ارسال دوباره‌ی امن است.
+ */
+export function setCloudSyncHandler() {
+    setSyncHandler((op) => postSingleOp(op));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // IndexedDB
 // ═══════════════════════════════════════════════════════════════════════════

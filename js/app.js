@@ -258,7 +258,7 @@ import { exportBackupV2, importBackupV2, normalizeBackup } from './backup-v2.js'
 
 // ⚠️ فاز ۵ گام ۵ — ماژول‌های شبکه و صف
 import { startNetworkMonitor } from './net.js';
-import { initSyncQueue, getQueueSize as getSyncQueueSize } from './sync-queue.js';
+import { initSyncQueue, getQueueSize as getSyncQueueSize, setCloudSyncHandler, enableCloudSyncFromState } from './sync-queue.js';
 import { initPWA, updateBadge } from './pwa.js';
 import { initHeaderStatus, updateHeaderStatus } from './header-status.js';
 
@@ -727,6 +727,12 @@ function wireEvents() {
     events.on('auth:login', () => {
         updateAccountStatusText();
         preloadDrawerLists();
+        // ⚠️ Phase 13 (E.5.3): فعال‌سازی سینک ابری + آپلود مدیا بعد از ورود
+        try {
+            enableCloudSyncFromState();
+        } catch (err) {
+            console.warn('[app] enableCloudSync failed:', err);
+        }
         // ⚠️ Phase 10 مرحله ۲: بعد از ورود، سینک ورود (pull + push/merge) اجرا می‌شود
         import('./personal-sync.js').then(async (m) => {
             try {
@@ -2734,6 +2740,12 @@ startNetworkMonitor();
 initSyncQueue().catch(err => {
     console.error('[app] initSyncQueue failed:', err);
 });
+// ⚠️ Phase 13 (E.5.3): handler واقعی سینک ابری — قبل از هر enable (وگرنه flush جعلی موفق می‌شود)
+try {
+    setCloudSyncHandler();
+} catch (err) {
+    console.warn('[app] setCloudSyncHandler failed:', err);
+}
 // ⚠️ فاز ۸ (8.3-C): صف آفلاین تسک‌های گروه
 initGroupQueue();
 initHeaderStatus();
@@ -2939,6 +2951,12 @@ initI18n().then(async () => {
         const restored = await restoreSession();
         if (restored.restored) {
             console.log('[auth] session restored for user:', restored.user?.id);
+            // ⚠️ Phase 13 (E.5.3): فعال‌سازی سینک ابری بعد از بازیابی نشست
+            try {
+                enableCloudSyncFromState();
+            } catch (err) {
+                console.warn('[app] enableCloudSync failed:', err);
+            }
             // ⚠️ Phase 10 مرحله ۲: بعد از بازیابی نشست، سینک ورود اجرا می‌شود
             try {
                 const m = await import('./personal-sync.js');

@@ -18,7 +18,10 @@
 import { state, uid, SCHEMA_VERSION } from './core.js';
 import { apiFetch } from './api.js';
 import { isOnline, getDeviceId } from './net.js';
-import { getQueue, dequeue } from './sync-queue.js';
+import { getQueue, dequeue, toServerOp } from './sync-queue.js';
+
+// باز-اکسپورت برای سازگاری تست‌ها (مرجع واحد در sync-queue.js است)
+export { toServerOp };
 
 /** محافظ ورود همزمان (دو push موازی صف را دو بار نفرستد) */
 let _pushing = false;
@@ -33,26 +36,6 @@ export function canPushNow() {
     } catch {
         return false;
     }
-}
-
-/**
- * نگاشت یک ردیف صف لوکال به op سرور (`POST /api/sync`).
- * ⚠️ `timestamp` همان مهر تسک است (نه `now`) تا conflict سرور درست کار کند.
- */
-export function toServerOp(entry) {
-    return {
-        id: String(entry.id),
-        type: entry.type,
-        entityId: String(entry.entityId),
-        entityType: entry.entityType === 'child' ? 'child' : 'task',
-        data: entry.data || null,
-        parentId: entry.parentId ? String(entry.parentId) : null,
-        timestamp: entry.timestamp,
-        deviceId: entry.deviceId,
-        schemaVersion: entry.schemaVersion || SCHEMA_VERSION,
-        retries: entry.retries || 0,
-        lastError: entry.lastError || null,
-    };
 }
 
 /**
