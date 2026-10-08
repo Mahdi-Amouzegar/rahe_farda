@@ -279,6 +279,23 @@
       "logoutButton": "خروج از حساب",
       "disconnectButton": "🔗 ورود با حساب تلگرام دیگر"
     },
+    "sessions": {
+      "title": "نشست‌های فعال",
+      "empty": "نشست فعالی نیست.",
+      "current": "این دستگاه",
+      "revoke": "غیرفعال‌سازی",
+      "mobile": "موبایل",
+      "desktop": "دسکتاپ",
+      "unknownDevice": "دستگاه ناشناخته",
+      "methodTelegram": "تلگرام",
+      "methodSyncCode": "کد همگام‌سازی",
+      "methodUnknown": "نامشخص",
+      "createdLabel": "شروع",
+      "lastUsedLabel": "آخرین فعالیت",
+      "revokeConfirmTitle": "غیرفعال‌سازی نشست",
+      "revokeConfirmMessage": "این دستگاه از حساب خارج می‌شود؟",
+      "revokedToast": "نشست غیرفعال شد"
+    },
     "logout": {
       "confirmTitle": "خروج از حساب",
       "confirmMessage": "از حساب خارج می‌شوید؟ داده‌های محلی شما حفظ می‌شود.",

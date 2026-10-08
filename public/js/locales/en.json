@@ -279,6 +279,23 @@
       "logoutButton": "Sign out",
       "disconnectButton": "🔗 Sign in with another Telegram account"
     },
+    "sessions": {
+      "title": "Active sessions",
+      "empty": "No active sessions.",
+      "current": "This device",
+      "revoke": "Revoke",
+      "mobile": "Mobile",
+      "desktop": "Desktop",
+      "unknownDevice": "Unknown device",
+      "methodTelegram": "Telegram",
+      "methodSyncCode": "Sync code",
+      "methodUnknown": "Unknown",
+      "createdLabel": "Started",
+      "lastUsedLabel": "Last active",
+      "revokeConfirmTitle": "Revoke session",
+      "revokeConfirmMessage": "Sign this device out of your account?",
+      "revokedToast": "Session revoked"
+    },
     "logout": {
       "confirmTitle": "Sign out",
       "confirmMessage": "Sign out of your account? Your local data will be kept.",

@@ -8,6 +8,64 @@
 import { apiFetch } from './api.js';
 import { t as i18nT } from './i18n.js';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// نشست‌ها (لیست + باطل کردن — فقط ورود تلگرامی)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * خواندن نشست‌های فعال خودم.
+ */
+export async function fetchAccountSessions() {
+    return apiFetch('/api/sessions');
+}
+
+/**
+ * باطل کردن یک نشست (غیر از جاری — سرور هم گیت دارد).
+ */
+export async function revokeAccountSession(sessionId) {
+    return apiFetch('/api/sessions/' + encodeURIComponent(sessionId), { method: 'DELETE' });
+}
+
+/**
+ * تجزیه‌ی سبک user-agent → {browser, os, mobile} (خالص، تست‌پذیر).
+ * ⚠️ فقط برای نمایش است؛ مرجع امنیتی نیست.
+ */
+export function parseUserAgent(ua) {
+    const s = String(ua || '');
+    let browser = null;
+    if (/Edg\//i.test(s)) browser = 'Edge';
+    else if (/OPR\/|Opera/i.test(s)) browser = 'Opera';
+    else if (/SamsungBrowser/i.test(s)) browser = 'Samsung';
+    else if (/Chrome\//i.test(s)) browser = 'Chrome';
+    else if (/Firefox\//i.test(s)) browser = 'Firefox';
+    else if (/Safari\//i.test(s)) browser = 'Safari';
+    let os = null;
+    if (/Android/i.test(s)) os = 'Android';
+    else if (/iPhone|iPad|iPod/i.test(s)) os = 'iOS';
+    else if (/Windows/i.test(s)) os = 'Windows';
+    else if (/Mac OS X/i.test(s)) os = 'macOS';
+    else if (/Linux/i.test(s)) os = 'Linux';
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(s);
+    return { browser, os, mobile };
+}
+
+/**
+ * برچسب روش ورود نشست.
+ */
+export function sessionMethodLabel(method) {
+    if (method === 'telegram') return i18nT('auth.sessions.methodTelegram');
+    if (method === 'sync-code') return i18nT('auth.sessions.methodSyncCode');
+    return i18nT('auth.sessions.methodUnknown');
+}
+
+/**
+ * آیا دکمه‌ی revoke برای این ورود نشان داده شود؟
+ * فقط ورود تلگرامی (قدیمیِ بدون method هم، مثل سرور، مجاز).
+ */
+export function canRevokeSessions(myMethod) {
+    return myMethod !== 'sync-code';
+}
+
 /**
  * خلاصه‌ی preview از سرور.
  */

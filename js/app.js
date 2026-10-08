@@ -373,7 +373,11 @@ function openAuthModal() {
     modal.hidden = false;
     if (_authTrapCleanup) _authTrapCleanup();
     _authTrapCleanup = trapFocus(modal);
-    setTimeout(() => document.getElementById('authModalClose')?.focus(), 60);
+    // ⚠️ فوکوس روی عنوان (بالا) نه دکمه بستن (پایین) — وگرنه در صفحه کوتاه،
+    //    مرورگر انتهای مودال را نشان می‌دهد و عنوان گم می‌شود.
+    const body = document.getElementById('authModalBody');
+    if (body) body.scrollTop = 0;
+    setTimeout(() => document.getElementById('authModalTitle')?.focus({ preventScroll: true }), 60);
 }
 
 /**
@@ -389,11 +393,101 @@ function closeAuthModal() {
 }
 
 /**
+ * لیست نشست‌های فعال در مودال حساب (فاز ۱۱).
+ * revoke فقط برای ورود تلگرامی (نه کد) — گیت نهایی در سرور است.
+ */
+async function renderAuthSessions() {
+    const box = document.getElementById('authSessionsList');
+    if (!box) return;
+    let mod;
+    try {
+        mod = await import('./account-delete.js');
+    } catch {
+        box.innerHTML = '';
+        return;
+    }
+    let res;
+    try {
+        res = await mod.fetchAccountSessions();
+    } catch {
+        res = { ok: false };
+    }
+    if (!res || !res.ok) {
+        box.innerHTML = '';
+        return;
+    }
+    const sessions = (res.data && res.data.sessions) || [];
+    const { getLoginMethod } = await import('./auth.js');
+    const canRevoke = mod.canRevokeSessions(getLoginMethod());
+    if (sessions.length === 0) {
+        box.innerHTML = `<span class="settings-note">${escapeHtml(i18nT('auth.sessions.empty'))}</span>`;
+        return;
+    }
+    const fmtDateTime = (iso) => {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString(
+                getLang() === 'en' ? 'en-US' : 'fa-IR',
+                { dateStyle: 'medium', timeStyle: 'short' }
+            );
+        } catch {
+            return '—';
+        }
+    };
+    box.innerHTML = sessions.map((s) => {
+        const ua = mod.parseUserAgent(s.deviceUserAgent || s.deviceName || '');
+        const bits = [ua.browser, ua.os, ua.mobile ? i18nT('auth.sessions.mobile') : i18nT('auth.sessions.desktop')]
+            .filter(Boolean).join(' · ');
+        const title = escapeHtml(s.deviceName || bits || i18nT('auth.sessions.unknownDevice'));
+        const sub = escapeHtml(
+            [bits, mod.sessionMethodLabel(s.authMethod)].filter(Boolean).join(' · ')
+        );
+        const dates = escapeHtml(
+            `${i18nT('auth.sessions.createdLabel')}: ${fmtDateTime(s.createdAt)} — ${i18nT('auth.sessions.lastUsedLabel')}: ${fmtDateTime(s.lastUsedAt)}`
+        );
+        const badge = s.isCurrent
+            ? `<span class="drawer-badge">${escapeHtml(i18nT('auth.sessions.current'))}</span>`
+            : '';
+        const btn = (!s.isCurrent && canRevoke)
+            ? `<button type="button" class="btn-small" data-revoke-session="${escapeHtml(String(s.id))}">${escapeHtml(i18nT('auth.sessions.revoke'))}</button>`
+            : '';
+        return `<div class="settings-row"><div><strong>${title}</strong><br><small class="settings-note">${sub}</small><br><small class="settings-note">${dates}</small></div><div>${badge}${btn}</div></div>`;
+    }).join('');
+    box.querySelectorAll('[data-revoke-session]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const sid = btn.getAttribute('data-revoke-session');
+            if (!sid) return;
+            const ok = await showConfirmModal({
+                title: i18nT('auth.sessions.revokeConfirmTitle'),
+                message: i18nT('auth.sessions.revokeConfirmMessage'),
+                confirmText: i18nT('auth.sessions.revoke'),
+                cancelText: t('common.cancel'),
+                danger: true,
+            });
+            if (!ok) return;
+            btn.disabled = true;
+            try {
+                const r = await mod.revokeAccountSession(sid);
+                if (!r.ok) {
+                    showToast((r.error && r.error.message) || i18nT('errors.serverError'));
+                    return;
+                }
+                showToast(i18nT('auth.sessions.revokedToast'));
+                await renderAuthSessions();
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    });
+}
+
+/**
  * رندر محتوای مودال بر اساس وضعیت auth.
  */
 function renderAuthModal() {
     const body = document.getElementById('authModalBody');
     if (!body) return;
+    try { body.scrollTop = 0; } catch { /* silent */ }
 
     const auth = getAuthState();
 
@@ -532,6 +626,11 @@ function renderAuthModal() {
             <div class="auth-remaining" id="authNewCodeExp" hidden></div>
         </div>
 
+        <div class="auth-user-info" id="authSessionsBlock">
+            <div class="auth-ttl-label">${i18nT('auth.sessions.title')}</div>
+            <div id="authSessionsList"><span class="settings-note">${i18nT('common.loading')}</span></div>
+        </div>
+
         ${warning}
 
         <div class="auth-actions">
@@ -585,6 +684,9 @@ function renderAuthModal() {
             }
         });
     }
+
+    // ─── فاز ۱۱: لیست نشست‌ها (فقط خواندن؛ revoke با تأیید) ───
+    renderAuthSessions().catch(() => {});
 
     const disconnectBtn = document.getElementById('authDisconnectBtn');
     if (disconnectBtn) {

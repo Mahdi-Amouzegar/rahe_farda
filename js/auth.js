@@ -107,13 +107,14 @@ let _refreshing = false;
 /**
  * ذخیره‌ی session در localStorage + state.sync.
  *
- * @param {{ token: string, user: object, expiresAt: string }} session
+ * @param {{ token: string, user: object, expiresAt: string, method?: string }} session
  */
 function _persistSession(session) {
     const payload = {
         token: session.token,
         user: session.user,
         expiresAt: session.expiresAt,
+        method: session.method || null,
         savedAt: new Date().toISOString(),
     };
 
@@ -147,6 +148,7 @@ function _readSession() {
             token: parsed.token,
             user: parsed.user,
             expiresAt: parsed.expiresAt || null,
+            method: parsed.method || null,
         };
     } catch {
         return null;
@@ -250,6 +252,18 @@ export function getAuthState() {
  */
 export function isLoggedIn() {
     return getAuthState().loggedIn;
+}
+
+/**
+ * روش ورود نشست فعلی (telegram / sync-code / null برای قدیمی‌ها).
+ */
+export function getLoginMethod() {
+    try {
+        const session = _readSession();
+        return (session && session.method) || null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -488,6 +502,7 @@ export async function loginWithTelegram(telegramPayload, options) {
             token: data.data.token,
             user: data.data.user,
             expiresAt: data.data.expiresAt,
+            method: 'telegram',
         };
 
         _persistSession(session);
@@ -546,6 +561,7 @@ export async function loginWithSyncCode(code, options) {
             token: data.data.token,
             user: data.data.user,
             expiresAt: data.data.expiresAt,
+            method: 'sync-code',
         };
 
         _persistSession(session);
@@ -620,6 +636,7 @@ export function setStoredHasSyncCode(value) {
             token: session.token,
             user: session.user,
             expiresAt: session.expiresAt,
+            method: session.method || null,
             savedAt: new Date().toISOString(),
         };
         localStorage.setItem(AUTH_KEY, JSON.stringify(payload));

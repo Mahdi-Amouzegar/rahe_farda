@@ -23,6 +23,11 @@ import {
     requestAccountDeletion,
     buildDeleteConfirm,
     performLocalWipeout,
+    fetchAccountSessions,
+    revokeAccountSession,
+    parseUserAgent,
+    sessionMethodLabel,
+    canRevokeSessions,
 } from '../js/account-delete.js';
 
 beforeEach(() => {
@@ -87,5 +92,60 @@ describe('account-delete — performLocalWipeout', () => {
             rerender: async () => { rendered = true; },
         });
         expect(rendered).toBe(true);
+    });
+});
+
+describe('account-delete — sessions API', () => {
+    it('لیست نشست‌ها GET می‌زند', async () => {
+        nextResponse = { ok: true, data: { sessions: [] } };
+        const r = await fetchAccountSessions();
+        expect(r.ok).toBe(true);
+        expect(apiCalls[apiCalls.length - 1].path).toBe('/api/sessions');
+    });
+
+    it('باطل کردن DELETE می‌زند', async () => {
+        nextResponse = { ok: true, data: { revoked: true } };
+        const r = await revokeAccountSession('s1');
+        expect(r.ok).toBe(true);
+        const last = apiCalls[apiCalls.length - 1];
+        expect(last.path).toBe('/api/sessions/s1');
+        expect(last.opts.method).toBe('DELETE');
+    });
+});
+
+describe('account-delete — parseUserAgent', () => {
+    it('کروم ویندوز دسکتاپ', () => {
+        const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+        expect(parseUserAgent(ua)).toEqual({ browser: 'Chrome', os: 'Windows', mobile: false });
+    });
+
+    it('سافاری آیفون موبایل', () => {
+        const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+        expect(parseUserAgent(ua)).toEqual({ browser: 'Safari', os: 'iOS', mobile: true });
+    });
+
+    it('اج: اج اول (نه کروم)', () => {
+        const ua = 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0';
+        expect(parseUserAgent(ua).browser).toBe('Edge');
+    });
+
+    it('خالی → همه null/false', () => {
+        expect(parseUserAgent(null)).toEqual({ browser: null, os: null, mobile: false });
+        expect(parseUserAgent('')).toEqual({ browser: null, os: null, mobile: false });
+    });
+});
+
+describe('account-delete — method labels و گیت revoke', () => {
+    it('برچسب روش ورود', () => {
+        expect(sessionMethodLabel('telegram')).toBe('auth.sessions.methodTelegram');
+        expect(sessionMethodLabel('sync-code')).toBe('auth.sessions.methodSyncCode');
+        expect(sessionMethodLabel(null)).toBe('auth.sessions.methodUnknown');
+        expect(sessionMethodLabel('email')).toBe('auth.sessions.methodUnknown');
+    });
+
+    it('فقط غیر کد همگام‌سازی می‌تواند revoke کند', () => {
+        expect(canRevokeSessions('telegram')).toBe(true);
+        expect(canRevokeSessions(null)).toBe(true);
+        expect(canRevokeSessions('sync-code')).toBe(false);
     });
 });
