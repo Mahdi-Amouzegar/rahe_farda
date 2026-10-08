@@ -1260,7 +1260,7 @@ async function runAccountDeletionFlow() {
     }
     const confirm = buildDeleteConfirm(preview.data);
     if (!confirm.canDelete) {
-        // ⚠️ نام گروه‌ها داده‌ی کاربرساز است و showInfoModal innerHTML می‌زند — escape شود
+        // ⚠️ نام گروه‌ها داده‌ی کاربرساز است و showInfoModal رشته را خام تزریق می‌کند — escape شود
         await showInfoModal({
             title: confirm.title,
             paragraphs: confirm.lines.map((l) => escapeHtml(l)),
