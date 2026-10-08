@@ -61,8 +61,9 @@ describe('live gate', () => {
         expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 2)).toBe(false);
     });
 
-    it('هر پنجمین تیک → fetch دوره‌ای', () => {
-        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 5)).toBe(true);
-        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 10)).toBe(true);
+    it('هر شصتمین تیک → fetch دوره‌ای', () => {
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 60)).toBe(true);
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 120)).toBe(true);
+        expect(shouldFullFetch('peer:u2', 3, 'peer:u2', 3, 61)).toBe(false);
     });
 });

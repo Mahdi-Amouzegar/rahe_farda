@@ -5,9 +5,9 @@
 //   - سطر تازه‌ی مخاطب/گروه → تازه‌سازی داده‌ی دراور (+ رندر اگر باز است و فوکوس روی input نیست)
 //   - نخوانده‌های گروه هم polling می‌شوند (قبلاً فقط DM بود)
 // ⚠️ تشخیص تغییر با (id → updatedAt) است، نه فقط شمارش — ویرایش/حذف هم گرفته می‌شود.
-// ⚠️ تنبل (lazy tick): تب مخفی = صفر درخواست؛ دراور بسته + مقصد محلی = صفر درخواست؛
-//    مقصد باز فقط با تغییر شمارش fetch کامل می‌زند (+ هر N تیک یک fetch دوره‌ای برای
-//    ویرایش/حذف بدون تغییر شمارش)؛ باز شدن دراور/برگشت فوکوس = تیک فوری.
+// ⚠️ تنبل (lazy tick) + دوسرعته: تب مخفی = صفر درخواست؛ دراور بسته + مقصد محلی = صفر؛
+//    مقصد باز هر ۵ ثانیه فقط گیت شمارش می‌زند؛ داده‌ی دراور هر ~۶۰ ثانیه؛
+//    مقصد باز فقط با تغییر شمارش fetch کامل می‌زند (+ هر ۶۰ تیک یک fetch دوره‌ای).
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch } from '../api.js';
@@ -27,10 +27,14 @@ import { listConversations, refreshConversationBadges } from '../communication/c
 import { listGroups, refreshGroupBadges } from '../communication/groups.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
 
-const LIVE_MS = 60000;
+/** ضربان تند برای مقصد باز (چت فعال) — فقط گیت شمارش ارزان */
+const FAST_MS = 5000;
+
+/** دراور حداکثر هر چند تیک تند تازه شود (۱۲×۵ثانیه = ۶۰ ثانیه) */
+const DRAWER_EVERY_TICKS = 12;
 
 /** هر چند تیک، یک fetch کامل دوره‌ای (برای ویرایش/حذف بدون تغییر شمارش) */
-const FULL_FETCH_EVERY_TICKS = 5;
+const FULL_FETCH_EVERY_TICKS = 60;
 
 let _timer = null;
 let _tick = 0;
@@ -248,7 +252,7 @@ async function tick() {
             // ⚠️ هیچ مصرف‌کننده‌ای نیست (بج‌ها و سطرها فقط دراورند) — سکوت کامل
             return;
         }
-        if (drawerOpen) {
+        if (drawerOpen && _tick % DRAWER_EVERY_TICKS === 0) {
             const beforeRows = drawerSnapshot();
             await refreshDrawerData().catch(() => {});
             try {
@@ -257,6 +261,8 @@ async function tick() {
                     rerenderDrawer();
                 }
             } catch { /* silent */ }
+            if (!dest || dest.type === 'local') return;
+        } else if (drawerOpen) {
             if (!dest || dest.type === 'local') return;
         }
         // مقصد مشترک باز است (دراور باز یا بسته): تطبیق با گیت شمارش
@@ -275,9 +281,11 @@ function onVisibleTick() {
 
 export function startLiveEngine() {
     if (_timer) return;
+    // ⚠️ ضربان تند ۵ ثانیه‌ای: فقط گیت شمارش مقصد باز می‌زند (ارزان)؛
+    //    داده‌ی دراور هر ۱۲ تیک (≈۶۰ ثانیه) تازه می‌شود.
     _timer = setInterval(() => {
         tick().catch(() => {});
-    }, LIVE_MS);
+    }, FAST_MS);
     if (typeof _timer.unref === 'function') {
         try { _timer.unref(); } catch { /* silent */ }
     }
