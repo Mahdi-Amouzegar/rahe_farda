@@ -403,7 +403,7 @@ async function renderAuthSessions() {
     try {
         mod = await import('./account-delete.js');
     } catch {
-        box.innerHTML = '';
+        box.replaceChildren();
         return;
     }
     let res;
@@ -413,14 +413,18 @@ async function renderAuthSessions() {
         res = { ok: false };
     }
     if (!res || !res.ok) {
-        box.innerHTML = '';
+        box.replaceChildren();
         return;
     }
     const sessions = (res.data && res.data.sessions) || [];
     const { getLoginMethod } = await import('./auth.js');
     const canRevoke = mod.canRevokeSessions(getLoginMethod());
     if (sessions.length === 0) {
-        box.innerHTML = `<span class="settings-note">${escapeHtml(i18nT('auth.sessions.empty'))}</span>`;
+        box.replaceChildren();
+        const empty = document.createElement('span');
+        empty.className = 'settings-note';
+        empty.textContent = i18nT('auth.sessions.empty');
+        box.appendChild(empty);
         return;
     }
     const fmtDateTime = (iso) => {
@@ -434,51 +438,68 @@ async function renderAuthSessions() {
             return '—';
         }
     };
-    box.innerHTML = sessions.map((s) => {
+    // ⚠️ بدون تزریق HTML: همه‌ی متن‌ها با textContent (داده‌ی UA/نام دستگاه کاربرساز است)
+    box.replaceChildren();
+    for (const s of sessions) {
         const ua = mod.parseUserAgent(s.deviceUserAgent || s.deviceName || '');
         const bits = [ua.browser, ua.os, ua.mobile ? i18nT('auth.sessions.mobile') : i18nT('auth.sessions.desktop')]
             .filter(Boolean).join(' · ');
-        const title = escapeHtml(s.deviceName || bits || i18nT('auth.sessions.unknownDevice'));
-        const sub = escapeHtml(
-            [bits, mod.sessionMethodLabel(s.authMethod)].filter(Boolean).join(' · ')
-        );
-        const dates = escapeHtml(
-            `${i18nT('auth.sessions.createdLabel')}: ${fmtDateTime(s.createdAt)} — ${i18nT('auth.sessions.lastUsedLabel')}: ${fmtDateTime(s.lastUsedAt)}`
-        );
-        const badge = s.isCurrent
-            ? `<span class="drawer-badge">${escapeHtml(i18nT('auth.sessions.current'))}</span>`
-            : '';
-        const btn = (!s.isCurrent && canRevoke)
-            ? `<button type="button" class="btn-small" data-revoke-session="${escapeHtml(String(s.id))}">${escapeHtml(i18nT('auth.sessions.revoke'))}</button>`
-            : '';
-        return `<div class="settings-row"><div><strong>${title}</strong><br><small class="settings-note">${sub}</small><br><small class="settings-note">${dates}</small></div><div>${badge}${btn}</div></div>`;
-    }).join('');
-    box.querySelectorAll('[data-revoke-session]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-            const sid = btn.getAttribute('data-revoke-session');
-            if (!sid) return;
-            const ok = await showConfirmModal({
-                title: i18nT('auth.sessions.revokeConfirmTitle'),
-                message: i18nT('auth.sessions.revokeConfirmMessage'),
-                confirmText: i18nT('auth.sessions.revoke'),
-                cancelText: t('common.cancel'),
-                danger: true,
-            });
-            if (!ok) return;
-            btn.disabled = true;
-            try {
-                const r = await mod.revokeAccountSession(sid);
-                if (!r.ok) {
-                    showToast((r.error && r.error.message) || i18nT('errors.serverError'));
-                    return;
+        const row = document.createElement('div');
+        row.className = 'settings-row';
+        const info = document.createElement('div');
+        const title = document.createElement('strong');
+        title.textContent = s.deviceName || bits || i18nT('auth.sessions.unknownDevice');
+        info.appendChild(title);
+        info.appendChild(document.createElement('br'));
+        const sub = document.createElement('small');
+        sub.className = 'settings-note';
+        sub.textContent = [bits, mod.sessionMethodLabel(s.authMethod)].filter(Boolean).join(' · ');
+        info.appendChild(sub);
+        info.appendChild(document.createElement('br'));
+        const dates = document.createElement('small');
+        dates.className = 'settings-note';
+        dates.textContent =
+            `${i18nT('auth.sessions.createdLabel')}: ${fmtDateTime(s.createdAt)} — ${i18nT('auth.sessions.lastUsedLabel')}: ${fmtDateTime(s.lastUsedAt)}`;
+        info.appendChild(dates);
+        row.appendChild(info);
+        const actions = document.createElement('div');
+        if (s.isCurrent) {
+            const badge = document.createElement('span');
+            badge.className = 'drawer-badge';
+            badge.textContent = i18nT('auth.sessions.current');
+            actions.appendChild(badge);
+        } else if (canRevoke) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-small';
+            btn.textContent = i18nT('auth.sessions.revoke');
+            btn.addEventListener('click', async () => {
+                const ok = await showConfirmModal({
+                    title: i18nT('auth.sessions.revokeConfirmTitle'),
+                    message: i18nT('auth.sessions.revokeConfirmMessage'),
+                    confirmText: i18nT('auth.sessions.revoke'),
+                    cancelText: t('common.cancel'),
+                    danger: true,
+                });
+                if (!ok) return;
+                btn.disabled = true;
+                try {
+                    const r = await mod.revokeAccountSession(s.id);
+                    if (!r.ok) {
+                        showToast((r.error && r.error.message) || i18nT('errors.serverError'));
+                        return;
+                    }
+                    showToast(i18nT('auth.sessions.revokedToast'));
+                    await renderAuthSessions();
+                } finally {
+                    btn.disabled = false;
                 }
-                showToast(i18nT('auth.sessions.revokedToast'));
-                await renderAuthSessions();
-            } finally {
-                btn.disabled = false;
-            }
-        });
-    });
+            });
+            actions.appendChild(btn);
+        }
+        row.appendChild(actions);
+        box.appendChild(row);
+    }
 }
 
 /**
