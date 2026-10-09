@@ -128,16 +128,21 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - User and group avatars
 - 7-step welcome wizard + backup v2 (with sent-items archive)
 - Bilingual interface (Persian + English)
+- Unified single page for personal tasks, messages, and groups (with live updates)
+- Personal cloud sync that survives local data loss (login restores everything)
+- Sync-code login + per-session device management (view and revoke sessions)
+- Account deletion with ownership transfer guidance
+- Group ownership transfer, group settings (rename, members), and public group handles
+- Search privacy toggle (opt out of being discoverable)
+- Username policy (system, official, and impersonation-risk names stay protected)
 
 ### ⏳ In Progress / Next
 
-- **Phase 9** — Unified tasks rebuild (same composer/list/page in all three modes; bubble model removed)
-- After that: account deletion, rate limiting, and final audit (requires ARCH §16 decision)
+- **Practical testing series (Phases 10.0–10.30)** — real-user testing, stabilization, architecture audit, and controlled refactor. No new features are planned in this series; the goal is a stable, trustworthy release.
 
 ### 🗓️ Planned
 
-- Account lifecycle (deletion, transfer, anonymization)
-- Rate limiting and final security audit
+- Refinements from practical test results
 
 ### ❌ Deferred
 
@@ -246,9 +251,12 @@ Status	Milestone
 ✅	Group synchronization + offline queue
 ✅	Communication & group UI
 ✅	Welcome wizard + Backup / restore v2
-⏳	Unified tasks rebuild (same composer/list everywhere)
-🗓️	Account lifecycle & security hardening
-🗓️	Final security audit
+✅	Unified single page (tasks, messages, groups) + live updates
+✅	Personal cloud sync + sync-code login + session management
+✅	Account deletion + group transfer/settings + public group handles
+✅	Username policy + search privacy
+⏳	Practical testing, stabilization, audit & refactor (Phases 10.0–10.30)
+🗓️	Stable release candidate
 9. Privacy
 Rahe Farda is designed for personal, offline-first use:
 
