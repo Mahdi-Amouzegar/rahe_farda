@@ -22,6 +22,7 @@ import {
     setRecentGroups,
     setGroupInvitations,
     removeDrawerRow,
+    rerenderDrawer,
 } from '../navigation/sidebar.js';
 import { showInfoModal, showConfirmModal } from '../core.js';
 import { displayNameOf } from './conversations.js';
@@ -283,6 +284,7 @@ export async function openGroupSettingsModal(groupId) {
             }
             await loadGroupData(groupId);
             await refreshGroupsHome();
+            try { rerenderDrawer(); } catch { /* best-effort: نام تازه همان لحظه در دراور */ }
             closeModalShell();
             openGroupSettingsModal(groupId);
         } finally {
@@ -321,6 +323,7 @@ export async function openGroupSettingsModal(groupId) {
             }
             await loadGroupData(groupId);
             await refreshGroupsHome();
+            try { rerenderDrawer(); } catch { /* best-effort */ }
             closeModalShell();
             openGroupSettingsModal(groupId);
         } finally {
