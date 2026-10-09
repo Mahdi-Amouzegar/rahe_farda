@@ -122,11 +122,11 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - Telegram login with session/device management
 - Multi-device sync with transactional outbox
 - Groups (create, members, invitations, invite links, leave) with role-based access
-- Group messages, tasks, and timeline + per-group unread counts
+- Group tasks with sender info + per-group unread counts
 - Group sync engine with per-group change sequences + offline queue
 - Global search (users + public groups)
 - User and group avatars
-- 7-step welcome wizard + backup v2 (with sent-items archive)
+- 6-step welcome wizard + backup v2 (with sent-items archive)
 - Bilingual interface (Persian + English)
 - Unified single page for personal tasks, messages, and groups (with live updates)
 - Personal cloud sync that survives local data loss (login restores everything)
@@ -134,7 +134,7 @@ Rahe Farda is **not** a Gregorian planner with a Persian skin. The calendar, the
 - Account deletion with ownership transfer guidance
 - Group ownership transfer, group settings (rename, members), and public group handles
 - Search privacy toggle (opt out of being discoverable)
-- Username policy (system, official, and impersonation-risk names stay protected)
+- Protected names for public group handles (system, official, and impersonation-risk names stay reserved)
 
 ### ⏳ In Progress / Next
 
@@ -246,7 +246,7 @@ Status	Milestone
 ✅	Number & unit localization
 ✅	Communication (connections, blocks, messages, shares, notifications)
 ✅	Groups API (create, members, invitations, links, leave)
-✅	Group messages, tasks & timeline + avatars
+✅	Group tasks with sender info + avatars
 ✅	Search (users + public groups)
 ✅	Group synchronization + offline queue
 ✅	Communication & group UI
@@ -254,7 +254,7 @@ Status	Milestone
 ✅	Unified single page (tasks, messages, groups) + live updates
 ✅	Personal cloud sync + sync-code login + session management
 ✅	Account deletion + group transfer/settings + public group handles
-✅	Username policy + search privacy
+✅	Protected names for public group handles + search privacy
 ⏳	Practical testing, stabilization, audit & refactor (Phases 10.0–10.30)
 🗓️	Stable release candidate
 9. Privacy
