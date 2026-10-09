@@ -369,7 +369,10 @@
         "openButton": "👤 My Account",
         "note": "To sync across devices, first sign in with Telegram. Your data stays on this device.",
         "deleteButton": "🗑 Delete account",
-        "deleteLoginRequired": "Sign in first to delete your account"
+        "deleteLoginRequired": "Sign in first to delete your account",
+        "discoverable": "Appear in search",
+        "discoverableHint": "When off, others cannot reach your profile via search.",
+        "discoverableError": "Could not save privacy setting"
       },
       "reminders": {
         "title": "Reminders & notifications",

@@ -275,6 +275,7 @@ import {
     logout as logoutAuth,
     getAuthState,
     getCurrentUser,
+    setStoredDiscoverable,
     formatExpiry,
     refreshToken,
     ttlLabel,
@@ -1914,6 +1915,36 @@ function initSettings() {
     on.addEventListener('change', () => { state.prefs.remindOn = on.checked; savePrefs(); });
     mins.addEventListener('change', () => { state.prefs.remindMin = parseInt(mins.value, 10) || 60; savePrefs(); });
     dig.addEventListener('change', () => { state.prefs.digestOn = dig.checked; savePrefs(); });
+
+    // ─── حریم خصوصی جستجو (پرچم سروری، نه prefs محلی) ───
+    const disc = document.getElementById('setDiscoverable');
+    if (disc) {
+        const auth = getAuthState();
+        disc.checked = !auth.loggedIn || (auth.user && auth.user.discoverable !== false);
+        disc.disabled = !auth.loggedIn;
+        disc.addEventListener('change', async () => {
+            const want = disc.checked;
+            disc.disabled = true;
+            try {
+                const { apiFetch } = await import('./api.js');
+                const res = await apiFetch('/api/users/me', {
+                    method: 'PATCH',
+                    body: { discoverable: want },
+                });
+                if (res && res.ok) {
+                    setStoredDiscoverable(want);
+                } else {
+                    disc.checked = !want;
+                    showToast(t('settings.sections.account.discoverableError'));
+                }
+            } catch {
+                disc.checked = !want;
+                showToast(t('settings.sections.account.discoverableError'));
+            } finally {
+                disc.disabled = !getAuthState().loggedIn;
+            }
+        });
+    }
 
     initSoundSettings();
     initSystemPermissions();

@@ -643,6 +643,25 @@ export function setStoredHasSyncCode(value) {
     } catch { /* silent */ }
 }
 
+/**
+ * به‌روزرسانی پرچم discoverable در session ذخیره‌شده (کش محلی).
+ */
+export function setStoredDiscoverable(value) {
+    try {
+        const session = _readSession();
+        if (!session || !session.user) return;
+        session.user.discoverable = Boolean(value);
+        const payload = {
+            token: session.token,
+            user: session.user,
+            expiresAt: session.expiresAt,
+            method: session.method || null,
+            savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
+    } catch { /* silent */ }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Refresh Token
 // ═══════════════════════════════════════════════════════════════════════════
