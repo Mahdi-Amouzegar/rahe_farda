@@ -181,7 +181,8 @@
     "change": "Change avatar",
     "remove": "Remove",
     "uploadFailed": "Upload failed.",
-    "loginRequired": "Sign in for avatar."
+    "loginRequired": "Sign in for avatar.",
+    "shapeHint": "💡 Choose a square photo so it won't be cropped or stretched."
   },
 
   "search": {

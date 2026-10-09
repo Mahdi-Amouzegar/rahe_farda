@@ -138,6 +138,10 @@ export async function renderAvatarSettings() {
     current.appendChild(choose);
     current.appendChild(remove);
     box.appendChild(current);
+    const hint = document.createElement('p');
+    hint.className = 'settings-note';
+    hint.textContent = tr('avatar.shapeHint', '💡 عکس مربعی انتخاب کنید تا کراپ یا کشیده نشود.');
+    box.appendChild(hint);
     box.appendChild(input);
 
     function el_row() {
