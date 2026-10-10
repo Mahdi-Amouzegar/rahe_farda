@@ -73,6 +73,29 @@ export function nearestUpcoming(task) {
         .sort((a, b) => new Date(a.at) - new Date(b.at))[0] || null;
 }
 
+/**
+ * هشدار سررسید چند دقیقه قبل است (همان پنجره‌ی شاخه due در notify.js).
+ */
+export const NEAR_DUE_MIN = 5;
+
+/**
+ * مهلت جبران هشدار سررسید بعد از گذشتن زمان (تب بسته/throttle/رفرش دیر).
+ */
+export const DUE_CATCH_UP_MS = 15 * 60 * 1000;
+
+/**
+ * آیا هشدار سررسید باید شلیک کند؟ (10.11 — خالص و تست‌پذیر)
+ *
+ * قبلاً شرط `now < v` داشت: در خود لحظه سررسید هیچ‌وقت شلیک نمی‌شد و اگر
+ * تیک حلقه دقیق در پنجره ۲دقیقه‌ای قبلش نمی‌افتاد، هشدار برای همیشه می‌پرید.
+ * حالا: از ۵ دقیقه قبل تا ۱۵ دقیقه بعد از سررسید.
+ */
+export function isDueFireable(nowMs, atMs, remindedDue) {
+    if (remindedDue) return false;
+    if (!Number.isFinite(atMs)) return false;
+    return nowMs >= atMs - NEAR_DUE_MIN * 60 * 1000 && nowMs - atMs <= DUE_CATCH_UP_MS;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Plan range (فاز ۱۱ آیتم ۷: اعتبارسنجی دوسویه شروع/پایان)
 // ═══════════════════════════════════════════════════════════════════════════

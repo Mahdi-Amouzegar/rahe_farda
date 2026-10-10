@@ -2,7 +2,8 @@
 // test/store.test.js — تست‌های sanitization
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur } from '../js/store.js';
+import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur } from '../js/store.js';
+import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -323,5 +324,49 @@ describe('store — advanceRecur anchoring 10.11', () => {
         expect(advanceRecur(task)).toBe(true);
         expect(new Date(task.sessions[1].at).getDay()).toBe(want);
         expect(new Date(task.sessions[1].at).getTime()).toBeGreaterThan(last.getTime());
+    });
+});
+
+describe('store — rollforwardRecur 10.11', () => {
+    const NOW = Date.now();
+    const past = new Date(NOW - 2 * 86400000).toISOString();
+    it('روزانه گذشته را تا آینده جلو می‌برد', () => {
+        const tasks = [{ id: 't1', text: 'x', recur: 'daily', completed: false, archived: false, sessions: [{ id: 's1', at: past }] }];
+        const out = rollforwardRecur(tasks, NOW);
+        expect(out).toEqual(['t1']);
+        const latest = Math.max(...tasks[0].sessions.map(s => new Date(s.at).getTime()));
+        expect(latest).toBeGreaterThan(NOW);
+    });
+    it('آینده‌دار/تکمیل‌شده/بدون قانون/بدون جلسه را دست نمی‌زند', () => {
+        const future = new Date(NOW + 86400000).toISOString();
+        const tasks = [
+            { id: 'a', text: 'x', recur: 'daily', sessions: [{ id: 's', at: future }] },
+            { id: 'b', text: 'x', recur: 'daily', completed: true, sessions: [{ id: 's', at: past }] },
+            { id: 'c', text: 'x', recur: 'none', sessions: [{ id: 's', at: past }] },
+            { id: 'd', text: 'x', recur: 'daily', sessions: [] },
+        ];
+        expect(rollforwardRecur(tasks, NOW)).toEqual([]);
+        expect(tasks[0].sessions.length).toBe(1);
+    });
+    it('فرزند plan را هم جلو می‌برد', () => {
+        const tasks = [{ id: 'p', text: 'x', kind: 'plan', sessions: [], children: [
+            { id: 'c1', text: 'y', recur: 'daily', sessions: [{ id: 's', at: past }] },
+        ] }];
+        const out = rollforwardRecur(tasks, NOW);
+        expect(out).toContain('c1');
+    });
+});
+
+describe('sessions — isDueFireable 10.11', () => {
+    const V = new Date('2026-10-10T12:00:00.000Z').getTime();
+    it('۵ دقیقه قبل و لحظه سررسید شلیک می‌کند', () => {
+        expect(isDueFireable(V - 5 * 60000, V, false)).toBe(true);
+        expect(isDueFireable(V, V, false)).toBe(true);
+        expect(isDueFireable(V + 60 * 1000, V, false)).toBe(true);
+    });
+    it('بعد از مهلت جبران یا با flag شلیک نمی‌کند', () => {
+        expect(isDueFireable(V + DUE_CATCH_UP_MS + 1000, V, false)).toBe(false);
+        expect(isDueFireable(V, V, true)).toBe(false);
+        expect(isDueFireable(V - 6 * 60000, V, false)).toBe(false);
     });
 });

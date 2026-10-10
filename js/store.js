@@ -1330,6 +1330,77 @@ export function advanceRecur(task) {
     return true;
 }
 
+/**
+ * سقف قدم برای جلو بردن خودکار (غیبت طولانی + پریود کوتاه نباید هزاران جلسه بسازد).
+ */
+const ROLLFORWARD_GUARD = 366;
+
+/**
+ * جلو بردن خودکار سری‌های قانونیِ تاریخ‌گذشته (10.11 — خالص روی آرایه، تست‌پذیر).
+ *
+ * مسئله: `advanceRecur` فقط موقع تکمیل صدا زده می‌شود؛ پس جلسه‌ای که زمانش گذشته
+ * تا ابد «overdue» می‌ماند و یادآور بعدی هرگز ساخته نمی‌شود. این تابع در حلقه‌ی
+ * یادآور (هر ۶۰ ثانیه) اجرا می‌شود و آخرین جلسه را تا آینده جلو می‌برد.
+ *
+ * قواعد:
+ * - بایگانی‌شده/تکمیل‌شده/بدون قانون/بدون جلسه → دست نمی‌خورد (قدیمی‌ها فقط با تکمیل kickstart).
+ * - جلسه‌های گذشته حذف نمی‌شوند (تاریخچه) — فقط آینده‌دار می‌شود.
+ * - اگر guard تمام شد (غیبت خیلی طولانی)، به‌جای انباشت، به یک جلسه آینده از اکنون فرومی‌پاشد.
+ * - مهر updatedAt را دست نمی‌زند؛ `saveTasks` بعدی via dirty-diff مهر+op را می‌سازد.
+ *
+ * @param {object[]} tasks — معمولاً state.tasks
+ * @param {number} nowMs
+ * @returns {string[]} id تسک‌های سطح‌بالا/فرزندِ جلو برده‌شده (برای رندر زنده)
+ */
+export function rollforwardRecur(tasks, nowMs) {
+    const advanced = [];
+    const latestOf = (list) => {
+        let m = -Infinity;
+        for (const s of list) {
+            const v = new Date(s.at).getTime();
+            if (Number.isFinite(v) && v > m) m = v;
+        }
+        return m;
+    };
+    const visit = (t) => {
+        if (!t || t.archived || t.completed) return false;
+        if (!t.recur || t.recur === 'none') return false;
+        const list = t.sessions;
+        if (!Array.isArray(list) || list.length === 0) return false;
+        if (!(latestOf(list) <= nowMs)) return false;
+        let changed = false;
+        let guard = 0;
+        while (guard++ < ROLLFORWARD_GUARD) {
+            if (!(latestOf(list) <= nowMs)) break;
+            if (!advanceRecur(t)) break;
+            changed = true;
+        }
+        if (changed && latestOf(list) <= nowMs) {
+            // غیبت طولانی: فروپاشی به یک جلسه آینده از اکنون (به‌جای هزاران جلسه گذشته)
+            const scratch = {
+                recur: t.recur,
+                recurN: t.recurN,
+                recurDays: Array.isArray(t.recurDays) ? [...t.recurDays] : [],
+                sessions: [{ id: uid(), at: new Date(nowMs).toISOString() }],
+            };
+            if (advanceRecur(scratch) && scratch.sessions.length > 1) {
+                t.sessions = scratch.sessions.slice(-1);
+            }
+        }
+        return changed;
+    };
+    for (const t of tasks || []) {
+        if (!t) continue;
+        if (visit(t)) advanced.push(String(t.id));
+        if (t.kind === 'plan' && Array.isArray(t.children)) {
+            for (const c of t.children) {
+                if (visit(c)) advanced.push(String(c.id));
+            }
+        }
+    }
+    return advanced;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Trash
 // ═══════════════════════════════════════════════════════════════════════════

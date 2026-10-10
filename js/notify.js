@@ -10,8 +10,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { state } from './core.js';
-import { findTask, saveTasks } from './store.js';
-import { allSessions, faShort, dayKey } from './sessions.js';
+import { findTask, saveTasks, rollforwardRecur } from './store.js';
+import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
+import { events, EV } from './events.js';
 import { getNow } from './time.js';
 import { savePrefs } from './map.js';
 import { formatNumber, getLang, t as i18nT } from './i18n.js';
@@ -389,8 +390,31 @@ export function checkReminders() {
     if (!state.prefs.remindOn) return;
     if (!notifGranted()) return;
     const now = Date.now();
-    const REMINDER_GRACE = 2 * 60 * 1000;
-    const NEAR_DUE_MIN = 5;
+
+    // ⚠️ 10.11: اول سری‌های تاریخ‌گذشته را جلو ببر تا جلسه آینده materialize شود؛
+    // وگرنه نه یادآور بعدی می‌آید نه نمایش زنده درست می‌شود.
+    let advanced = [];
+    try {
+        advanced = rollforwardRecur(state.tasks, now);
+    } catch {
+        advanced = [];
+    }
+    if (advanced.length > 0) {
+        try { saveTasks(); } catch { /* saveTasks خودش لاگ می‌کند */ }
+        // رندر زنده فقط وقتی صفحه دیده می‌شود (در تب مخفی: persist می‌شود ولی repaint نه)
+        if (typeof document === 'undefined' || !document.hidden) {
+            try { events.emit(EV.UI_RENDER_REQUESTED); } catch { /* silent */ }
+            try {
+                const openId = state.currentDetailId != null ? String(state.currentDetailId) : null;
+                if (openId && advanced.includes(openId)) {
+                    import('./detail.js').then(m => {
+                        try { m.renderDetailSessions(); } catch { /* silent */ }
+                    }).catch(() => {});
+                }
+            } catch { /* silent */ }
+        }
+    }
+
     allSessions(true).forEach(s => {
         const rm = (s.remindMin != null) ? s.remindMin : state.prefs.remindMin;
         const v = new Date(s.at).getTime();
@@ -414,9 +438,9 @@ export function checkReminders() {
             }
         }
 
-        // ۲. هشدار ۵ دقیقه قبل (همیشه، مستقل از rm)
-        const nearDueTarget = v - NEAR_DUE_MIN * 60 * 1000;
-        if (!s.remindedDue && now >= nearDueTarget && now < v && now - nearDueTarget <= REMINDER_GRACE) {
+        // ۲. هشدار سررسید: ۵ دقیقه قبل + لحظه سررسید + جبران عقب‌افتادگی (تب بسته/رفرش دیر).
+        // ⚠️ 10.11: قبلاً `now < v` داشت و در خود لحظه سررسید هیچ‌وقت شلیک نمی‌شد.
+        if (isDueFireable(now, v, s.remindedDue)) {
             fireNotification(
                 i18nT('notifications.reminder.dueSoonTitle'),
                 `${s.owner} — ${faShort(s.at)}`,
