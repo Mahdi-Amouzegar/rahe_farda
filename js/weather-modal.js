@@ -83,10 +83,16 @@ function openModal() {
     const modal = document.getElementById('weatherModal');
     if (!modal) return;
     modal.hidden = false;
+    // ⚠️ 10.11/UX-02: ریست اسکرول به بالا — وگرنه فوکوس دکمه «بستن» (پایین مودال)
+    // مودال بلند اسکرول‌پذیر را به پایین می‌پرد و عنوان دیده نمی‌شود.
+    try {
+        const scroller = modal.querySelector('.picker');
+        if (scroller) scroller.scrollTop = 0;
+    } catch { /* silent */ }
     if (_weatherTrapCleanup) _weatherTrapCleanup();
     _weatherTrapCleanup = trapFocus(modal);
     const closeBtn = document.getElementById('weatherModalOk');
-    if (closeBtn) setTimeout(() => closeBtn.focus(), 60);
+    if (closeBtn) setTimeout(() => closeBtn.focus({ preventScroll: true }), 60);
 }
 
 function closeModal() {
