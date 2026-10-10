@@ -27,6 +27,7 @@ import {
 import {
     enqueueUpload as enqueueMediaUpload,
 } from './media-upload.js';
+import { dataUrlToBlob } from './media.js';
 import { getDetailBridgeTask, saveSharedTask as persistSharedTask } from './tasks/source.js';
 
 async function saveSharedTask(task) {
@@ -714,8 +715,13 @@ async function enqueueNewPhotosForTask(task) {
         // ─── تبدیل dataUrl به Blob ───
         let blob;
         try {
-            const res = await fetch(photo.dataUrl);
-            blob = await res.blob();
+            if (typeof photo.dataUrl === 'string' && photo.dataUrl.startsWith('data:')) {
+                // ⚠️ 10.11/BUG-02: بدون fetch — fetch روی data:URL تابع CSP connect-src است و بلاک می‌شود.
+                blob = dataUrlToBlob(photo.dataUrl);
+            } else {
+                const res = await fetch(photo.dataUrl);
+                blob = await res.blob();
+            }
         } catch (err) {
             console.warn('[store] failed to convert dataUrl to blob:', err);
             continue;

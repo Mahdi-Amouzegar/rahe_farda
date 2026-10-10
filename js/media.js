@@ -111,6 +111,36 @@ export function formatBytes(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+/**
+ * تبدیل data:URL به Blob — خالص، بدون fetch.
+ *
+ * ⚠️ 10.11/BUG-02: `fetch(dataUrl)` تابع CSP connect-src است و در مرورگر بلاک می‌شود،
+ * پس آپلود مدیا بی‌صدا رد می‌شد. این تابع هیچ I/O ندارد.
+ *
+ * @param {string} dataUrl
+ * @returns {Blob}
+ * @throws {Error} اگر data:URL معتبر نباشد
+ */
+export function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+        throw new Error('invalid data URL');
+    }
+    const comma = dataUrl.indexOf(',');
+    if (comma < 0) throw new Error('invalid data URL');
+    const meta = dataUrl.slice(5, comma);
+    const body = dataUrl.slice(comma + 1);
+    const mime = (meta.split(';')[0] || '').trim() || 'application/octet-stream';
+    let bytes;
+    if (meta.includes('base64')) {
+        const bin = atob(body);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else {
+        bytes = new TextEncoder().encode(decodeURIComponent(body));
+    }
+    return new Blob([bytes], { type: mime });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Validation
 // ═══════════════════════════════════════════════════════════════════════════
