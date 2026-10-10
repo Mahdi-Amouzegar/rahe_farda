@@ -2,8 +2,8 @@
 // test/store.test.js — تست‌های sanitization
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeUrl, validLoc, sanitizeTask } from '../js/store.js';
-import { MAX_LENGTH } from '../js/core.js';
+import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks } from '../js/store.js';
+import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
     it('URL کامل https را حفظ می‌کند', () => {
@@ -252,5 +252,31 @@ describe('store — sanitizeTask', () => {
     it('recur معتبر را حفظ می‌کند', () => {
         expect(sanitizeTask({ ...baseTask, recur: 'daily' }).recur).toBe('daily');
         expect(sanitizeTask({ ...baseTask, recur: 'weekly' }).recur).toBe('weekly');
+    });
+});
+
+describe('store — photo round-trip 10.11/BUG-01', () => {
+    it('عکس بعد از saveTasks و loadTasks می‌ماند', async () => {
+        const id = uid();
+        state.tasks = [{
+            id,
+            text: 'تست عکس',
+            photos: [{
+                id: uid(),
+                dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+                addedAt: new Date().toISOString(),
+                contentType: 'image/png',
+                sizeBytes: 100,
+            }],
+            mediaIds: [],
+        }];
+        await saveTasks();
+        state.tasks = [];
+        await loadTasks();
+        const found = state.tasks.find(t => String(t.id) === String(id));
+        expect(found).toBeTruthy();
+        expect(Array.isArray(found.photos)).toBe(true);
+        expect(found.photos.length).toBe(1);
+        state.tasks = [];
     });
 });

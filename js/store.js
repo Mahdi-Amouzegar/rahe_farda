@@ -537,6 +537,15 @@ export async function loadTasks() {
         } catch {
             raw = [];
         }
+    } else {
+        // ⚠️ 10.11: مسیر fallback باید بخواند — وگرنه save (localStorage) و load نامتقارن است و بعد رفرش همه‌چیز می‌پرد.
+        try {
+            const s = localStorage.getItem('spaceTodoTasks');
+            const parsed = s ? JSON.parse(s) : [];
+            raw = Array.isArray(parsed) ? parsed : [];
+        } catch {
+            raw = [];
+        }
     }
     state.tasks = raw
         .filter(t => t && typeof t.id !== 'undefined' && typeof t.text === 'string' && t.text.trim() !== '')

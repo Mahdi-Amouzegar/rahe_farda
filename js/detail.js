@@ -13,7 +13,7 @@
 
 import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
-import { findTask, saveTasks, moveToTrashById, sanitizeUrl } from './store.js';
+import { findTask, saveTasks, enqueueDirtyTasks, moveToTrashById, sanitizeUrl } from './store.js';
 import { faShort, hasSessionAt, parseDateText, validatePlanRange } from './sessions.js';
 import {
     processImageFile,
@@ -1183,7 +1183,10 @@ export function bindDetailInputs() {
         }
 
         if (successCount > 0) {
-            saveTasks();
+            // ⚠️ 10.11/BUG-01: await تا commit واقعی IDB + ساخت op سینک انجام شود؛
+            // وگرنه رفرش سریع بعد از پیش‌نمایش = از دست رفتن عکس (موفقیت فقط بعد از durability).
+            await saveTasks();
+            await enqueueDirtyTasks().catch(() => {});
             await renderDetailPhotos();
             call('render');
         }
@@ -1255,7 +1258,9 @@ export function bindDetailInputs() {
             task.photos = (task.photos || []).filter(p => String(p.id) !== String(photoId));
             task.mediaIds = (task.mediaIds || []).filter(id => String(id) !== String(photoId));
 
-            saveTasks();
+            // ⚠️ 10.11/BUG-01: همان race حذف — await تا حذف durable شود.
+            await saveTasks();
+            await enqueueDirtyTasks().catch(() => {});
             await renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
             call('render');
             flashSaved(i18nT('detail.photo.deleted'));

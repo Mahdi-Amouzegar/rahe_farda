@@ -2601,9 +2601,11 @@ taskList.addEventListener('dblclick', e => {
     if (!textEl) return;
     const scopeEl = textEl.closest('.child-item') || textEl.closest('.task-item');
     if (!scopeEl) return;
-    const role = getSharedRole(scopeEl.dataset.id);
-    if (role && !role.mine) return;
-    startEdit(scopeEl.dataset.id);
+    // ⚠️ 10.11/UX-01: دابل‌کلیک روی نام در هر سه فضا (شخصی/پیام/گروه) → صفحه جزئیات.
+    // ویرایش درون‌خطی از دکمه edit می‌ماند.
+    const id = scopeEl.dataset.id;
+    if (getSharedRole(id)) openSharedDetail(id);
+    else openDetail(id);
 });
 
 taskList.addEventListener('keydown', e => {
