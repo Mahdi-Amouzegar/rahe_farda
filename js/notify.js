@@ -387,12 +387,11 @@ function markReminded(taskId, sessId, which) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function checkReminders() {
-    if (!state.prefs.remindOn) return;
-    if (!notifGranted()) return;
     const now = Date.now();
 
-    // ⚠️ 10.11: اول سری‌های تاریخ‌گذشته را جلو ببر تا جلسه آینده materialize شود؛
-    // وگرنه نه یادآور بعدی می‌آید نه نمایش زنده درست می‌شود.
+    // ⚠️ 10.11-fix: جلو بردن داده مستقل از تنظیم اعلان است — اگر پشت گیت‌های
+    // remindOn/notifGranted باشد، با اعلان خاموش due-line هرگز زنده نمی‌شود.
+    // (یادآورها پایین‌تر همچنان گیت خودشان را دارند.)
     let advanced = [];
     try {
         advanced = rollforwardRecur(state.tasks, now);
@@ -414,6 +413,9 @@ export function checkReminders() {
             } catch { /* silent */ }
         }
     }
+
+    if (!state.prefs.remindOn) return;
+    if (!notifGranted()) return;
 
     allSessions(true).forEach(s => {
         const rm = (s.remindMin != null) ? s.remindMin : state.prefs.remindMin;

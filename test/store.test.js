@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
+import { checkReminders } from '../js/notify.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -368,5 +369,24 @@ describe('sessions — isDueFireable 10.11', () => {
         expect(isDueFireable(V + DUE_CATCH_UP_MS + 1000, V, false)).toBe(false);
         expect(isDueFireable(V, V, true)).toBe(false);
         expect(isDueFireable(V - 6 * 60000, V, false)).toBe(false);
+    });
+});
+
+describe('notify — checkReminders 10.11-fix', () => {
+    it('جلو بردن داده مستقل از خاموش بودن اعلان است', () => {
+        const prev = state.prefs.remindOn;
+        state.prefs.remindOn = false;
+        try {
+            const past = new Date(Date.now() - 2 * 86400000).toISOString();
+            state.tasks = [{ id: 'r1', text: 'x', recur: 'daily', completed: false, archived: false, sessions: [{ id: 's', at: past }] }];
+            checkReminders();
+            const t = state.tasks.find(x => String(x.id) === 'r1');
+            const latest = Math.max(...t.sessions.map(s => new Date(s.at).getTime()));
+            expect(latest).toBeGreaterThan(Date.now());
+        } finally {
+            state.prefs.remindOn = prev;
+            state.tasks = [];
+            try { localStorage.removeItem('spaceTodoTasks'); } catch { /* silent */ }
+        }
     });
 });
