@@ -46,6 +46,8 @@ export const state = {
     seriesType: 'daily',
     seriesN: 8,
     seriesDays: [],
+    // ⚠️ 10.11: شروع دوره (اولین جلسه) — برای سری‌های قانونی اجباری است
+    seriesFirstAt: null,
     prefs: {
         mapVisible: true,
         remindOn: true,

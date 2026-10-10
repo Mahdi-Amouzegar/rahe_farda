@@ -2,7 +2,7 @@
 // test/store.test.js — تست‌های sanitization
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks } from '../js/store.js';
+import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur } from '../js/store.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -278,5 +278,50 @@ describe('store — photo round-trip 10.11/BUG-01', () => {
         expect(Array.isArray(found.photos)).toBe(true);
         expect(found.photos.length).toBe(1);
         state.tasks = [];
+    });
+});
+
+describe('store — validateSeriesStart 10.11', () => {
+    const NOW = new Date('2026-10-10T12:00:00.000Z').getTime();
+    it('خالی را رد می‌کند', () => {
+        expect(validateSeriesStart(null, NOW).ok).toBe(false);
+        expect(validateSeriesStart('', NOW).error).toBe('tasks.series.firstRequired');
+    });
+    it('گذشته و اکنون را رد می‌کند', () => {
+        expect(validateSeriesStart('2026-10-09T12:00:00.000Z', NOW).error).toBe('tasks.series.firstMustBeFuture');
+        expect(validateSeriesStart('2026-10-10T12:00:00.000Z', NOW).ok).toBe(false);
+        expect(validateSeriesStart('not-a-date', NOW).ok).toBe(false);
+    });
+    it('آینده را با ISO نرمال قبول می‌کند', () => {
+        const r = validateSeriesStart('2026-10-11T08:30:00.000Z', NOW);
+        expect(r.ok).toBe(true);
+        expect(r.at).toBe('2026-10-11T08:30:00.000Z');
+    });
+});
+
+describe('store — advanceRecur anchoring 10.11', () => {
+    it('روزانه: روز بعد با همان ساعت', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const task = { recur: 'daily', sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(task.sessions.length).toBe(2);
+        const next = new Date(task.sessions[1].at);
+        expect(next.getHours()).toBe(last.getHours());
+        expect(next.getDate()).toBe(new Date(last.getTime() + 86400000).getDate());
+        expect(next.getTime()).toBeGreaterThan(last.getTime());
+    });
+    it('ساعتی: دقیقاً N ساعت بعد', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const task = { recur: 'hourly', recurN: 3, sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe(3 * 3600 * 1000);
+    });
+    it('روزهای هفته: نزدیک‌ترین روز آینده', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const want = (last.getDay() + 2) % 7; // دوری که قطعاً امروز/فردا نیست
+        const task = { recur: 'weeklyDays', recurDays: [want], sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(new Date(task.sessions[1].at).getDay()).toBe(want);
+        expect(new Date(task.sessions[1].at).getTime()).toBeGreaterThan(last.getTime());
     });
 });

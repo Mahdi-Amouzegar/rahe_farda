@@ -34,7 +34,7 @@ async function saveSharedTask(task) {
     const res = await persistSharedTask(task);
     if (!res || !res.ok) throw new Error('saveSharedTask failed');
 }
-import { formatNumber } from './i18n.js';
+import { formatNumber, t } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ثابت‌های Media (Stage D)
@@ -1235,6 +1235,27 @@ export function planDueKey(g) {
 // Recur
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * اعتبارسنجی شروع دوره (10.11 — خالص و تست‌پذیر).
+ *
+ * سری قانونی بدون «اولین جلسه‌ی بعد از اکنون» ثبت نمی‌شود؛ وگرنه دوره
+ * همان لحظه‌ی ساخت مرده به دنیا می‌آید (نه یادآور، نه نقطه، نه تمدید).
+ *
+ * @param {string|null} at — ISO اولین جلسه
+ * @param {number} nowMs — مرجع «اکنون» (برای تست تزریق می‌شود)
+ * @returns {{ok:boolean, at?:string, error?:string}}
+ */
+export function validateSeriesStart(at, nowMs) {
+    if (at === null || at === undefined || at === '') {
+        return { ok: false, error: 'tasks.series.firstRequired' };
+    }
+    const v = new Date(at).getTime();
+    if (!Number.isFinite(v) || v <= nowMs) {
+        return { ok: false, error: 'tasks.series.firstMustBeFuture' };
+    }
+    return { ok: true, at: new Date(v).toISOString() };
+}
+
 function daysInMonth(gy, gm) {
     return new Date(gy, gm + 1, 0).getDate();
 }
@@ -1457,7 +1478,6 @@ export function buildTaskFromComposer(forceKind) {
             sessions.sort((a, b) => new Date(a.at) - new Date(b.at));
         } else if (['hourly', 'daily', 'weekly', 'monthly'].includes(state.seriesType)) {
             recur = state.seriesType;
-            sessions = [];
         } else if (state.seriesType === 'hourlyN') {
             const n = parseInt(document.getElementById('seriesN').value, 10);
             if (!(n >= 1 && n <= 168)) {
@@ -1467,7 +1487,6 @@ export function buildTaskFromComposer(forceKind) {
             }
             recur = 'hourly';
             recurN = n;
-            sessions = [];
         } else if (state.seriesType === 'weeklyDays' || state.seriesType === 'monthlyDays') {
             if (!state.seriesDays.length) {
                 if (errEl) errEl.textContent = 'حداقل یک روز انتخاب کنید';
@@ -1476,7 +1495,17 @@ export function buildTaskFromComposer(forceKind) {
             }
             recur = state.seriesType;
             recurDays = [...state.seriesDays];
-            sessions = [];
+        }
+        // ⚠️ 10.11: سری قانونی با «اولین جلسه‌ی بعد از اکنون» متولد می‌شود (اجباری، تصمیم کاربر).
+        // از همان جلسه، advanceRecur جلسه‌های بعدی را می‌سازد.
+        if (state.seriesType !== 'dates' && recur !== 'none') {
+            const start = validateSeriesStart(state.seriesFirstAt, Date.now());
+            if (!start.ok) {
+                if (errEl) errEl.textContent = t(start.error);
+                input.focus();
+                return null;
+            }
+            sessions = [{ id: uid(), at: start.at, reminded: false, remindMin: null, location: null }];
         }
     }
     const newTask = {
@@ -1522,6 +1551,10 @@ export function resetComposerForm() {
     state.planDraftKids = [];
     state.planDraftStart = null;
     state.planDraftEnd = null;
+    // ⚠️ 10.11: شروع دوره هم ریست می‌شود
+    state.seriesFirstAt = null;
+    const sfc = document.getElementById('seriesFirstChip');
+    if (sfc) { sfc.hidden = true; sfc.textContent = ''; }
     call('renderPlanKids');
     document.getElementById('descInput').value = '';
     document.getElementById('prioritySelect').value = 'medium';

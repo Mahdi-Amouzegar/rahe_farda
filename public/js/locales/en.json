@@ -555,7 +555,10 @@
       "monthlyDays": "Days of month…",
       "dates": "Due date",
       "everyNHours": "Every how many hours?",
-      "addDate": "＋ Add due date"
+      "addDate": "＋ Add due date",
+      "firstDate": "＋ First session",
+      "firstRequired": "Pick the first session",
+      "firstMustBeFuture": "First session must be in the future"
     },
     "drag": {
       "sortHint": "To reorder, drag cards in \"Manual\" mode"

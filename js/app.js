@@ -912,6 +912,11 @@ export function setKind(kind) {
         state.planDraftEnd = null;
     }
 
+    // ⚠️ 10.11: خروج از حالت دوره → شروع دوره پاک می‌شود (وگرنه در ساخت بعدی reuse می‌شود)
+    if (!isSeries && state.seriesFirstAt) {
+        state.seriesFirstAt = null;
+    }
+
     if (state.addDraftSessions.length && isSeries) {
         state.addDraftSessions = [];
         updateDueChips();
@@ -1003,6 +1008,25 @@ function updateDueRow() {
     } else {
         dueChipsManager.restore();
     }
+    renderSeriesFirst();
+}
+
+/**
+ * نمایش اولین جلسه دوره (10.11 — فقط سری‌های قانونی).
+ */
+function renderSeriesFirst() {
+    const btn = document.getElementById('seriesFirstBtn');
+    const chip = document.getElementById('seriesFirstChip');
+    const show = state.pendingKind === 'series' && state.seriesType !== 'dates';
+    if (btn) btn.hidden = !show;
+    if (!chip) return;
+    if (!show || !state.seriesFirstAt) {
+        chip.hidden = true;
+        chip.textContent = '';
+        return;
+    }
+    chip.hidden = false;
+    chip.textContent = '📅 ' + faShort(state.seriesFirstAt);
 }
 
 function syncDisclosure() {
@@ -1072,6 +1096,11 @@ document.querySelectorAll('[data-srecur]').forEach(b => {
         document.getElementById('seriesSubWeek').hidden = state.seriesType !== 'weeklyDays';
         document.getElementById('seriesSubMonth').hidden = state.seriesType !== 'monthlyDays';
         updateDueRow();
+        // ⚠️ 10.11: رفتن به «تاریخ سررسید» شروع دوره را پاک می‌کند؛ بین قانون‌ها می‌ماند
+        if (state.seriesType === 'dates' && state.seriesFirstAt) {
+            state.seriesFirstAt = null;
+        }
+        renderSeriesFirst();
         if (state.seriesType !== 'dates' && state.addDraftSessions.length) {
             state.addDraftSessions = [];
             updateDueChips();
@@ -1134,6 +1163,13 @@ document.querySelectorAll('.mobile-tab').forEach(b => {
     b.addEventListener('click', () => switchToTab(b.dataset.tab));
 });
 document.getElementById('seriesAddDate').addEventListener('click', () => openPicker('add'));
+// ⚠️ 10.11: اولین جلسه دوره (اجباری برای سری‌های قانونی) — تک‌انتخابی، جایگزین می‌شود
+document.getElementById('seriesFirstBtn').addEventListener('click', () => {
+    openPicker('seriesStart', iso => {
+        state.seriesFirstAt = iso;
+        renderSeriesFirst();
+    });
+});
 
 // ─── Plan dates in add form ───
 const planStartBtnForm = document.getElementById('planStartBtn');
