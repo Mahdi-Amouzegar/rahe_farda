@@ -283,6 +283,7 @@ export function sanitizeTask(t) {
                 at: s.at,
                 reminded: Boolean(s.reminded),
                 remindedDue: Boolean(s.remindedDue),
+                remindedDueSoon: Boolean(s.remindedDueSoon),
                 location: validLoc(s.location),
                 remindMin: (s.remindMin === null || s.remindMin === undefined) ? null
                     : (Number.isFinite(+s.remindMin) && +s.remindMin >= 0 ? Math.floor(+s.remindMin) : null)

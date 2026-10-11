@@ -390,3 +390,31 @@ describe('notify — checkReminders 10.11-fix', () => {
         }
     });
 });
+
+describe('notify — at-due fires with own flag 10.11/BUG-05', () => {
+    it('هشدار لحظه سررسید بعد از ۵دقیقه‌ای هم می‌آید', () => {
+        const seen = [];
+        const prevNotif = globalThis.Notification;
+        globalThis.Notification = class {
+            constructor(title, opts) { seen.push({ title, tag: opts && opts.tag }); }
+        };
+        globalThis.Notification.permission = 'granted';
+        const prevRemind = state.prefs.remindOn;
+        state.prefs.remindOn = true;
+        try {
+            const at = new Date(Date.now() - 30 * 1000).toISOString();
+            state.tasks = [{ id: 'n1', text: 'x', completed: false, archived: false,
+                sessions: [{ id: 'ns1', at, reminded: false, remindedDue: false, remindedDueSoon: true }] }];
+            checkReminders();
+            expect(seen.length).toBe(1);
+            expect(seen[0].title).toBe('notifications.reminder.dueTitle');
+            expect(seen[0].tag).toBe('due-ns1');
+        } finally {
+            if (prevNotif === undefined) delete globalThis.Notification;
+            else globalThis.Notification = prevNotif;
+            state.prefs.remindOn = prevRemind;
+            state.tasks = [];
+            try { localStorage.removeItem('spaceTodoTasks'); } catch { /* silent */ }
+        }
+    });
+});

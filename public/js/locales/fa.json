@@ -1362,7 +1362,8 @@
     },
     "reminder": {
       "title": "⏰ یادآور جلسه",
-      "dueSoonTitle": "🔔 ۵ دقیقه تا جلسه"
+      "dueSoonTitle": "🔔 ۵ دقیقه تا جلسه",
+      "dueTitle": "🔔 زمان جلسه رسید"
     },
     "digest": {
       "title": "📅 برنامه امروز",

@@ -1362,7 +1362,8 @@
     },
     "reminder": {
       "title": "⏰ Session reminder",
-      "dueSoonTitle": "🔔 5 minutes to session"
+      "dueSoonTitle": "🔔 5 minutes to session",
+      "dueTitle": "🔔 Session time"
     },
     "digest": {
       "title": "📅 Today's schedule",

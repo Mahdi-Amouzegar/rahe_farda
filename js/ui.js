@@ -1077,7 +1077,14 @@ export function render() {
 
     // ─── تصمیم renderFull vs renderDiff ───
     const visibleIds = filtered.map(t => String(t.id));
-    const signature = buildRenderSignature(state, visibleIds);
+    // ⚠️ 10.11/BUG-04: امضا فقط idها را می‌دید — افزودن/تغییر جلسه (مثلاً جلو رفتن خودکار
+    // دوره) امضا را عوض نمی‌کرد و due-line کهنه می‌ماند (رفرش دستی با reset امضا درستش می‌کرد).
+    // اثر جلسات هم لحاظ می‌شود؛ snapshotهای diff آرایه sessions را by-ref شر می‌کنند پس به diff اتکا نیست.
+    const sessFp = filtered.map(t =>
+        ((t.sessions || []).map(s => s.at).join(',')) + '#' +
+        (((t.children || []).map(c => (c.sessions || []).map(s => s.at).join(',')).join(';')))
+    ).join('|');
+    const signature = buildRenderSignature(state, visibleIds) + '::' + sessFp;
 
         if (signature !== _lastRenderSignature) {
         renderFull(filtered, total, done);

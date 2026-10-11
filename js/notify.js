@@ -376,7 +376,10 @@ function markReminded(taskId, sessId, which) {
     if (!found) return;
     const s = (found.task.sessions || []).find(x => String(x.id) === String(sessId));
     if (s) {
+        // ⚠️ 10.11/BUG-05: «۵ دقیقه قبل» و «لحظه سررسید» پرچم جدا دارند؛ وگرنه
+        // اولی دومی را برای همیشه می‌بلعد.
         if (which === 'due') s.remindedDue = true;
+        else if (which === 'dueSoon') s.remindedDueSoon = true;
         else s.reminded = true;
         saveTasks();
     }
@@ -440,11 +443,26 @@ export function checkReminders() {
             }
         }
 
-        // ۲. هشدار سررسید: ۵ دقیقه قبل + لحظه سررسید + جبران عقب‌افتادگی (تب بسته/رفرش دیر).
-        // ⚠️ 10.11: قبلاً `now < v` داشت و در خود لحظه سررسید هیچ‌وقت شلیک نمی‌شد.
-        if (isDueFireable(now, v, s.remindedDue)) {
+        // ۲. هشدار ۵ دقیقه قبل (فقط قبل از سررسید، با پرچم خودش).
+        const nearDueTarget = v - NEAR_DUE_MIN * 60 * 1000;
+        if (!s.remindedDueSoon && now >= nearDueTarget && now < v) {
             fireNotification(
                 i18nT('notifications.reminder.dueSoonTitle'),
+                `${s.owner} — ${faShort(s.at)}`,
+                'due-' + s.id
+            ).then(ok => {
+                if (ok) {
+                    playChime(s.owner);
+                    markReminded(s.taskId, s.id, 'dueSoon');
+                }
+            });
+        }
+
+        // ۳. هشدار لحظه سررسید + جبران عقب‌افتادگی (تب بسته/رفرش دیر).
+        // ⚠️ 10.11/BUG-05: پرچمش از شاخه ۲ جداست تا آن را نبلعد؛ و فقط از v به بعد تا دو هشدار هم‌زمان نیاید.
+        if (now >= v && isDueFireable(now, v, s.remindedDue)) {
+            fireNotification(
+                i18nT('notifications.reminder.dueTitle'),
                 `${s.owner} — ${faShort(s.at)}`,
                 'due-' + s.id
             ).then(ok => {
