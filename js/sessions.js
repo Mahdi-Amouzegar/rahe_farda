@@ -352,6 +352,7 @@ export function allSessions(onlyOpen) {
                 priority: t.priority,
                 reminded: Boolean(s.reminded),
                 remindedDue: Boolean(s.remindedDue),
+                remindedDueSoon: Boolean(s.remindedDueSoon),
                 remindMin: s.remindMin != null ? s.remindMin : null
             });
         });
