@@ -123,6 +123,40 @@ export function getSharedItem(id) {
     return _items.find((t) => String(t.id) === String(id)) || null;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// کش مقصدها برای یادآور پس‌زمینه (REQ-02)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// حلقه یادآور باید همه مقصدها (باز یا بسته) را ببیند، ولی fetch دوره‌ای همه
+// سنگین است. راه میانه: آیتم‌های هر مقصدی که لود می‌شود (بازدید یا اسکن
+// پس‌زمینه گیت‌دار) اینجا کش می‌شود و اسکن یادآور فقط همین کش را می‌خواند.
+
+const _sharedCache = new Map(); // destKey -> { items, at }
+const SHARED_CACHE_CAP = 25;
+
+export function sharedCacheKey(dest) {
+    if (!dest) return null;
+    if (dest.type === 'peer' && dest.peerId) return 'peer:' + dest.peerId;
+    if (dest.type === 'group' && dest.groupId) return 'group:' + dest.groupId;
+    return null;
+}
+
+export function cacheSharedItems(key, items) {
+    if (!key) return;
+    _sharedCache.set(key, { items: Array.isArray(items) ? items : [], at: Date.now() });
+    while (_sharedCache.size > SHARED_CACHE_CAP) {
+        _sharedCache.delete(_sharedCache.keys().next().value);
+    }
+}
+
+export function getCachedSharedAll() {
+    const out = [];
+    for (const [, c] of _sharedCache) {
+        if (c && Array.isArray(c.items)) out.push(...c.items);
+    }
+    return out;
+}
+
 export function getSharedRole(id) {
     const item = getSharedItem(id);
     if (!item || !item._shared) return null;
@@ -165,6 +199,8 @@ export async function refreshSharedList() {
             return res;
         }
         _items = res.items || [];
+        // ⚠️ REQ-02: بازدید هم کش یادآور را تازه می‌کند
+        cacheSharedItems(sharedCacheKey(dest), _items);
         return { ok: true, items: _items };
     } finally {
         _loading = false;
@@ -174,6 +210,7 @@ export async function refreshSharedList() {
 // ⚠️ فقط برای تست
 export function __resetSharedForTest() {
     _items = [];
+    _sharedCache.clear();
     _loading = false;
     _error = null;
     _detailBridge = null;

@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
 import { checkReminders, collectSharedDue } from '../js/notify.js';
+import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -437,5 +438,27 @@ describe('notify — collectSharedDue REQ-02', () => {
         expect(collectSharedDue(items, V + 1000, flags)).toEqual([]);
         const arch = [{ id: 'x', text: 't', archived: true, sessions: [{ id: 's', at: new Date(V).toISOString() }] }];
         expect(collectSharedDue(arch, V + 1000, {})).toEqual([]);
+    });
+    it('جلسه تکراری در ورودی دوبار هشدار نمی‌دهد', () => {
+        const dup = [...items, { id: 'g1', text: 't', archived: false,
+            sessions: [{ id: 's1', at: new Date(V).toISOString(), remindMin: null }] }];
+        const out = collectSharedDue(dup, V + 1000, {});
+        expect(out.map(o => o.kind)).toEqual(['due']);
+    });
+});
+
+describe('source — shared cache REQ-02', () => {
+    it('کلید مقصد + کش + خواندن همه', () => {
+        __resetSharedForTest();
+        try {
+            expect(sharedCacheKey({ type: 'peer', peerId: 'p1' })).toBe('peer:p1');
+            expect(sharedCacheKey({ type: 'group', groupId: 'g1' })).toBe('group:g1');
+            expect(sharedCacheKey({ type: 'local' })).toBe(null);
+            cacheSharedItems('peer:p1', [{ id: 'a' }]);
+            cacheSharedItems('group:g1', [{ id: 'b' }, { id: 'c' }]);
+            expect(getCachedSharedAll().map(t => t.id).sort()).toEqual(['a', 'b', 'c']);
+        } finally {
+            __resetSharedForTest();
+        }
     });
 });

@@ -12,7 +12,8 @@
 import { state } from './core.js';
 import { findTask, saveTasks, rollforwardRecur } from './store.js';
 import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
-import { getSharedItems } from './tasks/source.js';
+import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks } from './tasks/source.js';
+import { isOnline } from './net.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
 import { savePrefs } from './map.js';
@@ -423,6 +424,7 @@ function writeSharedRem(map) {
  */
 export function collectSharedDue(items, nowMs, flags) {
     const out = [];
+    const seenKey = new Set();
     const rmDefault = (() => { try { return state.prefs.remindMin; } catch { return null; } })();
     for (const t of items || []) {
         if (!t || t.archived) continue;
@@ -431,6 +433,9 @@ export function collectSharedDue(items, nowMs, flags) {
             const v = new Date(s.at).getTime();
             if (!Number.isFinite(v)) continue;
             const key = `shr:${t.id}:${s.id}`;
+            // ⚠️ نمای فعلی + کش ممکن است هم‌پوشانی داشته باشند — هر جلسه یک بار در هر اسکن.
+            if (seenKey.has(key)) continue;
+            seenKey.add(key);
             const f = (flags && flags[key]) || {};
             const owner = t.text || '';
             const rm = (s.remindMin != null) ? s.remindMin : rmDefault;
@@ -537,12 +542,76 @@ export function checkReminders() {
         }
     });
 
-    // ۴. یادآور مشترک (REQ-02 — محلی هر دستگاه، فقط مقصد لودشده).
+    // ۴. یادآور مشترک (REQ-02 — محلی هر دستگاه، همه مقصدها).
+    // ⚠️ REQ-02 کامل: اول کش همه مقصدها تازه می‌شود (پس‌زمینه گیت‌دار)، بعد اسکن.
     try {
-        const shared = getSharedItems();
-        if (Array.isArray(shared) && shared.length > 0) {
+        refreshSharedCacheForReminders().catch(() => {}).finally(() => {
+            scanCachedShared(now);
+        });
+    } catch { /* silent */ }
+}
+
+/**
+ * تازه‌سازی کش مقصدها برای یادآور (پس‌زمینه: گیت ورود/آنلاین/هم‌پوشانی، best-effort).
+ */
+let _sharedScanInflight = false;
+
+async function refreshSharedCacheForReminders() {
+    if (_sharedScanInflight) return;
+    let me = null;
+    try { me = state.sync && state.sync.userId ? String(state.sync.userId) : null; } catch { me = null; }
+    if (!me) return;
+    try { if (!isOnline()) return; } catch { return; }
+    _sharedScanInflight = true;
+    try {
+        const [{ listConversations }, { listGroups }] = await Promise.all([
+            import('./communication/conversations.js'),
+            import('./communication/groups.js'),
+        ]);
+        const [convs, groups] = await Promise.all([
+            listConversations().catch(() => null),
+            listGroups().catch(() => null),
+        ]);
+        const jobs = [];
+        const seen = new Set();
+        for (const c of ((convs && convs.conversations) || [])) {
+            const pid = c && c.user && c.user.id;
+            if (!pid) continue;
+            const key = 'peer:' + pid;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const nm = (c.user.displayName || c.user.username || '');
+            jobs.push(
+                fetchPeerTasks(pid, me, nm)
+                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
+                    .catch(() => {})
+            );
+        }
+        for (const g of ((groups && groups.groups) || [])) {
+            if (!g || !g.id) continue;
+            const key = 'group:' + g.id;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            jobs.push(
+                fetchGroupTasks(g.id, me)
+                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
+                    .catch(() => {})
+            );
+        }
+        if (jobs.length > 0) await Promise.all(jobs);
+    } catch { /* silent */ }
+    finally { _sharedScanInflight = false; }
+}
+
+/**
+ * اسکن کش مشترک و شلیک هشدارها.
+ */
+function scanCachedShared(now) {
+    try {
+        const cached = getCachedSharedAll();
+        if (Array.isArray(cached) && cached.length > 0) {
             const flags = readSharedRem();
-            const due = collectSharedDue(shared, now, flags);
+            const due = collectSharedDue(cached, now, flags);
             if (due.length > 0) {
                 for (const d of due) {
                     const titleKey = d.kind === 'due'
