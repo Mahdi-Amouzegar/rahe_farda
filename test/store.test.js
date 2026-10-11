@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders } from '../js/notify.js';
+import { checkReminders, collectSharedDue } from '../js/notify.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -416,5 +416,26 @@ describe('notify — at-due fires with own flag 10.11/BUG-05', () => {
             state.tasks = [];
             try { localStorage.removeItem('spaceTodoTasks'); } catch { /* silent */ }
         }
+    });
+});
+
+describe('notify — collectSharedDue REQ-02', () => {
+    const V = new Date('2026-10-10T12:00:00.000Z').getTime();
+    const items = [{ id: 'g1', text: 't', archived: false,
+        sessions: [{ id: 's1', at: new Date(V).toISOString(), remindMin: null }] }];
+    it('لحظه سررسید را با پرچم خالی برمی‌گرداند', () => {
+        const out = collectSharedDue(items, V + 1000, {});
+        expect(out.map(o => o.kind)).toEqual(['due']);
+        expect(out[0].key).toBe('shr:g1:s1');
+    });
+    it('۴ دقیقه قبل lead و dueSoon را برمی‌گرداند', () => {
+        const out = collectSharedDue(items, V - 4 * 60000, {});
+        expect(out.map(o => o.kind).sort()).toEqual(['dueSoon', 'lead']);
+    });
+    it('پرچم‌های خورده و بایگانی را رد می‌کند', () => {
+        const flags = { 'shr:g1:s1': { reminded: true, remindedDueSoon: true, remindedDue: true } };
+        expect(collectSharedDue(items, V + 1000, flags)).toEqual([]);
+        const arch = [{ id: 'x', text: 't', archived: true, sessions: [{ id: 's', at: new Date(V).toISOString() }] }];
+        expect(collectSharedDue(arch, V + 1000, {})).toEqual([]);
     });
 });

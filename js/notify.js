@@ -12,6 +12,7 @@
 import { state } from './core.js';
 import { findTask, saveTasks, rollforwardRecur } from './store.js';
 import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
+import { getSharedItems } from './tasks/source.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
 import { savePrefs } from './map.js';
@@ -386,6 +387,68 @@ function markReminded(taskId, sessId, which) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Shared reminders — پرچم محلی هر دستگاه (REQ-02)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ چرا محلی؟ پرچم یادآور روی سرور مشترک است — اگر یک طرف ببیند، طرف دیگر
+// نمی‌بیند. وضعیت per-user در سرور نیاز به مایگریشن دارد (خارج از scope)؛
+// پس هر دستگاه برای خودش یادآوری می‌کند (ممکن است هر دستگاه یک بار بگوید).
+// ⚠️ فقط آیتم‌های لودشده مقصد فعلی اسکن می‌شوند (بدون fetch اضافه).
+
+const SHARED_REM_KEY = 'spaceTodoSharedReminded';
+const SHARED_REM_CAP = 300;
+
+function readSharedRem() {
+    try {
+        const v = JSON.parse(localStorage.getItem(SHARED_REM_KEY) || '{}');
+        return v && typeof v === 'object' ? v : {};
+    } catch {
+        return {};
+    }
+}
+
+function writeSharedRem(map) {
+    try {
+        const keys = Object.keys(map);
+        if (keys.length > SHARED_REM_CAP) {
+            for (const k of keys.slice(0, keys.length - SHARED_REM_CAP)) delete map[k];
+        }
+        localStorage.setItem(SHARED_REM_KEY, JSON.stringify(map));
+    } catch { /* silent */ }
+}
+
+/**
+ * کدام جلسه‌های مشترک باید هشدار بدهند؟ (خالص و تست‌پذیر — شلیک نمی‌کند)
+ * @returns {Array<{key:string, owner:string, at:string, kind:'lead'|'dueSoon'|'due', sessId:string}>}
+ */
+export function collectSharedDue(items, nowMs, flags) {
+    const out = [];
+    const rmDefault = (() => { try { return state.prefs.remindMin; } catch { return null; } })();
+    for (const t of items || []) {
+        if (!t || t.archived) continue;
+        for (const s of (t.sessions || [])) {
+            if (!s) continue;
+            const v = new Date(s.at).getTime();
+            if (!Number.isFinite(v)) continue;
+            const key = `shr:${t.id}:${s.id}`;
+            const f = (flags && flags[key]) || {};
+            const owner = t.text || '';
+            const rm = (s.remindMin != null) ? s.remindMin : rmDefault;
+            if (rm && rm > 0 && !f.reminded && nowMs >= v - rm * 60 * 1000 && nowMs < v) {
+                out.push({ key, owner, at: s.at, kind: 'lead', sessId: String(s.id) });
+            }
+            if (!f.remindedDueSoon && nowMs >= v - NEAR_DUE_MIN * 60 * 1000 && nowMs < v) {
+                out.push({ key, owner, at: s.at, kind: 'dueSoon', sessId: String(s.id) });
+            }
+            if (nowMs >= v && isDueFireable(nowMs, v, f.remindedDue)) {
+                out.push({ key, owner, at: s.at, kind: 'due', sessId: String(s.id) });
+            }
+        }
+    }
+    return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Reminders check
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -473,6 +536,35 @@ export function checkReminders() {
             });
         }
     });
+
+    // ۴. یادآور مشترک (REQ-02 — محلی هر دستگاه، فقط مقصد لودشده).
+    try {
+        const shared = getSharedItems();
+        if (Array.isArray(shared) && shared.length > 0) {
+            const flags = readSharedRem();
+            const due = collectSharedDue(shared, now, flags);
+            if (due.length > 0) {
+                for (const d of due) {
+                    const titleKey = d.kind === 'due'
+                        ? 'notifications.reminder.dueTitle'
+                        : (d.kind === 'dueSoon' ? 'notifications.reminder.dueSoonTitle' : 'notifications.reminder.title');
+                    const f = flags[d.key] || (flags[d.key] = {});
+                    fireNotification(
+                        i18nT(titleKey),
+                        `${d.owner} — ${faShort(d.at)}`,
+                        'sh-' + d.kind + '-' + d.sessId
+                    ).then(ok => {
+                        if (!ok) return;
+                        playChime(d.owner);
+                        if (d.kind === 'due') f.remindedDue = true;
+                        else if (d.kind === 'dueSoon') f.remindedDueSoon = true;
+                        else f.reminded = true;
+                        writeSharedRem(flags);
+                    });
+                }
+            }
+        }
+    } catch { /* silent */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
