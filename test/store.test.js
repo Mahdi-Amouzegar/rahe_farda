@@ -420,6 +420,26 @@ describe('notify — at-due fires with own flag 10.11/BUG-05', () => {
     });
 });
 
+describe('notify — legacyNotif tag replace 10.11/BUG-05b', () => {
+    it('نمایش دوم با تگ تکراری، قبلی را می‌بندد تا بنر بی‌صدا جایگزین نشود', async () => {
+        const { legacyNotif } = await import('../js/notify.js');
+        const closed = [];
+        const prevNotif = globalThis.Notification;
+        globalThis.Notification = class {
+            constructor(title, opts) { this.title = title; this.tag = opts && opts.tag; }
+            close() { closed.push(this.tag); }
+        };
+        try {
+            expect(legacyNotif('a', { tag: 'x' })).toBe(true);
+            expect(legacyNotif('b', { tag: 'x' })).toBe(true);
+            expect(closed).toEqual(['x']);
+        } finally {
+            if (prevNotif === undefined) delete globalThis.Notification;
+            else globalThis.Notification = prevNotif;
+        }
+    });
+});
+
 describe('notify — collectSharedDue REQ-02', () => {
     const V = new Date('2026-10-10T12:00:00.000Z').getTime();
     const items = [{ id: 'g1', text: 't', archived: false,

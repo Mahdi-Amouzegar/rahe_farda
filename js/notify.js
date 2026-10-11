@@ -354,9 +354,14 @@ export function playChime(titleText) {
 
 export function fireNotification(title, body, tag) {
     if (!notifGranted()) return Promise.resolve(false);
+    // ⚠️ 10.11-diag: مدرک شلیک (فقط سطح debug — در کنسول عادی دیده نمی‌شود).
+    try { console.debug('[remind] fire:', title, tag); } catch { /* silent */ }
     const opts = { body, tag, icon: 'icons/icon-192.png', dir: 'rtl', lang: 'fa' };
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        return navigator.serviceWorker.ready
+        // ⚠️ 10.11/BUG-05b: اول تگ قبلی بسته می‌شود — وگرنه showNotification با تگ
+        // تکراری بی‌صدا جایگزین می‌کند (renotify پیش‌فرض false) و کاربر فقط صدای chime را می‌شنود.
+        return closeTagNotifications(tag)
+            .then(() => navigator.serviceWorker.ready)
             .then(reg => reg.showNotification(title, opts))
             .then(() => true)
             .catch(() => legacyNotif(title, opts));
@@ -364,9 +369,29 @@ export function fireNotification(title, body, tag) {
     return Promise.resolve(legacyNotif(title, opts));
 }
 
+async function closeTagNotifications(tag) {
+    try {
+        if (!tag || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+        const reg = await navigator.serviceWorker.ready;
+        const list = await reg.getNotifications({ tag });
+        list.forEach(n => { try { n.close(); } catch { /* silent */ } });
+    } catch { /* silent */ }
+}
+
+/** نگهداشت آبجکت‌های legacy برای بستن تگ تکراری (معادل SW در تب بدون worker). */
+const _legacyNotifs = new Map();
+
 export function legacyNotif(title, opts) {
     try {
-        new Notification(title, opts);
+        const n = new Notification(title, opts);
+        const tag = opts && opts.tag;
+        if (tag) {
+            try {
+                const prev = _legacyNotifs.get(tag);
+                if (prev && prev !== n && typeof prev.close === 'function') prev.close();
+            } catch { /* silent */ }
+            _legacyNotifs.set(tag, n);
+        }
         return true;
     } catch {
         return false;
