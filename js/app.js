@@ -1107,10 +1107,30 @@ document.querySelectorAll('[data-srecur]').forEach(b => {
         }
     });
 });
-document.querySelectorAll('[data-snh]').forEach(b => {
-    b.addEventListener('click', () => {
-        document.getElementById('seriesN').value = b.dataset.snh;
-    });
+/**
+ * نمایشگر بازه‌ی ساعتی (series > hourlyN) — دیجیتال، ساعت و دقیقه.
+ *
+ * ⚠️ 10.12: چیپ‌های قبلی هرگز listener نمی‌گرفتند (با کد HTML
+ *    ساخته می‌شدند و binding static بود) — حالا رویداد با
+ *    delegation می‌خوانیم.
+ */
+function renderSeriesDur() {
+    const h = document.getElementById('seriesDurH');
+    const m = document.getElementById('seriesDurM');
+    if (h) h.textContent = formatNumber(String(state.seriesDurH));
+    if (m) m.textContent = formatNumber(String(state.seriesDurM).padStart(2, '0'));
+}
+renderSeriesDur();
+
+document.getElementById('seriesSubHours').addEventListener('click', e => {
+    const b = e.target.closest('[data-dur]');
+    if (!b) return;
+    const op = b.dataset.dur;
+    if (op === 'h+' && state.seriesDurH < 168) state.seriesDurH++;
+    else if (op === 'h-' && state.seriesDurH > 0) state.seriesDurH--;
+    else if (op === 'm+') state.seriesDurM = (state.seriesDurM + 5) % 60;
+    else if (op === 'm-' && state.seriesDurM > 0) state.seriesDurM = Math.max(0, state.seriesDurM - 5);
+    renderSeriesDur();
 });
 document.getElementById('seriesSubWeek').addEventListener('click', e => {
     const b = e.target.closest('[data-swday]');
@@ -1132,23 +1152,8 @@ function renderSeriesMonth() {
     for (let d = 1; d <= 31; d++) h += `<button type="button" class="day-chip" data-smday="${d}">${formatNumber(d)}</button>`;
     mc.innerHTML = h;
 }
-renderSeriesMonth();
 
-/**
- * رندر chip-row ساعت‌ها (series > hourlyN).
- *
- * ⚠️ فاز ۴D.4c-fix: از این پس از JS ساخته می‌شود (نه HTML hardcoded)
- *    تا locale-aware باشد.
- */
-function renderSeriesHours() {
-    const container = document.querySelector('#seriesSubHours .chip-row');
-    if (!container) return;
-    const HOURS = [2, 4, 6, 8, 12, 24];
-    container.innerHTML = HOURS.map(h =>
-        `<button type="button" class="day-chip" data-snh="${h}">${formatNumber(h)}</button>`
-    ).join('');
-}
-renderSeriesHours();
+renderSeriesMonth();
 
 document.getElementById('seriesMonthChips').addEventListener('click', e => {
     const b = e.target.closest('[data-smday]');
@@ -1814,7 +1819,7 @@ if (langBtnEl) {
         resetRenderSignature();
         render();
         renderSeriesMonth();      // ⚠️ فاز ۴D.4c-fix
-        renderSeriesHours();      // ⚠️ فاز ۴D.4c-fix
+        renderSeriesDur();        // ⚠️ 10.12: نمایشگر بازه (locale-aware)
         refreshTimeSelects();     // ⚠️ فاز ۴D.4c-fix
         updateAccountStatusText();
         refreshSoundPresetList();

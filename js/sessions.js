@@ -178,8 +178,12 @@ export function recurBadge(task, cls) {
     let suffix = '';
     if (task.recur === 'custom' && task.recurN > 1) {
         suffix = ' ' + i18nT('recur.everyNDays', { n: formatNumber(task.recurN) });
-    } else if (task.recur === 'hourly' && task.recurN >= 1) {
-        suffix = ' ' + i18nT('recur.everyNHours', { n: formatNumber(task.recurN) });
+    } else if (task.recur === 'hourly' && (task.recurN >= 1 || task.recurMin >= 1)) {
+        suffix = task.recurMin >= 1
+            ? (task.recurN >= 1
+                ? ' ' + i18nT('recur.everyHAndM', { h: formatNumber(task.recurN), m: formatNumber(task.recurMin) })
+                : ' ' + i18nT('recur.everyMinutes', { m: formatNumber(task.recurMin) }))
+            : ' ' + i18nT('recur.everyNHours', { n: formatNumber(task.recurN) });
     } else if (task.recur === 'weeklyDays') {
         suffix = ' ' + i18nT('recur.weeklyDays');
     } else if (task.recur === 'monthlyDays') {

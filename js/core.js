@@ -44,7 +44,8 @@ export const state = {
     planDraftStart: null,
     planDraftEnd: null,
     seriesType: 'daily',
-    seriesN: 8,
+    seriesDurH: 8,
+    seriesDurM: 0,
     seriesDays: [],
     // ⚠️ 10.11: شروع دوره (اولین جلسه) — برای سری‌های قانونی اجباری است
     seriesFirstAt: null,

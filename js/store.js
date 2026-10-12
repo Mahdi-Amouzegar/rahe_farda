@@ -303,6 +303,8 @@ export function sanitizeTask(t) {
             .filter(c => c && typeof c.id !== 'undefined' && typeof c.text === 'string' && c.text.trim() !== '' && c.kind !== 'plan')
             .map(c => sanitizeTask({ ...c, kind: 'task', children: undefined }))
         : [];
+    const recurValid = ['daily', 'weekly', 'monthly', 'custom', 'hourly', 'weeklyDays', 'monthlyDays'].includes(t.recur) ? t.recur : 'none';
+    const recurNum = +t.recurN;
     return {
         id: t.id,
         text: String(t.text).slice(0, MAX_LENGTH),
@@ -322,8 +324,13 @@ export function sanitizeTask(t) {
         kind,
         children,
         pinned: Boolean(t.pinned),
-        recur: ['daily', 'weekly', 'monthly', 'custom', 'hourly', 'weeklyDays', 'monthlyDays'].includes(t.recur) ? t.recur : 'none',
-        recurN: (Number.isFinite(+t.recurN) && +t.recurN >= 1 && +t.recurN <= 365) ? Math.floor(+t.recurN) : null,
+        recur: recurValid,
+        recurN: Number.isFinite(recurNum)
+            ? (recurValid === 'hourly'
+                ? (recurNum >= 0 && recurNum <= 168 ? Math.floor(recurNum) : null)
+                : (recurValid === 'custom' && recurNum >= 1 && recurNum <= 365 ? Math.floor(recurNum) : null))
+            : null,
+        recurMin: (Number.isFinite(+t.recurMin) && +t.recurMin >= 0 && +t.recurMin <= 59) ? Math.floor(+t.recurMin) : 0,
         recurDays: Array.isArray(t.recurDays) ? [...new Set(t.recurDays.map(x => Math.floor(+x)).filter(x => x >= 0 && x <= 31))].slice(0, 31) : [],
         archived: Boolean(t.archived),
         photos: Array.isArray(t.photos) ? t.photos
@@ -1261,7 +1268,7 @@ function daysInMonth(gy, gm) {
     return new Date(gy, gm + 1, 0).getDate();
 }
 
-function addInterval(date, recur, n) {
+function addInterval(date, recur, n, m) {
     const d = new Date(date.getTime());
     if (recur === 'daily') d.setDate(d.getDate() + 1);
     else if (recur === 'weekly') d.setDate(d.getDate() + 7);
@@ -1272,7 +1279,7 @@ function addInterval(date, recur, n) {
         d.setDate(Math.min(day, daysInMonth(d.getFullYear(), d.getMonth())));
     }
     else if (recur === 'custom' && n >= 1) d.setDate(d.getDate() + n);
-    else if (recur === 'hourly' && n >= 1) d.setTime(d.getTime() + n * 3600 * 1000);
+    else if (recur === 'hourly' && (n >= 1 || (m || 0) >= 1)) d.setTime(d.getTime() + (n * 3600 + (m || 0) * 60) * 1000);
     return d;
 }
 
@@ -1310,9 +1317,12 @@ export function advanceRecur(task) {
     const n = r === 'custom'
         ? ((task.recurN >= 1 && task.recurN <= 365) ? task.recurN : 0)
         : r === 'hourly'
-            ? ((task.recurN >= 1 && task.recurN <= 168) ? task.recurN : 0)
+            ? ((task.recurN >= 0 && task.recurN <= 168) ? task.recurN : 0)
             : 0;
-    if ((r === 'custom' || r === 'hourly') && !n) return false;
+    const m = r === 'hourly'
+        ? ((task.recurMin >= 0 && task.recurMin <= 59) ? task.recurMin : 0)
+        : 0;
+    if ((r === 'custom' || r === 'hourly') && !n && !m) return false;
     const list = task.sessions || [];
     let base = Date.now();
     if (list.length) {
@@ -1325,7 +1335,7 @@ export function advanceRecur(task) {
     let next = null;
     if (r === 'weeklyDays') next = nextWeekday(b, task.recurDays);
     else if (r === 'monthlyDays') next = nextMonthday(b, task.recurDays);
-    else next = addInterval(b, r, n);
+    else next = addInterval(b, r, n, m);
     if (!next || next.getTime() <= base) return false;
     task.sessions.push({ id: uid(), at: next.toISOString(), reminded: false, remindMin: null, location: null });
     return true;
@@ -1541,6 +1551,7 @@ export function buildTaskFromComposer(forceKind) {
     const isSeries = kind === 'series';
     let recur = 'none';
     let recurN = null;
+    let recurMin = 0;
     let recurDays = [];
     let sessions = state.addDraftSessions.map(s => ({ ...s }));
     if (isSeries) {
@@ -1551,14 +1562,16 @@ export function buildTaskFromComposer(forceKind) {
         } else if (['hourly', 'daily', 'weekly', 'monthly'].includes(state.seriesType)) {
             recur = state.seriesType;
         } else if (state.seriesType === 'hourlyN') {
-            const n = parseInt(document.getElementById('seriesN').value, 10);
-            if (!(n >= 1 && n <= 168)) {
-                if (errEl) errEl.textContent = 'عدد ساعت بین ۱ تا ۱۶۸ باشد';
+            const h = state.seriesDurH;
+            const m = state.seriesDurM;
+            if (!(h >= 0 && h <= 168) || !(m >= 0 && m <= 59) || (h === 0 && m === 0)) {
+                if (errEl) errEl.textContent = t('tasks.series.durRequired');
                 input.focus();
                 return null;
             }
             recur = 'hourly';
-            recurN = n;
+            recurN = h;
+            recurMin = m;
         } else if (state.seriesType === 'weeklyDays' || state.seriesType === 'monthlyDays') {
             if (!state.seriesDays.length) {
                 if (errEl) errEl.textContent = 'حداقل یک روز انتخاب کنید';
@@ -1588,6 +1601,7 @@ export function buildTaskFromComposer(forceKind) {
         priority: prioritySelect.value,
         recur,
         recurN,
+        recurMin,
         recurDays,
         description: document.getElementById('descInput').value.trim().slice(0, 1000),
         createdAt: new Date().toISOString(),

@@ -319,6 +319,34 @@ describe('store — advanceRecur anchoring 10.11', () => {
         expect(advanceRecur(task)).toBe(true);
         expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe(3 * 3600 * 1000);
     });
+    it('ساعتی با دقیقه: ۳ ساعت و ۲۰ دقیقه بعد (10.12)', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const task = { recur: 'hourly', recurN: 3, recurMin: 20, sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe((3 * 3600 + 20 * 60) * 1000);
+    });
+    it('ساعتی فقط‌دقیقه: ۴۵ دقیقه بعد (10.12)', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const task = { recur: 'hourly', recurN: 0, recurMin: 45, sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe(45 * 60 * 1000);
+    });
+    it('ساعتی با بازه‌ی صفر: جلو نمی‌رود (10.12)', () => {
+        const last = new Date(Date.now() + 3600 * 1000);
+        const task = { recur: 'hourly', recurN: 0, recurMin: 0, sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(false);
+        expect(task.sessions.length).toBe(1);
+    });
+    it('sanitizeTask: recurMin و recurN=۰ ساعتی را می‌پذیرد (10.12)', () => {
+        const r = sanitizeTask({ id: 'x', text: 't', recur: 'hourly', recurN: 0, recurMin: 45, sessions: [] });
+        expect(r.recur).toBe('hourly');
+        expect(r.recurN).toBe(0);
+        expect(r.recurMin).toBe(45);
+    });
+    it('sanitizeTask: recurMin نامعتبر را صفر می‌کند (10.12)', () => {
+        const r = sanitizeTask({ id: 'x', text: 't', recur: 'hourly', recurN: 2, recurMin: 99, sessions: [] });
+        expect(r.recurMin).toBe(0);
+    });
     it('روزهای هفته: نزدیک‌ترین روز آینده', () => {
         const last = new Date(Date.now() + 3600 * 1000);
         const want = (last.getDay() + 2) % 7; // دوری که قطعاً امروز/فردا نیست

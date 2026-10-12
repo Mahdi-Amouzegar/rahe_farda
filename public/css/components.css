@@ -1485,6 +1485,66 @@
         box-shadow: 0 0 12px var(--accent-cyan-soft);
     }
 
+    /* ═══ Duration Picker (series > hourlyN) ═══ */
+    .dur-picker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--border-medium);
+        background: var(--bg-2);
+    }
+
+    .dur-field {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .dur-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        border: 1.5px solid var(--border-medium);
+        background: var(--bg-3);
+        color: var(--accent-cyan);
+        font-size: 0.85rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .dur-btn:hover,
+    .dur-btn:active {
+        border-color: var(--accent-cyan-border);
+        box-shadow: 0 0 10px var(--accent-cyan-soft);
+    }
+
+    .dur-val {
+        min-width: 2.2em;
+        text-align: center;
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dur-label {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-weight: 700;
+    }
+
+    .dur-sep {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-muted);
+    }
+
     /* ═══ Smart Chip ═══ */
     .smart-chip {
         display: flex;

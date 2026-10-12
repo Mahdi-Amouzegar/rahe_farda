@@ -228,8 +228,21 @@
                                         <button type="button" data-srecur="dates" data-i18n="tasks.series.dates">تاریخ سررسید</button>
                                     </div>
                                     <div id="seriesSubHours" hidden>
-                                        <div class="chip-row u-mb-8"></div>
-                                        <label class="more-row"><span data-i18n="tasks.series.everyNHours">هر چند ساعت؟</span><input type="number" id="seriesN" min="1" max="168" value="8"></label>
+                                        <div class="dur-picker" id="seriesDurPicker">
+                                            <div class="dur-field">
+                                                <button type="button" class="dur-btn" data-dur="h+" data-i18n-aria-label="tasks.series.incHour" aria-label="افزایش ساعت">＋</button>
+                                                <span class="dur-val" id="seriesDurH">۸</span>
+                                                <button type="button" class="dur-btn" data-dur="h-" data-i18n-aria-label="tasks.series.decHour" aria-label="کاهش ساعت">－</button>
+                                                <span class="dur-label" data-i18n="tasks.series.hours">ساعت</span>
+                                            </div>
+                                            <span class="dur-sep">:</span>
+                                            <div class="dur-field">
+                                                <button type="button" class="dur-btn" data-dur="m+" data-i18n-aria-label="tasks.series.incMin" aria-label="افزایش دقیقه">＋</button>
+                                                <span class="dur-val" id="seriesDurM">۰۰</span>
+                                                <button type="button" class="dur-btn" data-dur="m-" data-i18n-aria-label="tasks.series.decMin" aria-label="کاهش دقیقه">－</button>
+                                                <span class="dur-label" data-i18n="tasks.series.minutes">دقیقه</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div id="seriesSubWeek" hidden>
                                         <div class="chip-row">

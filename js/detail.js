@@ -1026,7 +1026,7 @@ export function bindDetailInputs() {
             renderDetailSessions();
             warn = i18nT('detail.warn.sessionsCollapsed');
         }
-        if (task.recur === 'hourly' && !(task.recurN >= 1 && task.recurN <= 168)) task.recurN = 8;
+        if (task.recur === 'hourly' && !((task.recurN >= 1 && task.recurN <= 168) || (task.recurMin >= 1 && task.recurMin <= 59))) task.recurN = 8;
         if (task.recur === 'custom') {
             const n = parseInt(document.getElementById('fRecurN').value, 10);
             if (n >= 1 && n <= 365) task.recurN = n;
