@@ -496,17 +496,12 @@ export function checkReminders() {
     }
     if (advanced.length > 0) {
         try { saveTasks(); } catch { /* saveTasks خودش لاگ می‌کند */ }
-        // رندر زنده فقط وقتی صفحه دیده می‌شود (در تب مخفی: persist می‌شود ولی repaint نه)
+        // رندر زنده فقط وقتی صفحه دیده می‌شود (در تب مخفی: persist می‌شود ولی repaint نه —
+        // موقع بازگشت، paintIfPending جبران می‌کند).
         if (typeof document === 'undefined' || !document.hidden) {
-            try { events.emit(EV.UI_RENDER_REQUESTED); } catch { /* silent */ }
-            try {
-                const openId = state.currentDetailId != null ? String(state.currentDetailId) : null;
-                if (openId && advanced.includes(openId)) {
-                    import('./detail.js').then(m => {
-                        try { m.renderDetailSessions(); } catch { /* silent */ }
-                    }).catch(() => {});
-                }
-            } catch { /* silent */ }
+            paintAdvanced(advanced);
+        } else {
+            _pendingPaint = true;
         }
     }
 
@@ -574,6 +569,33 @@ export function checkReminders() {
             scanCachedShared(now);
         });
     } catch { /* silent */ }
+}
+
+/**
+ * repaint لیست + جزئیاتِ باز بعد از جلو رفتن داده.
+ */
+function paintAdvanced(advanced) {
+    try { events.emit(EV.UI_RENDER_REQUESTED); } catch { /* silent */ }
+    try {
+        const openId = state.currentDetailId != null ? String(state.currentDetailId) : null;
+        if (openId && (advanced || []).includes(openId)) {
+            import('./detail.js').then(m => {
+                try { m.renderDetailSessions(); } catch { /* silent */ }
+            }).catch(() => {});
+        }
+    } catch { /* silent */ }
+}
+
+/**
+ * آیا در تب مخفی داده جلو رفته و repaint بدهکاریم؟ (BUG-07)
+ */
+let _pendingPaint = false;
+
+export function paintIfPending() {
+    if (!_pendingPaint) return false;
+    _pendingPaint = false;
+    paintAdvanced();
+    return true;
 }
 
 /**
@@ -705,7 +727,12 @@ export function startReminderLoop() {
     };
     run();
     setInterval(run, 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        run();
+        // ⚠️ 10.11/BUG-07: داده ممکن است در تب مخفی جلو رفته باشد — repaint بدهی را بده.
+        try { paintIfPending(); } catch { /* silent */ }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

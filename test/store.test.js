@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders, collectSharedDue } from '../js/notify.js';
+import { checkReminders, collectSharedDue, paintIfPending } from '../js/notify.js';
 import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
@@ -496,6 +496,28 @@ describe('sessions — allSessions carries dueSoon flag 10.11/BUG-05c', () => {
         } finally {
             state.tasks = [];
             invalidateTaskIndex();
+        }
+    });
+});
+
+describe('notify — paintIfPending BUG-07', () => {
+    it('repaint بدهی تب مخفی را موقع بازگشت می‌دهد', () => {
+        const prevHidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+        const prevRemind = state.prefs.remindOn;
+        state.prefs.remindOn = false;
+        try {
+            Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+            const past = new Date(Date.now() - 2 * 86400000).toISOString();
+            state.tasks = [{ id: 'h1', text: 'x', recur: 'daily', completed: false, archived: false, sessions: [{ id: 's', at: past }] }];
+            checkReminders();
+            Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+            expect(paintIfPending()).toBe(true);
+            expect(paintIfPending()).toBe(false);
+        } finally {
+            if (prevHidden) Object.defineProperty(document, 'hidden', prevHidden);
+            state.prefs.remindOn = prevRemind;
+            state.tasks = [];
+            try { localStorage.removeItem('spaceTodoTasks'); } catch { /* silent */ }
         }
     });
 });
