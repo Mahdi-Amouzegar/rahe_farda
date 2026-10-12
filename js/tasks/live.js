@@ -5,9 +5,10 @@
 //   - سطر تازه‌ی مخاطب/گروه → تازه‌سازی داده‌ی دراور (+ رندر اگر باز است و فوکوس روی input نیست)
 //   - نخوانده‌های گروه هم polling می‌شوند (قبلاً فقط DM بود)
 // ⚠️ تشخیص تغییر با (id → updatedAt) است، نه فقط شمارش — ویرایش/حذف هم گرفته می‌شود.
-// ⚠️ تنبل (lazy tick) + دوسرعته: تب مخفی = صفر درخواست؛ دراور بسته + مقصد محلی = صفر؛
-//    مقصد باز هر ۵ ثانیه فقط گیت شمارش می‌زند؛ داده‌ی دراور هر ~۶۰ ثانیه؛
-//    مقصد باز فقط با تغییر شمارش fetch کامل می‌زند (+ هر ۶۰ تیک یک fetch دوره‌ای).
+//   ⚠️ تنبل (lazy tick) + دوسرعته: تب مخفی = صفر درخواست؛ دراور بسته + مقصد محلی = صفر؛
+//    مقصد باز هر ۱۵ ثانیه فقط گیت شمارش می‌زند (backoff تا ۶۰ ثانیه در سکون)؛
+//    داده‌ی دراور هر ~۲ دقیقه؛ مقصد باز فقط با تغییر شمارش fetch کامل می‌زند
+//    (+ هر ۴۰ تیک ≈ ۱۰ دقیقه یک fetch دوره‌ای).
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { apiFetch } from '../api.js';
@@ -27,14 +28,17 @@ import { listConversations, refreshConversationBadges } from '../communication/c
 import { listGroups, refreshGroupBadges } from '../communication/groups.js';
 import { updateDrawerBadges } from '../navigation/sidebar.js';
 
-/** ضربان تند برای مقصد باز (چت فعال) — فقط گیت شمارش ارزان */
-const FAST_MS = 5000;
+/** ضربان برای مقصد باز (چت فعال) — فقط گیت شمارش ارزان */
+const FAST_MS = 15000;
 
-/** دراور حداکثر هر چند تیک تند تازه شود (۱۲×۵ثانیه = ۶۰ ثانیه) */
-const DRAWER_EVERY_TICKS = 12;
+/** سقف backoff وقتی سکون است (بدون تغییر، ضربان آرام‌تر می‌شود) */
+const MAX_MS = 60000;
 
-/** هر چند تیک، یک fetch کامل دوره‌ای (برای ویرایش/حذف بدون تغییر شمارش) */
-const FULL_FETCH_EVERY_TICKS = 60;
+/** دراور حداکثر هر چند تیک تازه شود (۸×۱۵ثانیه = ۲ دقیقه) */
+const DRAWER_EVERY_TICKS = 8;
+
+/** هر چند تیک، یک fetch کامل دوره‌ای (۴۰×۱۵ثانیه = ۱۰ دقیقه) */
+const FULL_FETCH_EVERY_TICKS = 40;
 
 let _timer = null;
 let _tick = 0;
@@ -43,6 +47,10 @@ let _visBound = false;
 let _lastUnreadTotal = null;
 let _lastRowsKey = '';
 let _lastDestKey = '';
+// ⚠️ 10.14: backoff — هر تیک بدون تغییر، ضربان تا سقف کنده‌تر می‌شود؛
+//    با هر تغییر، فوراً به FAST_MS برمی‌گردد.
+let _nextMs = FAST_MS;
+let _idleTicks = 0;
 let _lastDestCount = -1;
 
 function myId() {
@@ -140,14 +148,16 @@ export function shouldFullFetch(lastKey, lastCount, destKey, count, tickN) {
 async function refreshOpenDestination(dest, opts) {
     const o = opts || {};
     const d = dest || getDestination();
-    if (!d || d.type === 'local') return;
+    if (!d || d.type === 'local') return false;
     const me = myId();
+    let activity = false;
     // ─── گیت شمارش: بدون تغییر شمارش و بدون force، fetch کامل نمی‌زنیم ───
     if (!o.force) {
         try {
             const n = await destUnreadCount(d);
             const key = d.type + ':' + (d.peerId || d.groupId || '');
-            if (!shouldFullFetch(_lastDestKey, _lastDestCount, key, n, _tick)) return;
+            if (n !== null && n !== _lastDestCount) activity = true;
+            if (!shouldFullFetch(_lastDestKey, _lastDestCount, key, n, _tick)) return activity;
             if (n !== null) {
                 _lastDestKey = key;
                 _lastDestCount = n;
@@ -164,10 +174,11 @@ async function refreshOpenDestination(dest, opts) {
             if (res.ok) fresh = res.items;
         }
     } catch { /* silent */ }
-    if (!fresh) return;
+    if (!fresh) return activity;
     const current = getSharedItems();
     const { added, updated, removed } = diffSharedItems(current, fresh);
-    if (added.length === 0 && updated.length === 0 && removed.length === 0) return;
+    if (added.length === 0 && updated.length === 0 && removed.length === 0) return activity;
+    activity = true;
     let detailOpen = false;
     try {
         detailOpen = !!(state && state.currentDetailId);
@@ -188,6 +199,7 @@ async function refreshOpenDestination(dest, opts) {
     if (removed.length > 0) {
         showLiveToast(i18nT('dm.deleted'));
     }
+    return activity;
 }
 
 async function refreshDrawerData() {
@@ -239,18 +251,19 @@ async function isDrawerOpenSafe() {
 }
 
 async function tick() {
-    if (_ticking) return;
-    if (!isLoggedIn() || !isOnline()) return;
+    if (_ticking) return false;
+    if (!isLoggedIn() || !isOnline()) return false;
     // ⚠️ تب مخفی = صفر درخواست (صرفه‌جویی باتری/ترافیک؛ با برگشت فوکوس تیک فوری می‌زنیم)
-    if (isPageHidden()) return;
+    if (isPageHidden()) return false;
     _ticking = true;
+    let activity = false;
     try {
         _tick += 1;
         const dest = getDestination();
         const drawerOpen = await isDrawerOpenSafe();
         if (!drawerOpen && (!dest || dest.type === 'local')) {
             // ⚠️ هیچ مصرف‌کننده‌ای نیست (بج‌ها و سطرها فقط دراورند) — سکوت کامل
-            return;
+            return false;
         }
         if (drawerOpen && _tick % DRAWER_EVERY_TICKS === 0) {
             const beforeRows = drawerSnapshot();
@@ -259,14 +272,16 @@ async function tick() {
                 const { rerenderDrawer } = await import('../navigation/sidebar.js');
                 if (!drawerInputFocused() && drawerSnapshot() !== beforeRows) {
                     rerenderDrawer();
+                    activity = true;
                 }
             } catch { /* silent */ }
-            if (!dest || dest.type === 'local') return;
+            if (!dest || dest.type === 'local') return activity;
         } else if (drawerOpen) {
-            if (!dest || dest.type === 'local') return;
+            if (!dest || dest.type === 'local') return false;
         }
         // مقصد مشترک باز است (دراور باز یا بسته): تطبیق با گیت شمارش
-        await refreshOpenDestination(dest, {}).catch(() => {});
+        activity = (await refreshOpenDestination(dest, {}).catch(() => false)) || activity;
+        return activity;
     } finally {
         _ticking = false;
     }
@@ -279,16 +294,33 @@ function onVisibleTick() {
     } catch { /* silent */ }
 }
 
+/**
+ * زمان‌بندی تیک بعدی با backoff (10.14):
+ * تیک فعال → ضربان FAST_MS؛ تیک ساکت → ضربان تا MAX_MS کنده‌تر.
+ */
+function scheduleTick() {
+    clearTimeout(_timer);
+    _timer = setTimeout(() => {
+        Promise.resolve(tick()).then((active) => {
+            if (active) {
+                _idleTicks = 0;
+                _nextMs = FAST_MS;
+            } else {
+                _idleTicks += 1;
+                _nextMs = Math.min(FAST_MS * Math.pow(2, _idleTicks), MAX_MS);
+            }
+            scheduleTick();
+        }).catch(() => scheduleTick());
+    }, _nextMs);
+}
+
 export function startLiveEngine() {
     if (_timer) return;
-    // ⚠️ ضربان تند ۵ ثانیه‌ای: فقط گیت شمارش مقصد باز می‌زند (ارزان)؛
-    //    داده‌ی دراور هر ۱۲ تیک (≈۶۰ ثانیه) تازه می‌شود.
-    _timer = setInterval(() => {
-        tick().catch(() => {});
-    }, FAST_MS);
-    if (typeof _timer.unref === 'function') {
-        try { _timer.unref(); } catch { /* silent */ }
-    }
+    // ⚠️ 10.14: ضربان ۱۵ ثانیه‌ای + backoff تا ۶۰ ثانیه در سکون
+    //    (پیش‌تر هر ۵ ثانیه بی‌وقفه بود).
+    _nextMs = FAST_MS;
+    _idleTicks = 0;
+    scheduleTick();
     // ⚠️ تیک فوری با برگشت به صفحه (تازگی بدون polling تند)
     if (!_visBound && typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
         _visBound = true;
@@ -301,7 +333,7 @@ export function startLiveEngine() {
 
 export function stopLiveEngine() {
     if (_timer) {
-        clearInterval(_timer);
+        clearTimeout(_timer);
         _timer = null;
     }
     if (_visBound && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {

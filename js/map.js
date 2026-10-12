@@ -484,7 +484,9 @@ export async function initMap() {
     const layers = {};
     ['normal','dark','sat'].forEach(k => {
         const c = TILES[k];
-        layers[c.name] = L.tileLayer(c.url, { maxZoom: c.max, subdomains: c.sub, attribution: c.attr, className: c.cls || '' });
+        // ⚠️ 10.14: updateWhenIdle — تایل‌ها بعد از پایان pan/zoom می‌آیند،
+        // نه حین drag (کاهش چشمگیر درخواست‌های تایل).
+        layers[c.name] = L.tileLayer(c.url, { maxZoom: c.max, subdomains: c.sub, attribution: c.attr, className: c.cls || '', updateWhenIdle: true });
     });
     layers[TILES.normal.name].addTo(map);
     L.control.layers(layers, null, { position: 'topleft' }).addTo(map);
