@@ -331,6 +331,13 @@ describe('store — advanceRecur anchoring 10.11', () => {
         expect(advanceRecur(task)).toBe(true);
         expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe(45 * 60 * 1000);
     });
+    it('تمدید از آخرین سررسید محاسبه می‌شود نه از لحظه تمدید (10.13)', () => {
+        const last = new Date(Date.now() - 60 * 1000); // ۱ دقیقه پیش
+        const task = { recur: 'hourly', recurN: 0, recurMin: 5, sessions: [{ id: 's1', at: last.toISOString() }] };
+        expect(advanceRecur(task)).toBe(true);
+        expect(new Date(task.sessions[1].at).getTime() - last.getTime()).toBe(5 * 60 * 1000);
+        expect(typeof task.sessions[1].regAt).toBe('string');
+    });
     it('ساعتی با بازه‌ی صفر: جلو نمی‌رود (10.12)', () => {
         const last = new Date(Date.now() + 3600 * 1000);
         const task = { recur: 'hourly', recurN: 0, recurMin: 0, sessions: [{ id: 's1', at: last.toISOString() }] };
@@ -365,8 +372,7 @@ describe('store — rollforwardRecur 10.11', () => {
         const out = rollforwardRecur(tasks, NOW);
         expect(out).toEqual(['t1']);
         const latest = Math.max(...tasks[0].sessions.map(s => new Date(s.at).getTime()));
-        expect(latest).toBeGreaterThan(NOW);
-    });
+        expect(latest).toBeGreaterThan(NOW);    });
     it('آینده‌دار/تکمیل‌شده/بدون قانون/بدون جلسه را دست نمی‌زند', () => {
         const future = new Date(NOW + 86400000).toISOString();
         const tasks = [
@@ -385,6 +391,27 @@ describe('store — rollforwardRecur 10.11', () => {
         const out = rollforwardRecur(tasks, NOW);
         expect(out).toContain('c1');
     });
+    it('سررسید بعدی روی شبکه است نه از لحظه اسکن (10.13)', () => {
+        const last = new Date(NOW - 60 * 1000).toISOString(); // ۱ دقیقه پیش
+        const tasks = [{ id: 't1', text: 'x', recur: 'hourly', recurN: 0, recurMin: 5, completed: false, archived: false, sessions: [{ id: 's1', at: last }] }];
+        const out = rollforwardRecur(tasks, NOW);
+        expect(out).toEqual(['t1']);
+        const latest = Math.max(...tasks[0].sessions.map(s => new Date(s.at).getTime()));
+        expect(latest - new Date(last).getTime()).toBe(5 * 60 * 1000);
+        expect(latest).toBeGreaterThan(NOW);
+    });
+});
+
+describe('store — sanitizeTask regAt 10.13', () => {
+    it('regAt را می‌پذیرد؛ نبودش به createdAt می‌افتد', () => {
+        const created = new Date(Date.now() - 86400000).toISOString();
+        const at = new Date(Date.now() + 3600000).toISOString();
+        const r = sanitizeTask({ id: 'x', text: 't', createdAt: created, sessions: [{ id: 's1', at }] });
+        expect(r.sessions[0].regAt).toBe(created);
+        const regAt = new Date().toISOString();
+        const r2 = sanitizeTask({ id: 'y', text: 't', createdAt: created, sessions: [{ id: 's1', at, regAt }] });
+        expect(r2.sessions[0].regAt).toBe(regAt);
+    });
 });
 
 describe('sessions — isDueFireable 10.11', () => {
@@ -398,6 +425,35 @@ describe('sessions — isDueFireable 10.11', () => {
         expect(isDueFireable(V + DUE_CATCH_UP_MS + 1000, V, false)).toBe(false);
         expect(isDueFireable(V, V, true)).toBe(false);
         expect(isDueFireable(V - 6 * 60000, V, false)).toBe(false);
+    });
+});
+
+describe('notify — lead suppression 10.13', () => {
+    const NOW = Date.now();
+    const at = new Date(NOW + 30 * 60000).toISOString();
+    it('ثبت با فاصله‌ی < ۲ ساعت: یادآور اصلی خاموش', () => {
+        const regAt = new Date(NOW - 30 * 60000).toISOString();
+        const items = [{ id: 't1', text: 'x', createdAt: regAt,
+            sessions: [{ id: 's1', at, regAt, remindMin: 60 }] }];
+        const out = collectSharedDue(items, NOW, {});
+        expect(out.filter(x => x.kind === 'lead').length).toBe(0);
+    });
+    it('ثبت با فاصله‌ی ≥ ۲ ساعت: یادآور اصلی فعال', () => {
+        const regAt = new Date(NOW - 150 * 60000).toISOString();
+        const items = [{ id: 't1', text: 'x', createdAt: regAt,
+            sessions: [{ id: 's1', at, regAt, remindMin: 60 }] }];
+        const out = collectSharedDue(items, NOW, {});
+        expect(out.some(x => x.kind === 'lead')).toBe(true);
+    });
+    it('بدون regAt: fallback به createdAt تسک', () => {
+        const old = new Date(NOW - 3 * 86400000).toISOString();
+        const items = [{ id: 't1', text: 'x', createdAt: old,
+            sessions: [{ id: 's1', at, remindMin: 60 }] }];
+        expect(collectSharedDue(items, NOW, {}).some(x => x.kind === 'lead')).toBe(true);
+        const fresh = new Date(NOW - 10 * 60000).toISOString();
+        const items2 = [{ id: 't2', text: 'y', createdAt: fresh,
+            sessions: [{ id: 's2', at, remindMin: 60 }] }];
+        expect(collectSharedDue(items2, NOW, {}).some(x => x.kind === 'lead')).toBe(false);
     });
 });
 

@@ -275,6 +275,8 @@ export function sanitizeUrl(raw) {
 }
 
 export function sanitizeTask(t) {
+    const regFallback = (typeof t.createdAt === 'string' && !isNaN(new Date(t.createdAt))) ? t.createdAt : null;
+    const regOf = (s) => (typeof s.regAt === 'string' && !isNaN(new Date(s.regAt))) ? s.regAt : regFallback;
     const sessions = Array.isArray(t.sessions)
         ? t.sessions
             .filter(s => s && typeof s.at === 'string' && !isNaN(new Date(s.at)))
@@ -286,14 +288,15 @@ export function sanitizeTask(t) {
                 remindedDueSoon: Boolean(s.remindedDueSoon),
                 location: validLoc(s.location),
                 remindMin: (s.remindMin === null || s.remindMin === undefined) ? null
-                    : (Number.isFinite(+s.remindMin) && +s.remindMin >= 0 ? Math.floor(+s.remindMin) : null)
+                    : (Number.isFinite(+s.remindMin) && +s.remindMin >= 0 ? Math.floor(+s.remindMin) : null),
+                regAt: regOf(s)
             }))
         : [];
     for (let i = sessions.length - 1; i >= 0; i--) {
         if (sessions.findIndex(x => sameMinute(x.at, sessions[i].at)) !== i) sessions.splice(i, 1);
     }
     if (sessions.length === 0 && typeof t.dueAt === 'string' && !isNaN(new Date(t.dueAt))) {
-        sessions.push({ id: uid(), at: t.dueAt });
+        sessions.push({ id: uid(), at: t.dueAt, regAt: regFallback });
     }
     const kind = (t.kind === 'plan' || t.kind === 'group')
         ? 'plan'
@@ -1324,20 +1327,22 @@ export function advanceRecur(task) {
         : 0;
     if ((r === 'custom' || r === 'hourly') && !n && !m) return false;
     const list = task.sessions || [];
-    let base = Date.now();
-    if (list.length) {
-        base = list.reduce((m, s) => {
-            const v = new Date(s.at).getTime();
-            return isNaN(v) ? m : Math.max(m, v);
-        }, base);
+    // ⚠️ 10.13: پایه همیشه آخرین سررسید ثبت‌شده است — حتی گذشته.
+    // (پیش‌تر با Math.max(..., Date.now()) محاسبه می‌شد و در تمدید
+    //  دیرهنگام، سررسید بعدی از «لحظه تمدید» حساب می‌شد.)
+    let base = null;
+    for (const s of list) {
+        const v = new Date(s.at).getTime();
+        if (!isNaN(v) && (base === null || v > base)) base = v;
     }
+    if (base === null) base = Date.now();
     const b = new Date(base);
     let next = null;
     if (r === 'weeklyDays') next = nextWeekday(b, task.recurDays);
     else if (r === 'monthlyDays') next = nextMonthday(b, task.recurDays);
     else next = addInterval(b, r, n, m);
     if (!next || next.getTime() <= base) return false;
-    task.sessions.push({ id: uid(), at: next.toISOString(), reminded: false, remindMin: null, location: null });
+    task.sessions.push({ id: uid(), at: next.toISOString(), reminded: false, remindMin: null, location: null, regAt: new Date().toISOString() });
     return true;
 }
 
@@ -1391,6 +1396,7 @@ export function rollforwardRecur(tasks, nowMs) {
             const scratch = {
                 recur: t.recur,
                 recurN: t.recurN,
+                recurMin: t.recurMin,
                 recurDays: Array.isArray(t.recurDays) ? [...t.recurDays] : [],
                 sessions: [{ id: uid(), at: new Date(nowMs).toISOString() }],
             };
@@ -1590,7 +1596,7 @@ export function buildTaskFromComposer(forceKind) {
                 input.focus();
                 return null;
             }
-            sessions = [{ id: uid(), at: start.at, reminded: false, remindMin: null, location: null }];
+            sessions = [{ id: uid(), at: start.at, reminded: false, remindMin: null, location: null, regAt: new Date().toISOString() }];
         }
     }
     const newTask = {

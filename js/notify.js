@@ -443,6 +443,17 @@ function writeSharedRem(map) {
     } catch { /* silent */ }
 }
 
+// ⚠️ 10.13: جلسه‌ای که با فاصله‌ی کمتر از ۲ ساعت ثبت شده،
+// یادآور اصلی (مثلاً یک ساعت قبل) نمی‌دهد — هشدار فوری
+// تودرتو و بی‌صرفه می‌شود. (یادآورهای ۵ دقیقه و لحظه‌ای
+// همچنان فعال‌اند.)
+const LEAD_REG_MIN = 120;
+
+function leadRegisteredTooSoon(regAt, v) {
+    const regMs = regAt ? new Date(regAt).getTime() : NaN;
+    return Number.isFinite(regMs) && (v - regMs) < LEAD_REG_MIN * 60 * 1000;
+}
+
 /**
  * کدام جلسه‌های مشترک باید هشدار بدهند؟ (خالص و تست‌پذیر — شلیک نمی‌کند)
  * @returns {Array<{key:string, owner:string, at:string, kind:'lead'|'dueSoon'|'due', sessId:string}>}
@@ -464,7 +475,9 @@ export function collectSharedDue(items, nowMs, flags) {
             const f = (flags && flags[key]) || {};
             const owner = t.text || '';
             const rm = (s.remindMin != null) ? s.remindMin : rmDefault;
-            if (rm && rm > 0 && !f.reminded && nowMs >= v - rm * 60 * 1000 && nowMs < v) {
+            const regAt = s.regAt != null ? s.regAt : t.createdAt;
+            if (rm && rm > 0 && !f.reminded && nowMs >= v - rm * 60 * 1000 && nowMs < v
+                && !leadRegisteredTooSoon(regAt, v)) {
                 out.push({ key, owner, at: s.at, kind: 'lead', sessId: String(s.id) });
             }
             if (!f.remindedDueSoon && nowMs >= v - NEAR_DUE_MIN * 60 * 1000 && nowMs < v) {
@@ -514,9 +527,11 @@ export function checkReminders() {
         if (isNaN(v)) return;
 
         // ۱. یادآور اصلی (مثلاً ۶۰ دقیقه قبل)
+        // ⚠️ 10.13: ثبت با فاصله‌ی کمتر از ۲ ساعت → خاموش.
         if (rm && rm > 0) {
             const leadTarget = v - rm * 60 * 1000;
-            if (!s.reminded && now >= leadTarget && now < v) {
+            if (!s.reminded && now >= leadTarget && now < v
+                && !leadRegisteredTooSoon(s.regAt, v)) {
                 fireNotification(
                     i18nT('notifications.reminder.title'),
                     `${s.owner} — ${faShort(s.at)}`,

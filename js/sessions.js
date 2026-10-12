@@ -357,7 +357,8 @@ export function allSessions(onlyOpen) {
                 reminded: Boolean(s.reminded),
                 remindedDue: Boolean(s.remindedDue),
                 remindedDueSoon: Boolean(s.remindedDueSoon),
-                remindMin: s.remindMin != null ? s.remindMin : null
+                remindMin: s.remindMin != null ? s.remindMin : null,
+                regAt: s.regAt != null ? s.regAt : t.createdAt
             });
         });
     };

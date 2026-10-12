@@ -287,7 +287,7 @@ function maybeSuggestDueInDetail(value, targetId) {
             const t = getDetailTask();
             if (!t) { hideDetailSmart(); return; }
             if (hasSessionAt(t.sessions, iso)) { hideDetailSmart(); return; }
-            t.sessions.push({ id: uid(), at: iso });
+            t.sessions.push({ id: uid(), at: iso, regAt: new Date().toISOString() });
             saveTasks();
             renderDetailSessions();
             call('render');
@@ -895,7 +895,7 @@ export function bindDetailInputs() {
                 flashSaved(i18nT('picker.errorDuplicate'));
                 return;
             }
-            task.sessions.push({ id: uid(), at: iso });
+            task.sessions.push({ id: uid(), at: iso, regAt: new Date().toISOString() });
             saveTasks();
             renderDetailSessions();
             call('render');
