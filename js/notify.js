@@ -11,7 +11,7 @@
 
 import { state } from './core.js';
 import { findTask, saveTasks, rollforwardRecur } from './store.js';
-import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
+import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN, DUE_CATCH_UP_MS } from './sessions.js';
 import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks } from './tasks/source.js';
 import { isOnline } from './net.js';
 import { events, EV } from './events.js';
@@ -615,7 +615,38 @@ export function paintIfPending() {
 
 /**
  * تازه‌سازی کش مقصدها برای یادآور (پس‌زمینه: گیت ورود/آنلاین/هم‌پوشانی، best-effort).
+ * ⚠️ 10.15: تطبیقی — سررسید نزدیک (≤ ۱۵ دقیقه، هم‌اندازه‌ی مهلت جبران)
+ * یا کش خالی → هر چه زود؛ در سکون → حداکثر هر ۱۰ دقیقه. چون شلیک due
+ * تا ۱۵ دقیقه بعد از سررسید ممکن است، هیچ یادآوری از دست نمی‌رود.
  */
+const SCAN_NEAR_MS = DUE_CATCH_UP_MS;
+const SCAN_IDLE_MS = 10 * 60 * 1000;
+let _lastSharedScanAt = 0;
+
+/** آیا اسکن پس‌زمینه لازم است؟ (محض — برای تست) */
+export function shouldScanShared(nowMs, nearestMs, lastScanAt, cacheEmpty) {
+    if (cacheEmpty) return true;
+    if (nearestMs !== null && nearestMs <= SCAN_NEAR_MS) return true;
+    return (nowMs - lastScanAt) >= SCAN_IDLE_MS;
+}
+
+/** نزدیک‌ترین سررسید آینده در کش (ms)؛ null اگر هیچ‌کدام. */
+function nearestSharedDueMs() {
+    let best = null;
+    const now = Date.now();
+    try {
+        for (const t of getCachedSharedAll()) {
+            for (const s of (t && t.sessions) || []) {
+                const v = new Date(s.at).getTime();
+                if (!Number.isFinite(v)) continue;
+                const d = v - now;
+                if (d >= 0 && (best === null || d < best)) best = d;
+            }
+        }
+    } catch { /* silent */ }
+    return best;
+}
+
 let _sharedScanInflight = false;
 
 async function refreshSharedCacheForReminders() {
@@ -624,7 +655,11 @@ async function refreshSharedCacheForReminders() {
     try { me = state.sync && state.sync.userId ? String(state.sync.userId) : null; } catch { me = null; }
     if (!me) return;
     try { if (!isOnline()) return; } catch { return; }
+    let cacheEmpty = true;
+    try { cacheEmpty = getCachedSharedAll().length === 0; } catch { /* silent */ }
+    if (!shouldScanShared(Date.now(), nearestSharedDueMs(), _lastSharedScanAt, cacheEmpty)) return;
     _sharedScanInflight = true;
+    _lastSharedScanAt = Date.now();
     try {
         const [{ listConversations }, { listGroups }] = await Promise.all([
             import('./communication/conversations.js'),
@@ -655,7 +690,8 @@ async function refreshSharedCacheForReminders() {
             if (seen.has(key)) continue;
             seen.add(key);
             jobs.push(
-                fetchGroupTasks(g.id, me)
+                // ⚠️ 10.15: lite — نام/آواتار برای یادآور لازم نیست (نصف درخواست‌ها)
+                fetchGroupTasks(g.id, me, { lite: true })
                     .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
                     .catch(() => {})
             );

@@ -25,6 +25,8 @@ import {
     enableCloudSyncFromState,
     postSingleOp,
     setCloudSyncHandler,
+    loadSyncCursor,
+    applySyncCursor,
 } from '../js/sync-queue.js';
 
 let _savedSync;
@@ -96,5 +98,54 @@ describe('sync-cloud — postSingleOp', () => {
 
     it('setCloudSyncHandler خطا نمی‌دهد', () => {
         expect(() => setCloudSyncHandler()).not.toThrow();
+    });
+});
+
+describe('sync-cloud — cursor سینک (10.15)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        state.sync.userId = 'u1';
+        state.sync.deviceId = 'd1';
+    });
+    afterEach(() => {
+        localStorage.clear();
+        state.sync.userId = null;
+        state.sync.deviceId = null;
+        apiResult = { ok: true, data: {} };
+    });
+
+    it('بدون cursor ذخیره‌شده → null', () => {
+        expect(loadSyncCursor()).toBeNull();
+    });
+
+    it('newChangeSeq پاسخ موفق ذخیره و بازخوانی می‌شود', () => {
+        applySyncCursor({ ok: true, data: { newChangeSeq: 42 } });
+        expect(loadSyncCursor()).toBe(42);
+    });
+
+    it('پاسخ ناموفق/بدون newChangeSeq cursor را نمی‌خرابد', () => {
+        applySyncCursor({ ok: true, data: { newChangeSeq: 7 } });
+        applySyncCursor({ ok: false });
+        applySyncCursor({ ok: true, data: {} });
+        expect(loadSyncCursor()).toBe(7);
+    });
+
+    it('cursor برای هر کاربر جدا است', () => {
+        applySyncCursor({ ok: true, data: { newChangeSeq: 5 } });
+        state.sync.userId = 'u2';
+        expect(loadSyncCursor()).toBeNull();
+        state.sync.userId = 'u1';
+        expect(loadSyncCursor()).toBe(5);
+    });
+
+    it('postSingleOp cursor را می‌فرستد و از پاسخ جلو می‌برد', async () => {
+        applySyncCursor({ ok: true, data: { newChangeSeq: 9 } });
+        const { apiFetch } = await import('../js/api.js');
+        apiFetch.mockClear();
+        apiResult = { ok: true, data: { newChangeSeq: 10 } };
+        await postSingleOp({ id: 'op2', type: 'save', entityId: 't2', entityType: 'task', data: { id: 't2' }, parentId: null, timestamp: '2026-01-01T00:00:00.000Z', deviceId: 'd1', schemaVersion: '1.0.0', retries: 0, lastError: null });
+        const [, opts] = apiFetch.mock.calls[0];
+        expect(opts.body.lastChangeSeq).toBe(9);
+        expect(loadSyncCursor()).toBe(10);
     });
 });

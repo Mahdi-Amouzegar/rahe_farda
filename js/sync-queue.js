@@ -130,6 +130,47 @@ export function toServerOp(entry) {
 }
 
 /**
+ * ⚠️ 10.15: cursor سینک شخصی.
+ * کلاینت باید آخرین `newChangeSeq` را که سرور داده بفرستد (lastChangeSeq)؛
+ * در غیر این صورت سرور هر بار حالت کامل (~۱MB) برمی‌گرداند.
+ * کلید شامل userId است تا کاربرِ دیگر روی یک مرورگر تداخل نکند.
+ */
+const CURSOR_PREFIX = 'rahefarda_sync_cursor:';
+
+function syncCursorKey() {
+    try {
+        return CURSOR_PREFIX + (state.sync && state.sync.userId ? String(state.sync.userId) : 'anon');
+    } catch {
+        return CURSOR_PREFIX + 'anon';
+    }
+}
+
+export function loadSyncCursor() {
+    try {
+        const n = parseInt(localStorage.getItem(syncCursorKey()), 10);
+        return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveSyncCursor(n) {
+    try {
+        if (Number.isFinite(n) && n > 0) {
+            localStorage.setItem(syncCursorKey(), String(Math.floor(n)));
+        }
+    } catch { /* silent — private mode */ }
+}
+
+/** `newChangeSeq` پاسخ موفق را ذخیره کن (بعدی دلتا می‌شود). */
+export function applySyncCursor(res) {
+    try {
+        const d = res && res.data;
+        if (d && Number.isFinite(+d.newChangeSeq)) saveSyncCursor(+d.newChangeSeq);
+    } catch { /* silent */ }
+}
+
+/**
  * فعال‌سازی Cloud Sync از روی state (E.5.3 — Phase 13).
  * فقط وقتی توکن و userId هست (واردشده)؛ وگرنه false و هیچ‌کار.
  * ⚠️ قبلش باید setCloudSyncHandler صدا شده باشد (وگرنه flush با handler جعلی موفق‌نمایی می‌کند).
@@ -159,10 +200,12 @@ export async function postSingleOp(op) {
             body: {
                 ops: [toServerOp(op)],
                 deviceId: state.sync.deviceId || op.deviceId || 'unknown',
-                lastChangeSeq: null,
+                lastChangeSeq: loadSyncCursor(),
                 requestFullResync: false,
             },
         });
+        // ⚠️ 10.15: cursor را جلو ببر تا پاسخ بعدی دلتا (چند KB) باشد
+        if (res && res.ok) applySyncCursor(res);
         return { ok: !!(res && res.ok) };
     } catch {
         return { ok: false };

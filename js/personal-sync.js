@@ -18,7 +18,7 @@
 import { state, uid, SCHEMA_VERSION } from './core.js';
 import { apiFetch } from './api.js';
 import { isOnline, getDeviceId } from './net.js';
-import { getQueue, dequeue, toServerOp } from './sync-queue.js';
+import { getQueue, dequeue, toServerOp, loadSyncCursor, applySyncCursor } from './sync-queue.js';
 
 // باز-اکسپورت برای سازگاری تست‌ها (مرجع واحد در sync-queue.js است)
 export { toServerOp };
@@ -139,6 +139,7 @@ export async function pullFullSnapshot(deps) {
         requestFullResync: true,
     });
     if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
+    applySyncCursor(res);
     const snap = Array.isArray(res.data.fullSnapshot) ? res.data.fullSnapshot : [];
     return { ok: true, snapshot: snap };
 }
@@ -173,8 +174,9 @@ export async function syncOnLogin(deps) {
         let deviceId = 'unknown';
         try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback */ }
         const ops = local.map(t => buildSaveOp(t, { deviceId }));
-        const res = await post({ ops, deviceId, lastChangeSeq: null, requestFullResync: false });
+        const res = await post({ ops, deviceId, lastChangeSeq: loadSyncCursor(), requestFullResync: false });
         if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
+        applySyncCursor(res);
         try { await pushPendingNow({ readQueue: d.readQueue, postSync: post, removeOps }); } catch { /* silent */ }
         return { ok: true, action: 'pushed-all', pushed: ops.length, persisted: false };
     }
@@ -200,8 +202,9 @@ export async function syncOnLogin(deps) {
     if (toPush.length > 0) {
         let deviceId = 'unknown';
         try { deviceId = state.sync.deviceId || getDeviceId(); } catch { /* fallback */ }
-        const res = await post({ ops: toPush.map(t => buildSaveOp(t, { deviceId })), deviceId, lastChangeSeq: null, requestFullResync: false });
+        const res = await post({ ops: toPush.map(t => buildSaveOp(t, { deviceId })), deviceId, lastChangeSeq: loadSyncCursor(), requestFullResync: false });
         if (!res || res.ok !== true || !res.data) return { ok: true, action: 'merged', pushed: 0, pullOk: true, persisted: true };
+        applySyncCursor(res);
         return { ok: true, action: 'merged', pushed: toPush.length, persisted: true };
     }
     return { ok: true, action: 'merged', pushed: 0, persisted: true };
@@ -231,10 +234,11 @@ export async function pushPendingNow(deps) {
         const res = await post({
             ops: ops.map(toServerOp),
             deviceId: deviceId || 'unknown',
-            lastChangeSeq: null,
+            lastChangeSeq: loadSyncCursor(),
             requestFullResync: false,
         });
         if (!res || res.ok !== true || !res.data) return { ok: false, reason: 'server-or-network' };
+        applySyncCursor(res);
         const accepted = Array.isArray(res.data.accepted) ? res.data.accepted : [];
         const acceptedIds = accepted.map(a => String(a && a.opId)).filter(Boolean);
         if (acceptedIds.length > 0) {

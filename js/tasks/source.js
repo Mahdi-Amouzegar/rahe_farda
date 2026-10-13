@@ -402,14 +402,15 @@ export function getDetailBridgeTask(id) {
 
 /**
  * تسک‌های گروه + نام/آواتار فرستنده از اعضا.
+ * opts.lite: بدون درخواست members (نام/آواتار خالی می‌ماند؛ برای یادآور کافی است).
  */
-export async function fetchGroupTasks(groupId, myId) {
-    const [tres, mres] = await Promise.all([
-        apiFetch('/api/groups/' + encodeURIComponent(groupId) + '/tasks'),
-        apiFetch('/api/groups/' + encodeURIComponent(groupId) + '/members'),
-    ]);
+export async function fetchGroupTasks(groupId, myId, opts) {
+    const lite = !!(opts && opts.lite);
+    const tasksP = apiFetch('/api/groups/' + encodeURIComponent(groupId) + '/tasks');
+    const membersP = lite ? null : apiFetch('/api/groups/' + encodeURIComponent(groupId) + '/members');
+    const [tres, mres] = membersP ? await Promise.all([tasksP, membersP]) : [await tasksP, null];
     if (!tres.ok) return tres;
-    const members = (mres.ok && mres.data && mres.data.members) || [];
+    const members = (mres && mres.ok && mres.data && mres.data.members) || [];
     const nameOf = (uid) => {
         const m = members.find((x) => String(x.userId) === String(uid));
         if (!m) return String(uid || '').slice(0, 8);
