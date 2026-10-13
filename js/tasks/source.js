@@ -134,6 +134,34 @@ export function getSharedItem(id) {
 const _sharedCache = new Map(); // destKey -> { items, at }
 const SHARED_CACHE_CAP = 25;
 
+// ⚠️ 10.17: آستانه‌های اسکنر یادآور مشترک (notify.js هم از آن‌ها استفاده می‌کند)
+export const SHARED_SCAN_NEAR_MS = 15 * 60 * 1000;
+export const SHARED_SCAN_IDLE_MS = 10 * 60 * 1000;
+
+/**
+ * آیا این مقصد برای اسکنر یادآور نیاز به تازه‌سازی دارد؟ (10.17)
+ * سررسید نزدیک (≤ ۱۵ دقیقه) → بله (هر ۶۰ ثانیه).
+ * در سکون → حداکثر هر ۱۰ دقیقه: جلسه‌ای که دستگاه دیگر ایجاد کند
+ * تا ۱۰ دقیقه دیر دیده می‌شود — هنوز در پنجره‌ی جبران ۱۵ دقیقه‌ای است.
+ */
+export function shouldRefreshSharedKey(key) {
+    const entry = _sharedCache.get(key);
+    if (!entry || !Array.isArray(entry.items)) return true;
+    const now = Date.now();
+    let nearest = null;
+    for (const t of entry.items) {
+        if (!t || t.archived) continue;
+        for (const s of (t.sessions || [])) {
+            const v = new Date(s.at).getTime();
+            if (!Number.isFinite(v)) continue;
+            const d = v - now;
+            if (d >= 0 && (nearest === null || d < nearest)) nearest = d;
+        }
+    }
+    if (nearest !== null && nearest <= SHARED_SCAN_NEAR_MS) return true;
+    return (now - entry.at) >= SHARED_SCAN_IDLE_MS;
+}
+
 export function sharedCacheKey(dest) {
     if (!dest) return null;
     if (dest.type === 'peer' && dest.peerId) return 'peer:' + dest.peerId;

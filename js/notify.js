@@ -11,8 +11,8 @@
 
 import { state, uid } from './core.js';
 import { findTask, saveTasks, rollforwardRecur, advanceRecur, ROLLFORWARD_GUARD } from './store.js';
-import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN, DUE_CATCH_UP_MS } from './sessions.js';
-import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared } from './tasks/source.js';
+import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
+import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared, shouldRefreshSharedKey, SHARED_SCAN_NEAR_MS, SHARED_SCAN_IDLE_MS } from './tasks/source.js';
 import { isOnline } from './net.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
@@ -578,12 +578,19 @@ export function checkReminders() {
     });
 
     // ۴. یادآور مشترک (REQ-02 — محلی هر دستگاه، همه مقصدها).
-    // ⚠️ REQ-02 کامل: اول کش همه مقصدها تازه می‌شود (پس‌زمینه گیت‌دار)، بعد اسکن.
+    // ⚠️ 10.17: اسکن فوری از کش فعلی — مستقل از شبکه. سرور گاهی
+    // ۲-۵ ثانیه (یا بیشتر) پاسخ می‌دهد؛ اگر اسکن منتظر تازه‌سازی
+    // بماند، یادآورها چند دقیقه صف می‌شوند و با جبران ۱۵ دقیقه‌ای
+    // یکجا شلیک می‌شوند. تازه‌سازی پس‌زمینه، بعد از اتمام یک
+    // اسکن دوم (با داده‌ی تازه‌تر) می‌دهد.
     try {
-        refreshSharedCacheForReminders().catch(() => {}).finally(() => {
-            scanCachedShared(now);
-        });
+        scanCachedShared(now);
     } catch { /* silent */ }
+    refreshSharedCacheForReminders()
+        .catch(() => {})
+        .finally(() => {
+            try { scanCachedShared(Date.now()); } catch { /* silent */ }
+        });
 }
 
 /**
@@ -619,15 +626,13 @@ export function paintIfPending() {
  * یا کش خالی → هر چه زود؛ در سکون → حداکثر هر ۱۰ دقیقه. چون شلیک due
  * تا ۱۵ دقیقه بعد از سررسید ممکن است، هیچ یادآوری از دست نمی‌رود.
  */
-const SCAN_NEAR_MS = DUE_CATCH_UP_MS;
-const SCAN_IDLE_MS = 10 * 60 * 1000;
 let _lastSharedScanAt = 0;
 
 /** آیا اسکن پس‌زمینه لازم است؟ (محض — برای تست) */
 export function shouldScanShared(nowMs, nearestMs, lastScanAt, cacheEmpty) {
     if (cacheEmpty) return true;
-    if (nearestMs !== null && nearestMs <= SCAN_NEAR_MS) return true;
-    return (nowMs - lastScanAt) >= SCAN_IDLE_MS;
+    if (nearestMs !== null && nearestMs <= SHARED_SCAN_NEAR_MS) return true;
+    return (nowMs - lastScanAt) >= SHARED_SCAN_IDLE_MS;
 }
 
 /** نزدیک‌ترین سررسید آینده در کش (ms)؛ null اگر هیچ‌کدام. */
@@ -676,6 +681,8 @@ async function refreshSharedCacheForReminders() {
             if (!pid) continue;
             const key = 'peer:' + pid;
             if (seen.has(key)) continue;
+            // ⚠️ 10.17: مقصد ساکن (سررسید دور + کش تازه) را دوباره نمی‌خوانیم
+            if (!shouldRefreshSharedKey(key)) continue;
             seen.add(key);
             const nm = (c.user.displayName || c.user.username || '');
             jobs.push(
@@ -688,6 +695,8 @@ async function refreshSharedCacheForReminders() {
             if (!g || !g.id) continue;
             const key = 'group:' + g.id;
             if (seen.has(key)) continue;
+            // ⚠️ 10.17: مقصد ساکن را دوباره نمی‌خوانیم (تا ۱۰ دقیقه صبر)
+            if (!shouldRefreshSharedKey(key)) continue;
             seen.add(key);
             jobs.push(
                 // ⚠️ 10.15: lite — نام/آواتار برای یادآور لازم نیست (نصف درخواست‌ها)
@@ -771,6 +780,27 @@ export function rollforwardSharedCache(nowMs) {
 }
 
 /**
+ * گیت شلیک دوگانه (10.17): اسکن فوری + اسکن پس از تازه‌سازی
+ * می‌توانند همزمان بیفتند (پرچم‌ها تا resolve شدن نوتیف ثبت
+ * نمی‌شوند) — هر (جلسه، نوع) را در ۹۰ ثانیه حداکثر یک بار
+ * شلیک می‌دهد.
+ */
+const _firedSharedKeys = new Map();
+
+export function firedSharedKey(key, kind, nowMs) {
+    const k = key + ':' + kind;
+    const exp = _firedSharedKeys.get(k);
+    if (exp !== undefined && exp > nowMs) return true;
+    _firedSharedKeys.set(k, nowMs + 90000);
+    if (_firedSharedKeys.size > 500) {
+        for (const [kk, ee] of _firedSharedKeys) {
+            if (ee <= nowMs) _firedSharedKeys.delete(kk);
+        }
+    }
+    return false;
+}
+
+/**
  * اسکن کش مشترک و شلیک هشدارها.
  */
 function scanCachedShared(now) {
@@ -780,7 +810,8 @@ function scanCachedShared(now) {
             // ⚠️ 10.16: اول سری‌های مشترک جلو می‌روند (جلسات آینده ساخته می‌شود)
             rollforwardSharedCache(now);
             const flags = readSharedRem();
-            const due = collectSharedDue(cached, now, flags);
+            const due = collectSharedDue(cached, now, flags)
+                .filter(d => !firedSharedKey(d.key, d.kind, now));
             if (due.length > 0) {
                 for (const d of due) {
                     const titleKey = d.kind === 'due'

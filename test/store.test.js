@@ -1,11 +1,11 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // test/store.test.js — تست‌های sanitization
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache } from '../js/notify.js';
-import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared } from '../js/tasks/source.js';
+import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey } from '../js/notify.js';
+import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared, shouldRefreshSharedKey } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -673,5 +673,53 @@ describe('rollforwardSharedCache — جلو بردن سری‌های مشترک 
         const t = { id: 't3', text: 'x', _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } } };
         const r = await persistAdvancedShared(t);
         expect(r).toEqual({ ok: false });
+    });
+});
+
+describe('shouldRefreshSharedKey — گیت مقصد اسکنر (10.17)', () => {
+    beforeEach(() => { __resetSharedForTest(); });
+    afterEach(() => { __resetSharedForTest(); });
+
+    it('مقصد کش‌نشده → تازه‌سازی', () => {
+        expect(shouldRefreshSharedKey('group:g1')).toBe(true);
+    });
+
+    it('سررسید نزدیک (≤ ۱۵ دقیقه) → تازه‌سازی', () => {
+        const t = { id: 't1', archived: false, sessions: [{ id: 's', at: new Date(Date.now() + 60000).toISOString() }] };
+        cacheSharedItems('group:g1', [t]);
+        expect(shouldRefreshSharedKey('group:g1')).toBe(true);
+    });
+
+    it('سررسید دور + کش تازه → صرفه‌جویی', () => {
+        const t = { id: 't1', archived: false, sessions: [{ id: 's', at: new Date(Date.now() + 3600000).toISOString() }] };
+        cacheSharedItems('group:g1', [t]);
+        expect(shouldRefreshSharedKey('group:g1')).toBe(false);
+    });
+
+    it('سررسید دور + گذشت ۱۰ دقیقه → دوباره تازه‌سازی', () => {
+        vi.useFakeTimers();
+        try {
+            const t = { id: 't1', archived: false, sessions: [{ id: 's', at: new Date(Date.now() + 3600000).toISOString() }] };
+            cacheSharedItems('group:g1', [t]);
+            expect(shouldRefreshSharedKey('group:g1')).toBe(false);
+            vi.advanceTimersByTime(11 * 60 * 1000);
+            expect(shouldRefreshSharedKey('group:g1')).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('firedSharedKey — گیت شلیک دوگانه (10.17)', () => {
+    it('هر (جلسه، نوع) در ۹۰ ثانیه حداکثر یک بار', () => {
+        expect(firedSharedKey('shr:xa:sa', 'due', 1000)).toBe(false);
+        expect(firedSharedKey('shr:xa:sa', 'due', 2000)).toBe(true);
+        expect(firedSharedKey('shr:xa:sa', 'due', 1000 + 90001)).toBe(false);
+    });
+
+    it('نوع و کلید متفاوت مستقل‌اند', () => {
+        expect(firedSharedKey('shr:xb:sb', 'due', 1000)).toBe(false);
+        expect(firedSharedKey('shr:xb:sb', 'dueSoon', 1001)).toBe(false);
+        expect(firedSharedKey('shr:xc:sc', 'due', 1002)).toBe(false);
     });
 });
