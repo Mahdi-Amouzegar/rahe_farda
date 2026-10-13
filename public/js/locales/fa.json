@@ -1371,7 +1371,7 @@
     },
     "reminder": {
       "title": "⏰ یادآور جلسه",
-      "dueSoonTitle": "🔔 ۵ دقیقه تا جلسه",
+      "dueSoonTitle": "🔔 کمتر از ۵ دقیقه تا جلسه",
       "dueTitle": "🔔 زمان جلسه رسید"
     },
     "digest": {

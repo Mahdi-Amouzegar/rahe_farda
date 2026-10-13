@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey } from '../js/notify.js';
+import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey, nextSessionAtMap } from '../js/notify.js';
 import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared, shouldRefreshSharedKey } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
@@ -721,5 +721,55 @@ describe('firedSharedKey — گیت شلیک دوگانه (10.17)', () => {
         expect(firedSharedKey('shr:xb:sb', 'due', 1000)).toBe(false);
         expect(firedSharedKey('shr:xb:sb', 'dueSoon', 1001)).toBe(false);
         expect(firedSharedKey('shr:xc:sc', 'due', 1002)).toBe(false);
+    });
+});
+
+describe('nextSessionAtMap + گیت dueSoon (10.18)', () => {
+    const M = 60000;
+
+    it('نخستین جلسه‌ی آینده‌ی هر تسک را می‌یابد', () => {
+        const now = 1000;
+        const map = nextSessionAtMap([
+            { taskId: 'a', at: new Date(now + 2 * M).toISOString() },
+            { taskId: 'a', at: new Date(now + 5 * M).toISOString() },
+            { taskId: 'a', at: new Date(now - M).toISOString() },
+            { taskId: 'b', at: new Date(now + M).toISOString() },
+        ], now);
+        expect(map.get('a')).toBe(now + 2 * M);
+        expect(map.get('b')).toBe(now + M);
+    });
+
+    it('بدون جلسه‌ی آینده → نقشه‌ی خالی', () => {
+        expect(nextSessionAtMap([], 1000).size).toBe(0);
+        expect(nextSessionAtMap([{ taskId: 'a', at: new Date(500).toISOString() }], 1000).size).toBe(0);
+    });
+
+    it('dueSoon فقط برای جلسه‌ی فعلی است (نه جلسه‌ی بعدی‌اش)', () => {
+        const now = Date.now();
+        const items = [{
+            id: 't1', text: 'x', archived: false,
+            sessions: [
+                { id: 's1', at: new Date(now + 3 * M).toISOString() },
+                { id: 's2', at: new Date(now + 4 * M).toISOString() },
+            ],
+        }];
+        const due = collectSharedDue(items, now, {});
+        const soon = due.filter(d => d.kind === 'dueSoon');
+        expect(soon).toHaveLength(1);
+        expect(soon[0].sessId).toBe('s1');
+    });
+
+    it('جلسه‌ی گذشته فقط «زمان رسید» می‌گیرد', () => {
+        const now = Date.now();
+        const items = [{
+            id: 't1', text: 'x', archived: false,
+            sessions: [
+                { id: 's1', at: new Date(now - 2 * M).toISOString() },
+                { id: 's2', at: new Date(now + 3 * M).toISOString() },
+            ],
+        }];
+        const due = collectSharedDue(items, now, {});
+        expect(due.filter(d => d.kind === 'due').map(d => d.sessId)).toEqual(['s1']);
+        expect(due.filter(d => d.kind === 'dueSoon').map(d => d.sessId)).toEqual(['s2']);
     });
 });

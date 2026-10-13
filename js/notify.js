@@ -458,10 +458,38 @@ function leadRegisteredTooSoon(regAt, v) {
  * کدام جلسه‌های مشترک باید هشدار بدهند؟ (خالص و تست‌پذیر — شلیک نمی‌کند)
  * @returns {Array<{key:string, owner:string, at:string, kind:'lead'|'dueSoon'|'due', sessId:string}>}
  */
+/**
+ * نخستین جلسه‌ی آینده‌ی هر تسک (10.18 — گیت هشدار ۵ دقیقه‌ای).
+ * هشدار «کمتر از ۵ دقیقه» فقط برای جلسه‌ی فعلی (نخستین آینده)
+ * است — جلسات از دست رفته‌ی دوره‌ها فقط هشدار «زمان رسید»
+ * می‌گیرند، تا در بازگشایی صفحه تعداد نوتیف‌ها کم شود.
+ * @param {Array<{taskId:(string|number), at:string}>} entries
+ * @param {number} nowMs
+ * @returns {Map<string, number>} taskId -> زمان نخستین جلسه‌ی آینده
+ */
+export function nextSessionAtMap(entries, nowMs) {
+    const map = new Map();
+    for (const e of entries || []) {
+        if (!e || e.at == null || e.taskId == null) continue;
+        const v = new Date(e.at).getTime();
+        if (!Number.isFinite(v) || v <= nowMs) continue;
+        const k = String(e.taskId);
+        const cur = map.get(k);
+        if (cur === undefined || v < cur) map.set(k, v);
+    }
+    return map;
+}
+
 export function collectSharedDue(items, nowMs, flags) {
     const out = [];
     const seenKey = new Set();
     const rmDefault = (() => { try { return state.prefs.remindMin; } catch { return null; } })();
+    // ⚠️ 10.18: هشدار ۵ دقیقه‌ای فقط برای جلسه‌ی فعلی هر تسک
+    const nextAt = nextSessionAtMap(
+        (items || []).flatMap(t => (t && !t.archived && Array.isArray(t.sessions))
+            ? t.sessions.map(s => ({ taskId: t.id, at: s.at }))
+            : []),
+        nowMs);
     for (const t of items || []) {
         if (!t || t.archived) continue;
         for (const s of (t.sessions || [])) {
@@ -480,7 +508,10 @@ export function collectSharedDue(items, nowMs, flags) {
                 && !leadRegisteredTooSoon(regAt, v)) {
                 out.push({ key, owner, at: s.at, kind: 'lead', sessId: String(s.id) });
             }
-            if (!f.remindedDueSoon && nowMs >= v - NEAR_DUE_MIN * 60 * 1000 && nowMs < v) {
+            // ⚠️ 10.18: فقط جلسه‌ی فعلی (نخستین آینده) — جلسات
+            // از دست رفته فقط هشدار «زمان رسید» می‌گیرند.
+            if (!f.remindedDueSoon && nextAt.get(String(t.id)) === v
+                && nowMs >= v - NEAR_DUE_MIN * 60 * 1000 && nowMs < v) {
                 out.push({ key, owner, at: s.at, kind: 'dueSoon', sessId: String(s.id) });
             }
             if (nowMs >= v && isDueFireable(nowMs, v, f.remindedDue)) {
@@ -521,7 +552,10 @@ export function checkReminders() {
     if (!state.prefs.remindOn) return;
     if (!notifGranted()) return;
 
-    allSessions(true).forEach(s => {
+    const allSess = allSessions(true);
+    // ⚠️ 10.18: هشدار ۵ دقیقه‌ای فقط برای جلسه‌ی فعلی هر تسک
+    const nextAt = nextSessionAtMap(allSess, now);
+    allSess.forEach(s => {
         const rm = (s.remindMin != null) ? s.remindMin : state.prefs.remindMin;
         const v = new Date(s.at).getTime();
         if (isNaN(v)) return;
@@ -547,8 +581,11 @@ export function checkReminders() {
         }
 
         // ۲. هشدار ۵ دقیقه قبل (فقط قبل از سررسید، با پرچم خودش).
+        // ⚠️ 10.18: فقط جلسه‌ی فعلی (نخستین آینده) — جلسات از دست
+        // رفته‌ی دوره‌ها فقط هشدار «زمان رسید» می‌گیرند.
         const nearDueTarget = v - NEAR_DUE_MIN * 60 * 1000;
-        if (!s.remindedDueSoon && now >= nearDueTarget && now < v) {
+        if (!s.remindedDueSoon && nextAt.get(String(s.taskId)) === v
+            && now >= nearDueTarget && now < v) {
             fireNotification(
                 i18nT('notifications.reminder.dueSoonTitle'),
                 `${s.owner} — ${faShort(s.at)}`,
