@@ -9,10 +9,10 @@
 // اولویت پخش: پیش‌فرض → preset → TTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state } from './core.js';
-import { findTask, saveTasks, rollforwardRecur } from './store.js';
+import { state, uid } from './core.js';
+import { findTask, saveTasks, rollforwardRecur, advanceRecur, ROLLFORWARD_GUARD } from './store.js';
 import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN, DUE_CATCH_UP_MS } from './sessions.js';
-import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks } from './tasks/source.js';
+import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared } from './tasks/source.js';
 import { isOnline } from './net.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
@@ -702,12 +702,83 @@ async function refreshSharedCacheForReminders() {
 }
 
 /**
+ * جلو بردن یک آیتم مشترک (معادل visit در rollforwardRecur).
+ * ⚠️ 10.16: سری‌های مشترک روی سرور فقط جلسات زمان ساخت را دارند —
+ * بدون این، هشدار به‌موقع و سررسید بعدی هرگز ظاهر نمی‌شوند.
+ * id جلسه‌ی ساخته‌شده قطعی است (taskId@at) تا چند دستگاه روی یک
+ * سررسید همگرا شوند و هشدار دوگانه نیاید.
+ */
+function advanceSharedRecur(t, nowMs) {
+    if (!t || t.archived || t.completed) return false;
+    if (!t.recur || t.recur === 'none') return false;
+    const list = t.sessions;
+    if (!Array.isArray(list) || list.length === 0) return false;
+    const latestOf = () => {
+        let m = -Infinity;
+        for (const s of list) {
+            const v = new Date(s.at).getTime();
+            if (Number.isFinite(v) && v > m) m = v;
+        }
+        return m;
+    };
+    if (!(latestOf() <= nowMs)) return false;
+    let changed = false;
+    let guard = 0;
+    while (guard++ < ROLLFORWARD_GUARD) {
+        if (!(latestOf() <= nowMs)) break;
+        if (!advanceRecur(t)) break;
+        const s = list[list.length - 1];
+        if (s) s.id = String(t.id) + '@' + s.at;
+        changed = true;
+    }
+    if (changed && latestOf() <= nowMs) {
+        // غیبت طولانی: فروپاشی به یک جلسه آینده از اکنون
+        const scratch = {
+            recur: t.recur,
+            recurN: t.recurN,
+            recurMin: t.recurMin,
+            recurDays: Array.isArray(t.recurDays) ? [...t.recurDays] : [],
+            sessions: [{ id: 'seed', at: new Date(nowMs).toISOString() }],
+        };
+        if (advanceRecur(scratch) && scratch.sessions.length > 1) {
+            const s = scratch.sessions[scratch.sessions.length - 1];
+            s.id = String(t.id) + '@' + s.at;
+            t.sessions = scratch.sessions.slice(-1);
+        }
+    }
+    return changed;
+}
+
+/**
+ * جلو بردن سری‌های مشترک در کش مقصدها (حلقه‌ی یادآور).
+ * آیتم‌های خودی را به سرور می‌نویسد (fire-and-forget؛ شکست →
+ * دوره‌ی بعدی بعد از تازه‌سازی کش دوباره تلاش می‌کند).
+ * @returns {Array} آیتم‌های جلو رفته
+ */
+export function rollforwardSharedCache(nowMs) {
+    const advanced = [];
+    try {
+        for (const t of getCachedSharedAll()) {
+            if (advanceSharedRecur(t, nowMs)) advanced.push(t);
+        }
+    } catch { /* silent */ }
+    for (const t of advanced) {
+        if (t._shared && t._shared.mine) {
+            persistAdvancedShared(t).catch(() => { /* آفلاین */ });
+        }
+    }
+    return advanced;
+}
+
+/**
  * اسکن کش مشترک و شلیک هشدارها.
  */
 function scanCachedShared(now) {
     try {
         const cached = getCachedSharedAll();
         if (Array.isArray(cached) && cached.length > 0) {
+            // ⚠️ 10.16: اول سری‌های مشترک جلو می‌روند (جلسات آینده ساخته می‌شود)
+            rollforwardSharedCache(now);
             const flags = readSharedRem();
             const due = collectSharedDue(cached, now, flags);
             if (due.length > 0) {

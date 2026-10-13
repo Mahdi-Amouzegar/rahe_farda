@@ -304,6 +304,17 @@ export async function updateSharedTaskText(remoteId, title) {
 }
 
 /**
+ * نوشتن تسک مشترکِ جلو رفته (rollforward 10.16 — فقط خودی).
+ * @returns {Promise<{ok:boolean}>}
+ */
+export function persistAdvancedShared(task) {
+    if (!task || !task._shared || !task._shared.mine || !task._shared.dest) {
+        return Promise.resolve({ ok: false });
+    }
+    return writeSharedTask(task._shared.dest, task.id, stripShared(task));
+}
+
+/**
  * تاگل تسک خودی در نمای مشترک.
  */
 export async function toggleSharedTask(remoteId) {

@@ -4,8 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders, collectSharedDue, paintIfPending } from '../js/notify.js';
-import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest } from '../js/tasks/source.js';
+import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache } from '../js/notify.js';
+import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
 describe('store — sanitizeUrl', () => {
@@ -603,5 +603,75 @@ describe('notify — paintIfPending BUG-07', () => {
             state.tasks = [];
             try { localStorage.removeItem('spaceTodoTasks'); } catch { /* silent */ }
         }
+    });
+});
+
+describe('rollforwardSharedCache — جلو بردن سری‌های مشترک (10.16)', () => {
+    beforeEach(() => { __resetSharedForTest(); });
+    afterEach(() => { __resetSharedForTest(); });
+
+    const H = 3600000;
+
+    it('جلسه‌ی گذشته را جلو می‌برد و جلسه‌ی آینده می‌سازد', () => {
+        const t = {
+            id: 't1', text: 'مشترک', recur: 'daily', archived: false, completed: false,
+            sessions: [{ id: 's0', at: new Date(Date.now() - H).toISOString() }],
+            _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } },
+        };
+        cacheSharedItems('peer:p1', [t]);
+        const advanced = rollforwardSharedCache(Date.now());
+        expect(advanced).toHaveLength(1);
+        expect(t.sessions).toHaveLength(2);
+        expect(new Date(t.sessions[1].at).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('id جلسه‌ی ساخته‌شده قطعی است (همگرایی چند دستگاه)', () => {
+        const base = new Date(Date.now() - 2 * 24 * H).toISOString();
+        const mk = () => ({
+            id: 't1', text: 'x', recur: 'daily', archived: false, completed: false,
+            sessions: [{ id: 's0', at: base }],
+            _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } },
+        });
+        const a = mk();
+        cacheSharedItems('peer:p1', [a]);
+        rollforwardSharedCache(Date.now());
+        expect(a.sessions[1].id).toBe('t1@' + a.sessions[1].at);
+        expect(a.sessions[2].id).toBe('t1@' + a.sessions[2].at);
+    });
+
+    it('بدون قانون / تکمیل‌شده / بایگانی / جلسه‌ی آینده دست نمی‌خورد', () => {
+        const future = new Date(Date.now() + H).toISOString();
+        const items = [
+            { id: 'a', text: 'x', recur: 'none', sessions: [{ id: 's', at: new Date(Date.now() - H).toISOString() }], _shared: { mine: false } },
+            { id: 'b', text: 'x', recur: 'daily', completed: true, sessions: [{ id: 's', at: new Date(Date.now() - H).toISOString() }], _shared: { mine: false } },
+            { id: 'c', text: 'x', recur: 'daily', archived: true, sessions: [{ id: 's', at: new Date(Date.now() - H).toISOString() }], _shared: { mine: false } },
+            { id: 'd', text: 'x', recur: 'daily', sessions: [{ id: 's', at: future }], _shared: { mine: false } },
+            { id: 'e', text: 'x', recur: 'daily', sessions: [], _shared: { mine: false } },
+        ];
+        cacheSharedItems('peer:p1', items);
+        expect(rollforwardSharedCache(Date.now())).toHaveLength(0);
+        for (const it of items) {
+            if (it.id === 'd') expect(it.sessions).toHaveLength(1);
+            else if (it.sessions.length) expect(it.sessions).toHaveLength(1);
+        }
+    });
+
+    it('غیبت طولانی → فروپاشی به یک جلسه‌ی آینده از اکنون', () => {
+        const t = {
+            id: 't2', text: 'x', recur: 'daily', archived: false, completed: false,
+            sessions: [{ id: 's0', at: new Date(Date.now() - 400 * 24 * H).toISOString() }],
+            _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } },
+        };
+        cacheSharedItems('peer:p1', [t]);
+        rollforwardSharedCache(Date.now());
+        expect(t.sessions).toHaveLength(1);
+        expect(new Date(t.sessions[0].at).getTime()).toBeGreaterThan(Date.now());
+        expect(t.sessions[0].id).toBe('t2@' + t.sessions[0].at);
+    });
+
+    it('persistAdvancedShared برای غیرخودی بدون درخواست شبکه {ok:false} است', async () => {
+        const t = { id: 't3', text: 'x', _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } } };
+        const r = await persistAdvancedShared(t);
+        expect(r).toEqual({ ok: false });
     });
 });

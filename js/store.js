@@ -1349,7 +1349,7 @@ export function advanceRecur(task) {
 /**
  * سقف قدم برای جلو بردن خودکار (غیبت طولانی + پریود کوتاه نباید هزاران جلسه بسازد).
  */
-const ROLLFORWARD_GUARD = 366;
+export const ROLLFORWARD_GUARD = 366;
 
 /**
  * جلو بردن خودکار سری‌های قانونیِ تاریخ‌گذشته (10.11 — خالص روی آرایه، تست‌پذیر).
