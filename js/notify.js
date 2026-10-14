@@ -626,6 +626,7 @@ export function checkReminders() {
     refreshSharedCacheForReminders()
         .catch(() => {})
         .finally(() => {
+            _sharedFirstScanDone = true;
             try { scanCachedShared(Date.now()); } catch { /* silent */ }
         });
 }
@@ -664,6 +665,10 @@ export function paintIfPending() {
  * تا ۱۵ دقیقه بعد از سررسید ممکن است، هیچ یادآوری از دست نمی‌رود.
  */
 let _lastSharedScanAt = 0;
+
+// ⚠️ 10.19: نخستین اسکن مقصدهای مشترک تمام شده؟
+// (دایجست صبحگاهی تا آن موقع فقط وظایف شخصی را می‌شمارد)
+let _sharedFirstScanDone = false;
 
 /** آیا اسکن پس‌زمینه لازم است؟ (محض — برای تست) */
 export function shouldScanShared(nowMs, nearestMs, lastScanAt, cacheEmpty) {
@@ -877,15 +882,42 @@ function scanCachedShared(now) {
 // Digest
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * وظایف امروز — شخصی + مشترک (10.19، محض و تست‌پذیر).
+ * @param {Array} personalSessions خروجی allSessions(false)
+ * @param {Array} sharedItems آیتم‌های کش مقصدها
+ * @param {string} day کلید روز (dayKey)
+ * @returns {Array<{owner:string, at:string}>} مرتب‌شده بر اساس زمان
+ */
+export function todaySessions(personalSessions, sharedItems, day) {
+    const out = [];
+    for (const s of personalSessions || []) {
+        if (s && dayKey(new Date(s.at)) === day) out.push({ owner: s.owner, at: s.at });
+    }
+    for (const t of sharedItems || []) {
+        if (!t || t.archived) continue;
+        for (const s of (t.sessions || []) || []) {
+            if (s && dayKey(new Date(s.at)) === day) out.push({ owner: t.text, at: s.at });
+        }
+    }
+    out.sort((a, b) => new Date(a.at) - new Date(b.at));
+    return out;
+}
+
 export function checkDigest() {
     if (!state.prefs.digestOn || !notifGranted()) return;
     const now = getNow();
     if (now.getHours() < 6) return;
     const day = dayKey(now);
     if (state.prefs.lastDigest === day) return;
+    // ⚠️ 10.19: اگر کاربر وارد شده، صبر کن تا نخستین اسکن
+    // مقصدهای مشترک تمام شود (کش هنوز خالی است) — در غیر
+    // این صورت نوتیف فقط وظایف شخصی را می‌شمارد.
+    let loggedIn = false;
+    try { loggedIn = !!(state.sync && state.sync.userId); } catch { /* silent */ }
+    if (loggedIn && !_sharedFirstScanDone) return;
 
-    // نکته: allSessions(false) چون می‌خواهیم همه جلسات امروز (حتی completed) را ببینیم
-    const todays = allSessions(false).filter(s => dayKey(new Date(s.at)) === day);
+    const todays = todaySessions(allSessions(false), getCachedSharedAll(), day);
     const body = todays.length
         ? i18nT('notifications.digest.hasSessions', {
             n: formatNumber(todays.length),

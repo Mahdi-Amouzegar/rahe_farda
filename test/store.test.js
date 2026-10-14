@@ -3,8 +3,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
-import { isDueFireable, DUE_CATCH_UP_MS } from '../js/sessions.js';
-import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey, nextSessionAtMap } from '../js/notify.js';
+import { isDueFireable, DUE_CATCH_UP_MS, dayKey } from '../js/sessions.js';
+import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey, nextSessionAtMap, todaySessions } from '../js/notify.js';
 import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared, shouldRefreshSharedKey } from '../js/tasks/source.js';
 import { MAX_LENGTH, state, uid } from '../js/core.js';
 
@@ -771,5 +771,42 @@ describe('nextSessionAtMap + گیت dueSoon (10.18)', () => {
         const due = collectSharedDue(items, now, {});
         expect(due.filter(d => d.kind === 'due').map(d => d.sessId)).toEqual(['s1']);
         expect(due.filter(d => d.kind === 'dueSoon').map(d => d.sessId)).toEqual(['s2']);
+    });
+});
+
+describe('todaySessions — دایجست امروز شخصی+مشترک (10.19)', () => {
+    const M = 60000;
+
+    it('وظایف امروز شخصی و مشترک را می‌شمارد و مرتب می‌کند', () => {
+        const now = Date.now();
+        const personal = [
+            { owner: 'شخصی۱', at: new Date(now + 2 * M).toISOString() },
+            { owner: 'شخصی۲', at: new Date(now - 24 * 60 * M).toISOString() },
+        ];
+        const shared = [{
+            id: 't1', text: 'مشترک۱', archived: false,
+            sessions: [{ id: 's1', at: new Date(now + M).toISOString() }],
+        }];
+        const day = dayKey(now);
+        const out = todaySessions(personal, shared, day);
+        expect(out.map(o => o.owner)).toEqual(['مشترک۱', 'شخصی۱']);
+    });
+
+    it('آیتم بایگانی‌شده و جلسه‌ی غیرامروز حذف می‌شود', () => {
+        const now = Date.now();
+        const personal = [];
+        const shared = [
+            { id: 'a', text: 'بایگانی', archived: true, sessions: [{ id: 's', at: new Date(now).toISOString() }] },
+            { id: 'b', text: 'فردا', archived: false, sessions: [{ id: 's', at: new Date(now + 24 * 60 * M).toISOString() }] },
+            { id: 'c', text: 'امروز', archived: false, sessions: [{ id: 's', at: new Date(now).toISOString() }] },
+        ];
+        const day = dayKey(now);
+        const out = todaySessions(personal, shared, day);
+        expect(out.map(o => o.owner)).toEqual(['امروز']);
+    });
+
+    it('ورودی‌های خالی → خالی', () => {
+        expect(todaySessions([], [], 'x')).toEqual([]);
+        expect(todaySessions(null, null, 'x')).toEqual([]);
     });
 });
