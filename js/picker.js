@@ -26,6 +26,7 @@ import {
     gregorianMonthLength
 } from './jalali.js';
 import { faShort, updateDueChips, hasSessionAt, allSessions } from './sessions.js';
+import { getCachedSharedAll } from './tasks/source.js';
 import { formatNumber, formatYear, getLang, t as i18nT } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -290,6 +291,18 @@ export function findConflict(ms) {
         const v = new Date(s.at).getTime();
         if (isNaN(v) || v < now) continue;
         if (Math.abs(v - ms) < 30 * 60 * 1000) return s;
+    }
+    // ─── مقصدهای مشترک هم (DM/گروه) — همان پنجره‌ی ۳۰ دقیقه‌ای ───
+    let shared = [];
+    try { shared = getCachedSharedAll() || []; } catch { shared = []; }
+    for (const t of shared) {
+        if (!t || t.archived || t.completed) continue;
+        for (const s of (t.sessions || [])) {
+            if (!s) continue;
+            const v = new Date(s.at).getTime();
+            if (isNaN(v) || v < now) continue;
+            if (Math.abs(v - ms) < 30 * 60 * 1000) return { at: s.at, owner: t.text || '' };
+        }
     }
     return null;
 }
