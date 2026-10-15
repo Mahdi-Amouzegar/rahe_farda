@@ -1,13 +1,22 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // test/media-photos.test.js — عکس lazy: بایت هرگز در سینک نیست
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+vi.mock('../js/media-upload.js', () => ({
+    enqueueUpload: vi.fn(async () => ({})),
+    getUploadStatus: vi.fn(async () => null),
+}));
+
 import {
     stripPhotoBytesForSync,
     classifyPhotoForDisplay,
 } from '../js/media-cache.js';
 import { toServerOp } from '../js/sync-queue.js';
 import { sanitizeTask } from '../js/store.js';
+import { stripSharedPayload, enqueueGroupPhotosForUpload } from '../js/tasks/source.js';
+import { enqueueUpload } from '../js/media-upload.js';
+import { state } from '../js/core.js';
 
 const photo = (over = {}) => ({
     id: 'p1',
@@ -101,5 +110,57 @@ describe('sanitizeTask — عکس آپلودشده', () => {
         const twice = sanitizeTask({ ...once, mediaIds: ['p1'] });
         expect(twice.photos).toHaveLength(1);
         expect(twice.photos[0].serverMediaId).toBe('srv1');
+    });
+});
+
+describe('stripSharedPayload — گروه/DM', () => {
+    it('گروه: dataUrl حذف می‌شود', () => {
+        const out = stripSharedPayload({ id: 't1', photos: [photo()] }, { type: 'group', groupId: 'g1' });
+        expect(out.photos[0].dataUrl).toBeUndefined();
+        expect(out.photos[0].id).toBe('p1');
+    });
+    it('DM: دست‌نخورده می‌ماند (flow آپلود/مجوز ندارد)', () => {
+        const task = { id: 't1', photos: [photo()] };
+        expect(stripSharedPayload(task, { type: 'peer' })).toBe(task);
+    });
+    it('بدون dest: دست‌نخورده', () => {
+        const task = { id: 't1', photos: [photo()] };
+        expect(stripSharedPayload(task, null)).toBe(task);
+    });
+});
+
+describe('enqueueGroupPhotosForUpload', () => {
+    const syncWas = { enabled: false, token: null };
+    beforeEach(() => {
+        syncWas.enabled = state.sync.enabled;
+        syncWas.token = state.sync.authToken;
+        state.sync.enabled = true;
+        state.sync.authToken = 'tok';
+        vi.mocked(enqueueUpload).mockClear();
+    });
+    afterEach(() => {
+        state.sync.enabled = syncWas.enabled;
+        state.sync.authToken = syncWas.token;
+    });
+    const groupDest = { type: 'group', groupId: 'g1' };
+    it('عکس جدید گروهی با groupId و taskId تهی enqueue می‌شود', async () => {
+        const res = await enqueueGroupPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: [] });
+        expect(res).toEqual({ enqueued: 1 });
+        expect(vi.mocked(enqueueUpload)).toHaveBeenCalledTimes(1);
+        const arg = vi.mocked(enqueueUpload).mock.calls[0][0];
+        expect(arg.mediaId).toBe('p1');
+        expect(arg.taskId).toBeNull();
+        expect(arg.groupId).toBe('g1');
+        expect(arg.blob instanceof Blob).toBe(true);
+    });
+    it('عکس آپلودشده رد می‌شود', async () => {
+        const res = await enqueueGroupPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: ['p1'] });
+        expect(res).toEqual({ enqueued: 0 });
+        expect(vi.mocked(enqueueUpload)).not.toHaveBeenCalled();
+    });
+    it('مقصد peer: هیچ enqueue (تا تغییر امنیتی سرور)', async () => {
+        const res = await enqueueGroupPhotosForUpload({ type: 'peer' }, { id: 't1', photos: [photo()], mediaIds: [] });
+        expect(res).toEqual({ enqueued: 0 });
+        expect(vi.mocked(enqueueUpload)).not.toHaveBeenCalled();
     });
 });

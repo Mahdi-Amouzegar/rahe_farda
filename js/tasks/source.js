@@ -9,6 +9,9 @@
 import { apiFetch } from '../api.js';
 import { state } from '../core.js';
 import { events, EV } from '../events.js';
+import { stripPhotoBytesForSync, putCachedPhoto } from '../media-cache.js';
+import { enqueueUpload } from '../media-upload.js';
+import { dataUrlToBlob } from '../media.js';
 import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { getDestination } from './destination.js';
@@ -266,13 +269,58 @@ function stripShared(item) {
     return clean;
 }
 
+/**
+ * payload نوشتن مشترک — گروه: بدون بایت عکس (lazy)؛ DM: دست‌نخورده.
+ *
+ * چرا DM نه؟ آپلود گروهی با groupId می‌رود و اعضا مجوز دانلود دارند؛
+ * ولی دانلود peer در Stage C مجاز نیست (تغییر امنیتی سرور می‌خواهد).
+ * تا آن زمان بایت DM مثل قبل می‌ماند تا عکس نشکند.
+ */
+export function stripSharedPayload(taskObj, dest) {
+    if (dest && dest.type === 'group') return stripPhotoBytesForSync(taskObj);
+    return taskObj;
+}
+
+/**
+ * enqueue آپلود عکس‌های گروهیِ هنوزآپلودنشده.
+ * taskId تهی می‌ماند (presign با taskId مالکیت تسک شخصی می‌خواهد)؛
+ * تطبیق محلی در upload-complete با photo.id انجام می‌شود.
+ */
+export async function enqueueGroupPhotosForUpload(dest, taskObj) {
+    if (!dest || dest.type !== 'group' || !dest.groupId) return { enqueued: 0 };
+    if (!taskObj || !Array.isArray(taskObj.photos) || taskObj.photos.length === 0) return { enqueued: 0 };
+    if (!state.sync.enabled || !state.sync.authToken) return { enqueued: 0 };
+    const uploaded = new Set(
+        Array.isArray(taskObj.mediaIds) ? taskObj.mediaIds.map(id => String(id)) : []
+    );
+    let enqueued = 0;
+    for (const photo of taskObj.photos) {
+        if (!photo || !photo.id || uploaded.has(String(photo.id))) continue;
+        if (typeof photo.dataUrl !== 'string' || !photo.dataUrl.startsWith('data:')) continue;
+        if (typeof photo.contentType !== 'string' || typeof photo.sizeBytes !== 'number') continue;
+        try {
+            const blob = dataUrlToBlob(photo.dataUrl);
+            await enqueueUpload({
+                mediaId: photo.id,
+                taskId: null,
+                groupId: dest.groupId,
+                contentType: photo.contentType,
+                sizeBytes: photo.sizeBytes,
+                blob,
+            });
+            enqueued++;
+        } catch { /* silent */ }
+    }
+    return { enqueued };
+}
+
 async function writeSharedTask(dest, remoteId, taskObj) {
     try {
         if (dest.type === 'peer') {
             return updateDmTask(remoteId, taskObj);
         }
         if (dest.type === 'group') {
-            await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: taskObj });
+            await enqueueGroupOp(dest.groupId, 'save', remoteId, { kind: 'task', payload: stripSharedPayload(taskObj, dest) });
             let failed = 0;
             try {
                 const fr = await flushGroup(dest.groupId);
@@ -281,6 +329,7 @@ async function writeSharedTask(dest, remoteId, taskObj) {
                 failed = 0; // آفلاین/transport: در صف می‌ماند، خطا نیست
             }
             if (failed > 0) return { ok: false, code: 'FLUSH_FAILED' };
+            enqueueGroupPhotosForUpload(dest, taskObj).catch(() => {});
             return { ok: true };
         }
     } catch {
@@ -288,6 +337,37 @@ async function writeSharedTask(dest, remoteId, taskObj) {
     }
     return { ok: false };
 }
+
+// ─── upload-complete گروهی: ثبت serverMediaId و برداشتن بایت ───
+events.on('media:upload-complete', ({ mediaId, serverMediaId }) => {
+    if (!mediaId || !serverMediaId) return;
+    let item = null;
+    try {
+        item = getSharedItems().find(t => t && t._shared && t._shared.mine
+            && t._shared.dest && t._shared.dest.type === 'group'
+            && Array.isArray(t.photos) && t.photos.some(p => p && String(p.id) === String(mediaId)));
+    } catch { return; }
+    if (!item) return;
+    const photo = item.photos.find(p => p && String(p.id) === String(mediaId));
+    if (!photo || photo.serverMediaId === serverMediaId) return;
+    photo.serverMediaId = serverMediaId;
+    const ids = Array.isArray(item.mediaIds) ? item.mediaIds : [];
+    if (!ids.some(id => String(id) === String(mediaId))) ids.push(String(mediaId));
+    item.mediaIds = ids;
+    const persist = async () => {
+        try {
+            if (typeof photo.dataUrl === 'string' && photo.dataUrl.startsWith('data:')) {
+                const blob = dataUrlToBlob(photo.dataUrl);
+                await putCachedPhoto(photo.id, blob, photo.contentType || blob.type, serverMediaId);
+            }
+        } catch { /* silent — کش best-effort است */ }
+        delete photo.dataUrl;
+        try {
+            await writeSharedTask(item._shared.dest, item.id, stripShared(item));
+        } catch { /* silent */ }
+    };
+    persist();
+});
 
 /**
  * ذخیره‌ی کامل آبجکت تسک مشترک (برای saveTask پل جزئیات — بدون refresh).

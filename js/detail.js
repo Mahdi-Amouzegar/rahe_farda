@@ -1399,10 +1399,18 @@ export function bindDetailInputs() {
 // Stage E: event listeners برای وضعیت آپلود Media
 // ═══════════════════════════════════════════════════════════════════════════
 
-events.on('media:upload-complete', ({ taskId }) => {
+events.on('media:upload-complete', ({ mediaId, taskId }) => {
     if (String(state.currentDetailId) === String(taskId)) {
         renderDetailPhotos().catch(() => {});
+        return;
     }
+    // آپلود گروهی (taskId تهی): اگر عکس متعلق به جزئیات باز است، رندر
+    try {
+        const t = getDetailTask();
+        if (t && Array.isArray(t.photos) && t.photos.some(p => p && String(p.id) === String(mediaId))) {
+            renderDetailPhotos().catch(() => {});
+        }
+    } catch { /* silent */ }
 });
 
 events.on('media:upload-failed', ({ taskId }) => {
