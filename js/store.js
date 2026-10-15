@@ -1512,7 +1512,9 @@ export function saveTrashItem(item) {
 export function deleteTrashItem(id) {
     const p = useIDB ? idbDelete(IDB_TRASH, id) : Promise.resolve();
     p.then(() => {
-        enqueueChange({ type: 'trash-delete', id });
+        // حذف نهایی: ردیف سرور + مدیاهای لینک‌شده هم باید بروند (op purge).
+        // مهمان سروری ندارد — فقط لوکال.
+        if (state.sync.enabled) enqueueChange({ type: 'purge', id });
     }).catch(() => {});
     return p;
 }

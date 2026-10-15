@@ -820,4 +820,7 @@ describe('store — isTrashOpType (سطل local-only)', () => {
         expect(isTrashOpType('delete')).toBe(false);
         expect(isTrashOpType(null)).toBe(false);
     });
+    it('purge سطل نیست (باید به سرور برود)', () => {
+        expect(isTrashOpType('purge')).toBe(false);
+    });
 });

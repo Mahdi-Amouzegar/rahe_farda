@@ -59,6 +59,7 @@ import {
     createPlanCustom,
     PLAN_TEMPLATES,
     restoreTrash,
+    deleteTrashItem,
     toggleTask,
     deleteTask,
     clearCompleted,
@@ -2355,10 +2356,13 @@ document.getElementById('trashEmpty').addEventListener('click', async () => {
         danger: true
     });
     if (!ok) return;
+    const ids = state.trash.map(x => x.id);
     state.trash = [];
     saveTrash();
     renderTrash();
     render();
+    // حذف نهایی سروری هم برای هر آیتم (purge) — deleteTrashItem پوشش می‌دهد
+    ids.forEach(id => { try { deleteTrashItem(id); } catch { /* silent */ } });
 });
 document.getElementById('trashList').addEventListener('click', async e => {
     const b = e.target.closest('[data-tact]');
@@ -2373,6 +2377,8 @@ document.getElementById('trashList').addEventListener('click', async e => {
             danger: true
         });
         if (!ok) return;
+        // حذف نهایی (لوکال + سرور + مدیا) — deleteTrashItem هر سه را پوشش می‌دهد
+        try { deleteTrashItem(b.dataset.tid); } catch { /* silent */ }
         state.trash = state.trash.filter(x => String(x.id) !== String(b.dataset.tid));
         saveTrash();
         renderTrash();

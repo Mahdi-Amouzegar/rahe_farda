@@ -76,6 +76,7 @@ describe('classifyPhotoForDisplay', () => {
 });
 
 describe('toServerOp — بدون بایت عکس', () => {
+
     it('dataUrl از data حذف می‌شود ولی صف دست نمی‌خورد', () => {
         const entry = {
             id: 'op1', type: 'save', entityId: 't1', entityType: 'task',
@@ -86,6 +87,14 @@ describe('toServerOp — بدون بایت عکس', () => {
         expect(op.data.photos[0].dataUrl).toBeUndefined();
         expect(op.data.photos[0].id).toBe('p1');
         expect(entry.data.photos[0].dataUrl).toBe('data:image/jpeg;base64,AAA');
+    });
+    it('purge بدون data رد می‌شود', () => {
+        const op = toServerOp({
+            id: 'op2', type: 'purge', entityId: 't9', entityType: 'task',
+            data: null, timestamp: '2026-10-15T00:00:00.000Z',
+        });
+        expect(op.type).toBe('purge');
+        expect(op.data).toBeNull();
     });
 });
 
