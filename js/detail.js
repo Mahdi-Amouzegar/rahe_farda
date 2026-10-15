@@ -19,6 +19,7 @@ import {
     processImageFile,
     validateImageFile,
     formatBytes,
+    dataUrlToBlob,
     MAX_PHOTOS_PER_TASK,
 } from './media.js';
 import {
@@ -32,6 +33,8 @@ import {
     deleteCachedPhoto,
     fetchPhotoBlob,
     classifyPhotoForDisplay,
+    clampZoom,
+    extForContentType,
 } from './media-cache.js';
 import { isOnline } from './net.js';
 import {
@@ -184,15 +187,188 @@ function formatDateShort(iso) {
 // Lightbox
 // ═══════════════════════════════════════════════════════════════════════════
 
-function openLightbox(src) {
+// ═══════════════════════════════════════════════════════════════════════════
+// Lightbox — زوم/پن/دانلود (ایده arasanad: زوم واقعی + پن با اسکرول)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const LB_MIN_ZOOM = 1;
+const LB_MAX_ZOOM = 3;
+
+let _lbZoom = LB_MIN_ZOOM;
+let _lbBase = { w: 0, h: 0 };
+let _lbPhotoId = null;
+let _lbUiWired = false;
+let _lbDrag = null;
+let _lbDragMoved = false;
+
+function lightboxEls() {
+    return {
+        lb: document.getElementById('lightbox'),
+        viewport: document.getElementById('lightboxViewport'),
+        img: document.getElementById('lightboxImg'),
+    };
+}
+
+/**
+ * اعمال زوم (عرض/ارتفاع واقعی تا اسکرول درست محاسبه شود — نه transform).
+ */
+function setLightboxZoom(scale, silent) {
+    const { img, viewport } = lightboxEls();
+    if (!img || !viewport) return;
+    const clamped = clampZoom(scale, LB_MIN_ZOOM, LB_MAX_ZOOM);
+    if (clamped > LB_MIN_ZOOM && _lbZoom === LB_MIN_ZOOM) {
+        try {
+            const r = img.getBoundingClientRect();
+            _lbBase = { w: Math.max(1, r.width), h: Math.max(1, r.height) };
+        } catch { /* silent */ }
+    }
+    _lbZoom = clamped;
+    if (clamped === LB_MIN_ZOOM) {
+        img.style.width = '';
+        img.style.height = '';
+        img.style.maxWidth = '';
+        img.style.maxHeight = '';
+        try { viewport.scrollTo(0, 0); } catch { /* silent */ }
+    } else {
+        img.style.maxWidth = 'none';
+        img.style.maxHeight = 'none';
+        img.style.width = Math.round(_lbBase.w * clamped) + 'px';
+        img.style.height = Math.round(_lbBase.h * clamped) + 'px';
+        requestAnimationFrame(() => {
+            try {
+                viewport.scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2;
+                viewport.scrollTop = (viewport.scrollHeight - viewport.clientHeight) / 2;
+            } catch { /* silent */ }
+        });
+    }
+    viewport.classList.toggle('zoomed', clamped > LB_MIN_ZOOM);
+    if (!silent) {
+        const resetBtn = document.getElementById('lightboxZoomReset');
+        if (resetBtn) {
+            resetBtn.textContent = formatNumber(Math.round(clamped * 100)) + (getLang() === 'fa' ? '٪' : '%');
+        }
+    }
+}
+
+function ensureLightboxUI() {
+    if (_lbUiWired) return;
+    const { lb, viewport, img } = lightboxEls();
+    if (!lb || !viewport || !img) return;
+    _lbUiWired = true;
+
+    img.addEventListener('click', e => {
+        e.stopPropagation();
+        if (_lbDragMoved) { _lbDragMoved = false; return; }
+        setLightboxZoom(_lbZoom === LB_MIN_ZOOM ? 2 : LB_MIN_ZOOM);
+    });
+    viewport.addEventListener('click', e => {
+        if (e.target === viewport) closeLightbox();
+    });
+    lb.addEventListener('click', e => {
+        if (e.target === lb) closeLightbox();
+    });
+    viewport.addEventListener('wheel', e => {
+        e.preventDefault();
+        setLightboxZoom(_lbZoom + (e.deltaY < 0 ? 0.25 : -0.25));
+    }, { passive: false });
+    viewport.addEventListener('pointerdown', e => {
+        if (_lbZoom <= LB_MIN_ZOOM) return;
+        e.preventDefault();
+        _lbDrag = { x: e.clientX, y: e.clientY, sx: viewport.scrollLeft, sy: viewport.scrollTop };
+        _lbDragMoved = false;
+        viewport.classList.add('dragging');
+        try { viewport.setPointerCapture(e.pointerId); } catch { /* silent */ }
+    });
+    viewport.addEventListener('pointermove', e => {
+        if (!_lbDrag) return;
+        const dx = e.clientX - _lbDrag.x;
+        const dy = e.clientY - _lbDrag.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _lbDragMoved = true;
+        viewport.scrollLeft = _lbDrag.sx - dx;
+        viewport.scrollTop = _lbDrag.sy - dy;
+    });
+    const endDrag = () => {
+        _lbDrag = null;
+        try { viewport.classList.remove('dragging'); } catch { /* silent */ }
+    };
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+    const onBtn = (id, fn) => {
+        const b = document.getElementById(id);
+        if (b) b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+    };
+    onBtn('lightboxZoomIn', () => setLightboxZoom(_lbZoom + 0.5));
+    onBtn('lightboxZoomOut', () => setLightboxZoom(_lbZoom - 0.5));
+    onBtn('lightboxZoomReset', () => setLightboxZoom(LB_MIN_ZOOM));
+    onBtn('lightboxDownload', () => { downloadLightboxPhoto().catch(() => {}); });
+    onBtn('lightboxClose', () => closeLightbox());
+}
+
+/**
+ * دانلود عکس باز در لایتباکس (کش → dataUrl تسک → fetch سرور).
+ */
+async function downloadLightboxPhoto() {
+    const photoId = _lbPhotoId;
+    let blob = null;
+    let contentType = '';
+    if (photoId) {
+        try {
+            const hit = await getCachedPhoto(photoId);
+            if (hit && hit.blob) { blob = hit.blob; contentType = hit.contentType || blob.type || ''; }
+        } catch { /* silent */ }
+    }
+    if (!blob) {
+        const t = getDetailTask();
+        const p = t && Array.isArray(t.photos)
+            ? t.photos.find(x => x && String(x.id) === String(photoId))
+            : null;
+        if (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:')) {
+            try {
+                blob = dataUrlToBlob(p.dataUrl);
+                contentType = p.contentType || blob.type || '';
+            } catch { /* silent */ }
+        } else if (p && p.serverMediaId && state.sync.enabled && state.sync.authToken && isOnline()) {
+            try {
+                const b = await fetchPhotoBlob(state.sync.endpoint, state.sync.authToken, p.serverMediaId);
+                blob = b;
+                contentType = b.type || p.contentType || '';
+                try { await putCachedPhoto(p.id, b, contentType, p.serverMediaId); } catch { /* silent */ }
+            } catch { /* silent */ }
+        }
+    }
+    if (!blob) {
+        flashSaved(i18nT('detail.photo.downloadFailed'));
+        return;
+    }
+    const ext = extForContentType(contentType || blob.type);
+    const url = URL.createObjectURL(blob);
+    try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'rahe-farda-' + String(photoId || 'photo').slice(0, 8) + '.' + ext;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    } finally {
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* silent */ } }, 5000);
+    }
+}
+
+function openLightbox(src, opts) {
     const lb = document.getElementById('lightbox');
     const img = document.getElementById('lightboxImg');
     if (!lb || !img) return;
 
     const previousFocus = document.activeElement;
 
+    _lbPhotoId = (opts && opts.photoId) || null;
+    if (opts && opts.alt) {
+        try { img.alt = String(opts.alt); } catch { /* silent */ }
+    }
     img.src = src;
     lb.hidden = false;
+    ensureLightboxUI();
+    setLightboxZoom(LB_MIN_ZOOM, true);
 
     if (lightboxTrapCleanup) {
         try { lightboxTrapCleanup(); } catch { /* silent */ }
@@ -239,6 +415,8 @@ function closeLightbox() {
 
     lb.hidden = true;
     img.removeAttribute('src');
+    setLightboxZoom(LB_MIN_ZOOM, true);
+    _lbPhotoId = null;
 
     const prev = lb._previousFocus;
     lb._previousFocus = null;
@@ -1359,7 +1537,7 @@ export function bindDetailInputs() {
         }
         const img = e.target.closest('[data-photo-view]');
         if (img) {
-            openLightbox(img.src);
+            openLightbox(img.src, { photoId: img.getAttribute('data-photo-view'), alt: img.alt });
         }
     });
     document.getElementById('lightbox').addEventListener('click', () => {

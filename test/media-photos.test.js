@@ -12,6 +12,8 @@ import {
     stripPhotoBytesForSync,
     classifyPhotoForDisplay,
     MEDIA_CACHE_DB_NAME,
+    clampZoom,
+    extForContentType,
 } from '../js/media-cache.js';
 import { toServerOp } from '../js/sync-queue.js';
 import { sanitizeTask, enqueueNewPhotosForTask } from '../js/store.js';
@@ -179,6 +181,25 @@ describe('enqueueSharedPhotosForUpload', () => {
 describe('media-cache — جدایی از spaceTodoDB', () => {
     it('کش در دیتابیس جدا باز می‌شود (بن‌بست ارتقا ندارد)', () => {
         expect(MEDIA_CACHE_DB_NAME).not.toBe('spaceTodoDB');
+    });
+});
+
+describe('lightbox helpers', () => {
+    it('clampZoom در بازه نگه می‌دارد', () => {
+        expect(clampZoom(0.5)).toBe(1);
+        expect(clampZoom(5)).toBe(3);
+        expect(clampZoom(2)).toBe(2);
+        expect(clampZoom(NaN)).toBe(1);
+        expect(clampZoom('x')).toBe(1);
+    });
+    it('extForContentType پسوند درست می‌دهد', () => {
+        expect(extForContentType('image/jpeg')).toBe('jpg');
+        expect(extForContentType('image/png')).toBe('png');
+        expect(extForContentType('image/webp')).toBe('webp');
+        expect(extForContentType('image/avif')).toBe('avif');
+        expect(extForContentType('image/gif')).toBe('gif');
+        expect(extForContentType('application/octet-stream')).toBe('jpg');
+        expect(extForContentType('')).toBe('jpg');
     });
 });
 

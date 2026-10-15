@@ -10,7 +10,6 @@
       "copyright": "© {year} — All rights reserved"
     }
   },
-
   "header": {
     "today": "Today: {date}",
     "settings": "Settings",
@@ -33,13 +32,11 @@
       "aria": "Time status"
     }
   },
-
   "tabs": {
     "tasks": "📋 Tasks",
     "map": "🗺 Map",
     "ariaSelect": "Select view"
   },
-
   "wiz": {
     "back": "‹ Back",
     "next": "Next",
@@ -74,7 +71,6 @@
     "accountTelegram": "Sign in with Telegram",
     "accountCode": "Sign in with code"
   },
-
   "nav": {
     "drawerTitle": "Rahe Farda menu",
     "search": "🔎 Search",
@@ -102,7 +98,6 @@
       "notificationsAria": "View notifications"
     }
   },
-
   "workspace": {
     "messagesTitle": "💬 Messages",
     "messagesEmpty": "No conversations yet.",
@@ -113,7 +108,6 @@
     "notificationsTitle": "🔔 Notifications",
     "notificationsEmpty": "No new notifications."
   },
-
   "msg": {
     "back": "‹ Back",
     "send": "➤",
@@ -125,7 +119,6 @@
     "moreAria": "Message options",
     "offline": "You are offline — connect to see messages."
   },
-
   "dm": {
     "taskPlaceholder": "New task…",
     "empty": "No tasks yet — create the first one.",
@@ -136,7 +129,6 @@
     "edited": "Edited — {name}",
     "deleted": "A message was deleted"
   },
-
   "conn": {
     "incoming": "Incoming requests",
     "accept": "Accept",
@@ -153,7 +145,6 @@
     "pending": "Pending",
     "blocked": "🚫 Blocked"
   },
-
   "share": {
     "title": "Share task",
     "menuItem": "Share",
@@ -161,13 +152,11 @@
     "noContacts": "No contacts yet — create a connection first.",
     "sent": "Task sent."
   },
-
   "plan": {
     "add": "Add to plan",
     "added": "Added to your plan.",
     "invalidSnapshot": "This task cannot be added."
   },
-
   "loc": {
     "route": "Show route",
     "mapTitle": "Map",
@@ -175,7 +164,6 @@
     "locating": "Locating…",
     "unavailable": "Location unavailable."
   },
-
   "avatar": {
     "title": "Avatar",
     "change": "Change avatar",
@@ -184,7 +172,6 @@
     "loginRequired": "Sign in for avatar.",
     "shapeHint": "💡 Choose a square photo so it won't be cropped or stretched."
   },
-
   "search": {
     "placeholder": "Username or group… (min 3 chars)",
     "users": "Users",
@@ -195,7 +182,6 @@
     "typeUser": "User",
     "typeGroup": "Group"
   },
-
   "grp": {
     "back": "‹ Groups",
     "create": "＋ New group",
@@ -234,7 +220,6 @@
     "inviteLinkShort": "Link",
     "linkCopied": "Copied"
   },
-
   "gtask": {
     "title": "Group tasks",
     "placeholder": "New task…",
@@ -244,7 +229,6 @@
     "cancel": "Cancel",
     "deleteConfirm": "Delete this task?"
   },
-
   "auth": {
     "defaultUserName": "User",
     "modalTitle": "👤 My Account",
@@ -339,7 +323,6 @@
       "years": "{n} years"
     }
   },
-
   "settings": {
     "title": "Settings",
     "kicker": "Personalization",
@@ -414,7 +397,6 @@
       }
     }
   },
-
   "theme": {
     "auto": "🖥 Auto",
     "light": "☀️ Light",
@@ -423,7 +405,6 @@
     "labelLight": "Display mode: light",
     "labelDark": "Display mode: dark"
   },
-
   "language": {
     "fa": "🌐 FA",
     "en": "🌐 EN",
@@ -431,7 +412,6 @@
     "switchToEn": "Switch to English",
     "switchToFa": "تغییر زبان به فارسی"
   },
-
   "tasks": {
     "add": "Add",
     "sharedFrom": "From {name}",
@@ -571,7 +551,6 @@
       "sortHint": "To reorder, drag cards in \"Manual\" mode"
     }
   },
-
   "taskItem": {
     "operations": {
       "menuLabel": "Operations",
@@ -622,7 +601,6 @@
       "showAria": "Show location on map"
     }
   },
-
   "detail": {
     "title": "Task details",
     "back": "Back to list",
@@ -772,7 +750,15 @@
         "failed": "Upload failed"
       },
       "blobError": "Failed to convert Blob to dataUrl",
-      "blobReadError": "Failed to read Blob"
+      "blobReadError": "Failed to read Blob",
+      "lightbox": {
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "zoomReset": "Reset zoom",
+        "download": "Download photo",
+        "close": "Close"
+      },
+      "downloadFailed": "Photo download failed"
     },
     "timer": {
       "started": "▶ Start",
@@ -813,7 +799,6 @@
       "rangeError": "Number must be between 1 and {max}"
     }
   },
-
   "map": {
     "title": "🗺 Task locations map",
     "panelAria": "Map",
@@ -877,7 +862,6 @@
       "allPast": "All sessions past"
     }
   },
-
   "route": {
     "summaryTitle": "🧭 Route to \"{task}\"",
     "summaryTitleGeneric": "🧭 Route",
@@ -889,7 +873,6 @@
     },
     "notCalculated": "Not calculated"
   },
-
   "location": {
     "pickBanner": "Tap on the map to set the new location. Tap cancel to dismiss.",
     "pickBannerSession": "Tap on the map to set the session location. Tap cancel to dismiss.",
@@ -935,7 +918,6 @@
       "cancel": "Cancel"
     }
   },
-
   "weather": {
     "modalTitle": "🌤️ Weather forecast",
     "loading": "Fetching weather forecast…",
@@ -1000,7 +982,6 @@
     },
     "attribution": "Weather data by"
   },
-
   "sessions": {
     "summary": {
       "count": "{n} sessions",
@@ -1029,7 +1010,6 @@
       "fri": "Friday"
     }
   },
-
   "picker": {
     "title": "Pick due date",
     "todayEvening": "Today evening",
@@ -1049,7 +1029,6 @@
     "errorConflict": "⚠️ Time conflict: \"{owner}\" is scheduled at {date}, less than 30 minutes from the chosen time. To register this due date, confirm again.",
     "errorDuplicate": "This due date is already registered."
   },
-
   "calendar": {
     "title": "📅 Sessions calendar",
     "aria": "Sessions calendar",
@@ -1066,7 +1045,6 @@
       "fri": "Fri"
     }
   },
-
   "trash": {
     "title": "🗑 Trash",
     "aria": "Trash",
@@ -1084,20 +1062,17 @@
     "purgeConfirmOk": "Delete",
     "purgeConfirmCancel": "Cancel"
   },
-
   "snackbar": {
     "trashSingle": "{kind} \"{text}\" moved to trash.",
     "trashMultiple": "{n} items moved to trash.",
     "trashGeneric": "Moved to trash",
     "undo": "Undo"
   },
-
   "kind": {
     "task": "Task",
     "plan": "Plan",
     "series": "Series"
   },
-
   "template": {
     "deleteChild": "Delete task",
     "emptyKids": "You've deleted all tasks; add a new one.",
@@ -1113,7 +1088,6 @@
     "childAria": "Add task to template",
     "childrenCount": "{n} prebuilt tasks"
   },
-
   "templates": {
     "travel": {
       "title": "✈️ Travel",
@@ -1244,7 +1218,6 @@
       ]
     }
   },
-
   "welcome": {
     "title": "👋 Welcome",
     "textShort": "Your personal planner — offline and private.",
@@ -1254,7 +1227,6 @@
     "languageLabel": "Language:",
     "start": "Start"
   },
-
   "hero": {
     "infoTitle": "Rahe Farda",
     "infoIntro": "Manage your daily tasks and appointments with reminders, maps, and the Persian calendar — <strong>no account needed</strong>, works offline.",
@@ -1264,7 +1236,6 @@
     "infoStart": "To start, type a title in the field above and tap <strong>Add task</strong>.",
     "buttonText": "Let's go"
   },
-
   "privacy": {
     "title": "🔒 Your privacy",
     "paragraphs": {
@@ -1279,7 +1250,6 @@
     },
     "buttonText": "Got it"
   },
-
   "export": {
     "title": "📤 Backup your data",
     "description": "A JSON file will be created with all tasks, plans, series, and trash. You can keep it somewhere safe or transfer it to another device.",
@@ -1295,7 +1265,6 @@
     "success": "✓ Backup file created ({filename})",
     "error": "Failed to create backup file"
   },
-
   "import": {
     "unknown": "Unknown",
     "title": "📥 Restore from backup file",
@@ -1331,7 +1300,6 @@
     "successSkipped": "{n} items skipped",
     "errorImport": "Restore failed"
   },
-
   "sound": {
     "master": "Reminder sound (master switch)",
     "masterHint": "If off, no sound will play.",
@@ -1361,7 +1329,6 @@
     },
     "test": "▶ Test"
   },
-
   "notifications": {
     "notifStatus": {
       "unsupported": "Your browser doesn't support notifications.",
@@ -1386,7 +1353,6 @@
     },
     "testReminder": "This is a test reminder"
   },
-
   "bottomActions": {
     "newTask": "New task",
     "newPlan": "New plan",
@@ -1395,7 +1361,6 @@
     "settings": "Settings",
     "ariaQuickAccess": "Quick access"
   },
-
   "modals": {
     "confirm": {
       "defaultTitle": "Confirm",
@@ -1428,7 +1393,6 @@
     "deletedToast": "Your account has been deleted",
     "deleteFailed": "Account deletion failed — try again"
   },
-
   "errors": {
     "network": "Couldn't connect to the server",
     "unauthorized": "You must sign in for this operation",
@@ -1457,13 +1421,11 @@
     "usernameInvalid": "Username must start with a letter and be 3-20 characters (letters, digits, _)",
     "accountHasGroups": "Transfer or close your open groups first"
   },
-
   "warnings": {
     "storageError": "Local storage error. Browser storage may be full.",
     "nameRequired": "Username is required",
     "titleRequired": "Title cannot be empty"
   },
-
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -1480,21 +1442,21 @@
     "back": "Back"
   },
   "units": {
-      "hoursAndMinutes": "{h} h {m} min",
-      "bytes": "{n} B",
-      "kb": "{n} KB",
-      "mb": "{n} MB",
-      "gb": "{n} GB",
-      "minute": "{n} min",
-      "hour": "{n} h",
-      "day": "{n} d",
-      "month": "{n} mo",
-      "year": "{n} y",
-      "meter": "{n} m",
-      "km": "{n} km"
+    "hoursAndMinutes": "{h} h {m} min",
+    "bytes": "{n} B",
+    "kb": "{n} KB",
+    "mb": "{n} MB",
+    "gb": "{n} GB",
+    "minute": "{n} min",
+    "hour": "{n} h",
+    "day": "{n} d",
+    "month": "{n} mo",
+    "year": "{n} y",
+    "meter": "{n} m",
+    "km": "{n} km"
   },
   "numbers": {
-      "hour": "{n}",
-      "dayOfMonth": "{n}"
+    "hour": "{n}",
+    "dayOfMonth": "{n}"
   }
 }

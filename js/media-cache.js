@@ -158,3 +158,24 @@ export function classifyPhotoForDisplay(photo, ctx) {
     if (photo.serverMediaId && ctx && ctx.online && ctx.authed) return 'fetch';
     return 'pending';
 }
+
+/**
+ * clamp زوم لایتباکس (ایده arasanad: بازه‌ی ۱ تا ۳).
+ */
+export function clampZoom(scale, min = 1, max = 3) {
+    const s = Number(scale);
+    if (!Number.isFinite(s)) return min;
+    return Math.min(max, Math.max(min, s));
+}
+
+/**
+ * پسوند فایل از content-type (برای نام فایل دانلود).
+ */
+export function extForContentType(contentType) {
+    const t = String(contentType || '').toLowerCase();
+    if (t.includes('png')) return 'png';
+    if (t.includes('webp')) return 'webp';
+    if (t.includes('avif')) return 'avif';
+    if (t.includes('gif')) return 'gif';
+    return 'jpg';
+}
