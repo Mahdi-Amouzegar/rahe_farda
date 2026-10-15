@@ -27,6 +27,7 @@
 import { state, uid, SCHEMA_VERSION } from './core.js';
 import { events, EV } from './events.js';
 import { isOnline, getDeviceId, probeConnection } from './net.js';
+import { stripPhotoBytesForSync } from './media-cache.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -111,15 +112,19 @@ let _syncHandler = async () => ({ ok: true });
 
 /**
  * نگاشت ردیف صف به op سرور (`POST /api/sync`) — مرجع واحد (Phase 13: E.5.3).
- * ⚠️ `timestamp` همان مهر تسک است (نه `now`) تا conflict سرور درست کار کند.
+ * ⚠️ `timestamp` همان مهر تسک است (نه `now`) تا conflict سرور درست کار شود.
+ * ⚠️ بایت عکس هرگز روی سیم نمی‌رود — فقط ارجاع (lazy؛ دانلود در جزئیات).
  */
 export function toServerOp(entry) {
+    const data = entry.data && typeof entry.data === 'object'
+        ? stripPhotoBytesForSync(entry.data)
+        : (entry.data || null);
     return {
         id: String(entry.id),
         type: entry.type,
         entityId: String(entry.entityId),
         entityType: entry.entityType === 'child' ? 'child' : 'task',
-        data: entry.data || null,
+        data,
         parentId: entry.parentId ? String(entry.parentId) : null,
         timestamp: entry.timestamp,
         deviceId: entry.deviceId,

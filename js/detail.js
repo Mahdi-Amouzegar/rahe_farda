@@ -27,6 +27,14 @@ import {
     retryFailedUploads,
 } from './media-upload.js';
 import {
+    getCachedPhoto,
+    putCachedPhoto,
+    deleteCachedPhoto,
+    fetchPhotoBlob,
+    classifyPhotoForDisplay,
+} from './media-cache.js';
+import { isOnline } from './net.js';
+import {
     ensureMapVisible,
     switchToTab,
     mapHint,
@@ -539,6 +547,57 @@ export function renderDetailSessions() {
 // Photos
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** نگاشت photoId → objectURL (revoke فقط برای عکس‌های حذف‌شده از لیست) */
+const _photoObjUrls = new Map();
+
+function prunePhotoObjectUrls(keepIds) {
+    for (const [id, u] of _photoObjUrls) {
+        if (!keepIds.has(id)) {
+            try { URL.revokeObjectURL(u); } catch { /* silent */ }
+            _photoObjUrls.delete(id);
+        }
+    }
+}
+
+/**
+ * منبع نمایش یک عکس: کش محلی، وگرنه بایت همراه تسک.
+ * دانلود lazy جداگانه انجام می‌شود (fetchMissingPhotos).
+ */
+async function resolvePhotoSrc(p) {
+    try {
+        const hit = await getCachedPhoto(p.id);
+        if (hit && hit.blob) {
+            let u = _photoObjUrls.get(String(p.id));
+            if (!u) {
+                u = URL.createObjectURL(hit.blob);
+                _photoObjUrls.set(String(p.id), u);
+            }
+            return u;
+        }
+    } catch { /* silent */ }
+    if (typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image')) return p.dataUrl;
+    return null;
+}
+
+/**
+ * دانلود عکس‌های کش‌نشده (فقط جدیدها) و ذخیره در کش.
+ */
+async function fetchMissingPhotos(photos) {
+    const endpoint = state.sync.endpoint;
+    const token = state.sync.authToken;
+    if (!endpoint || !token) return;
+    const jobs = photos
+        .filter(p => p && p.serverMediaId)
+        .map(async p => {
+            const blob = await fetchPhotoBlob(endpoint, token, p.serverMediaId);
+            await putCachedPhoto(p.id, blob, blob.type || p.contentType, p.serverMediaId);
+        });
+    const results = await Promise.allSettled(jobs);
+    if (results.length > 0 && results.every(r => r.status === 'rejected')) {
+        throw new Error('all photo fetches failed');
+    }
+}
+
 async function renderDetailPhotos() {
     const task = getDetailTask();
     if (!task) return;
@@ -604,6 +663,14 @@ async function renderDetailPhotos() {
     const delAria = i18nT('detail.photo.deleteAria');
     const sizeLabelPrefix = i18nT('detail.photo.sizePrefix');
 
+    // ─── resolve منابع نمایش: کش → dataUrl → lazy fetch ───
+    prunePhotoObjectUrls(new Set(list.map(p => String(p && p.id))));
+    const onlineNow = isOnline();
+    const authedNow = Boolean(state.sync.enabled && state.sync.authToken);
+    const srcs = await Promise.all(list.map(p => resolvePhotoSrc(p).catch(() => (
+        (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image')) ? p.dataUrl : null
+    ))));
+
     grid.innerHTML = list.map((p, idx) => {
         const upload = statuses[idx];
         const sizeLabel = p.sizeBytes ? formatBytes(p.sizeBytes) : '';
@@ -611,14 +678,33 @@ async function renderDetailPhotos() {
 
         const uploadState = upload ? upload.status : null;
         const uploadBadge = renderUploadBadge(uploadState);
-
+        const delBtn = `<button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>`;
+        const src = srcs[idx];
+        if (!src) {
+            return `
+        <div class="photo-thumb photo-thumb--loading">
+            <span class="photo-loading" aria-label="${altText}">⏳</span>
+            ${uploadBadge}
+            ${delBtn}
+        </div>`;
+        }
         return `
         <div class="photo-thumb photo-thumb--${uploadState || 'local'}">
-            <img src="${p.dataUrl}" data-photo-view="${escapeHtml(String(p.id))}" alt="${altText}" loading="lazy" title="${escapeHtml(title)}">
+            <img src="${src}" data-photo-view="${escapeHtml(String(p.id))}" alt="${altText}" loading="lazy" title="${escapeHtml(title)}">
             ${uploadBadge}
-            <button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>
+            ${delBtn}
         </div>`;
     }).join('');
+
+    // ─── lazy: فقط عکس‌های جدید (کش‌نشده) که ارجاع سروری دارند ───
+    const taskId = task.id;
+    const missing = list.filter((p, idx) => !srcs[idx]
+        && classifyPhotoForDisplay(p, { cached: false, online: onlineNow, authed: authedNow }) === 'fetch');
+    if (missing.length > 0) {
+        fetchMissingPhotos(missing).then(() => {
+            if (String(state.currentDetailId) === String(taskId)) renderDetailPhotos().catch(() => {});
+        }).catch(() => {});
+    }
 }
 
 /**
@@ -1162,8 +1248,9 @@ export function bindDetailInputs() {
                 const result = await processImageFile(file);
                 const dataUrl = await blobToDataUrl(result.blob);
 
+                const photoId = uid();
                 task.photos.push({
-                    id: uid(),
+                    id: photoId,
                     dataUrl,
                     addedAt: new Date().toISOString(),
                     contentType: result.contentType,
@@ -1171,6 +1258,8 @@ export function bindDetailInputs() {
                     width: result.width,
                     height: result.height,
                 });
+                // ⚠️ بایت هم در کش محلی می‌ماند تا بعد از آپلود (حذف dataUrl از تسک) نمایش بماند
+                putCachedPhoto(photoId, result.blob, result.contentType).catch(() => {});
 
                 successCount++;
             } catch (err) {
@@ -1257,6 +1346,7 @@ export function bindDetailInputs() {
 
             task.photos = (task.photos || []).filter(p => String(p.id) !== String(photoId));
             task.mediaIds = (task.mediaIds || []).filter(id => String(id) !== String(photoId));
+            deleteCachedPhoto(photoId);
 
             // ⚠️ 10.11/BUG-01: همان race حذف — await تا حذف durable شود.
             await saveTasks();

@@ -27,6 +27,7 @@ import {
 import {
     enqueueUpload as enqueueMediaUpload,
 } from './media-upload.js';
+import { putCachedPhoto } from './media-cache.js';
 import { dataUrlToBlob } from './media.js';
 import { getDetailBridgeTask, saveSharedTask as persistSharedTask } from './tasks/source.js';
 
@@ -307,6 +308,9 @@ export function sanitizeTask(t) {
             .map(c => sanitizeTask({ ...c, kind: 'task', children: undefined }))
         : [];
     const recurValid = ['daily', 'weekly', 'monthly', 'custom', 'hourly', 'weeklyDays', 'monthlyDays'].includes(t.recur) ? t.recur : 'none';
+    const uploadedIds = new Set(
+        Array.isArray(t.mediaIds) ? t.mediaIds.map(id => String(id)) : []
+    );
     const recurNum = +t.recurN;
     return {
         id: t.id,
@@ -337,14 +341,22 @@ export function sanitizeTask(t) {
         recurDays: Array.isArray(t.recurDays) ? [...new Set(t.recurDays.map(x => Math.floor(+x)).filter(x => x >= 0 && x <= 31))].slice(0, 31) : [],
         archived: Boolean(t.archived),
         photos: Array.isArray(t.photos) ? t.photos
-            .filter(p => p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image') && p.dataUrl.length < MAX_PHOTO_DATAURL_LENGTH)
+            .filter(p => {
+                if (!p || typeof p.id === 'undefined') return false;
+                // ارجاع آپلودشده (بدون بایت) نگه داشته می‌شود
+                if (typeof p.serverMediaId === 'string' && p.serverMediaId) return true;
+                return typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image') && p.dataUrl.length < MAX_PHOTO_DATAURL_LENGTH;
+            })
             .slice(0, MAX_PHOTOS_PER_TASK)
             .map(p => {
                 const out = {
                     id: typeof p.id !== 'undefined' ? p.id : uid(),
-                    dataUrl: p.dataUrl,
                     addedAt: typeof p.addedAt === 'string' ? p.addedAt : new Date().toISOString(),
                 };
+                // ⚠️ بایت عکسِ آپلودشده در تسک ذخیره نمی‌ماند (lazy؛ دانلود فقط در جزئیات).
+                // عکسِ هنوزآپلودنشده dataUrl را نگه می‌دارد تا آفلاین دیده شود.
+                if (!uploadedIds.has(String(out.id))) out.dataUrl = p.dataUrl;
+                if (typeof p.serverMediaId === 'string' && p.serverMediaId) out.serverMediaId = p.serverMediaId;
                 // ⚠️ فیلدهای Stage D (اختیاری)
                 if (typeof p.contentType === 'string') out.contentType = p.contentType;
                 if (Number.isFinite(+p.sizeBytes)) out.sizeBytes = Math.floor(+p.sizeBytes);
@@ -752,6 +764,42 @@ async function enqueueNewPhotosForTask(task) {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Stage E (lazy): بعد از آپلود موفق، ارجاع سروری در تسک ثبت و بایت از تسک برداشته می‌شود
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// با این کار:
+//   - photo.serverMediaId برای دانلود lazy در جزئیات ثبت می‌شود
+//   - photo.id در mediaIds می‌رود (آپلود بعدی دوباره انجام نمی‌شود)
+//   - بایت اول در media_cache می‌رود (نمایش آفلاین می‌ماند) بعد از تسک حذف می‌شود
+//   - save بعدی فقط ارجاع را سینک می‌کند (چند بایت به‌جای ~۶۰۰KB)
+
+events.on('media:upload-complete', ({ mediaId, taskId, serverMediaId }) => {
+    if (!taskId || !mediaId || !serverMediaId) return;
+    let found = null;
+    try { found = findTask(taskId); } catch { return; }
+    if (!found || !found.task || !Array.isArray(found.task.photos)) return;
+    const photo = found.task.photos.find(p => p && String(p.id) === String(mediaId));
+    if (!photo || photo.serverMediaId === serverMediaId) return;
+    photo.serverMediaId = serverMediaId;
+    const ids = Array.isArray(found.task.mediaIds) ? found.task.mediaIds : [];
+    if (!ids.some(id => String(id) === String(mediaId))) ids.push(String(mediaId));
+    found.task.mediaIds = ids;
+    const persist = async () => {
+        try {
+            if (typeof photo.dataUrl === 'string' && photo.dataUrl.startsWith('data:')) {
+                const blob = dataUrlToBlob(photo.dataUrl);
+                await putCachedPhoto(photo.id, blob, photo.contentType || blob.type, serverMediaId);
+            }
+        } catch { /* silent — کش best-effort است */ }
+        delete photo.dataUrl;
+        try {
+            await saveTask(found.task, found.parent || undefined);
+        } catch { /* silent */ }
+    };
+    persist();
+});
 export function saveTask(task, parent) {
     if (!task || typeof task.id === 'undefined') {
         return Promise.reject(new Error('saveTask: invalid task'));
