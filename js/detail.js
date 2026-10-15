@@ -262,6 +262,8 @@ function ensureLightboxUI() {
         setLightboxZoom(_lbZoom === LB_MIN_ZOOM ? 2 : LB_MIN_ZOOM);
     });
     viewport.addEventListener('click', e => {
+        // کلیکِ بعد از درگ (هدف‌گیری مجدد به viewport) نباید ببندد
+        if (_lbDragMoved) { _lbDragMoved = false; return; }
         if (e.target === viewport) closeLightbox();
     });
     lb.addEventListener('click', e => {
@@ -274,7 +276,7 @@ function ensureLightboxUI() {
     viewport.addEventListener('pointerdown', e => {
         if (_lbZoom <= LB_MIN_ZOOM) return;
         e.preventDefault();
-        _lbDrag = { x: e.clientX, y: e.clientY, sx: viewport.scrollLeft, sy: viewport.scrollTop };
+        _lbDrag = { x: e.clientX, y: e.clientY, sx: viewport.scrollLeft, sy: viewport.scrollTop, pid: e.pointerId };
         _lbDragMoved = false;
         viewport.classList.add('dragging');
         try { viewport.setPointerCapture(e.pointerId); } catch { /* silent */ }
@@ -287,7 +289,14 @@ function ensureLightboxUI() {
         viewport.scrollLeft = _lbDrag.sx - dx;
         viewport.scrollTop = _lbDrag.sy - dy;
     });
-    const endDrag = () => {
+    const endDrag = (e) => {
+        // رها کردن capture قبل از click تا کلیک به عکس برگردد (نه viewport)
+        try {
+            const pid = (_lbDrag && _lbDrag.pid !== undefined) ? _lbDrag.pid : (e && e.pointerId);
+            if (pid !== undefined && viewport.hasPointerCapture && viewport.hasPointerCapture(pid)) {
+                viewport.releasePointerCapture(pid);
+            }
+        } catch { /* silent */ }
         _lbDrag = null;
         try { viewport.classList.remove('dragging'); } catch { /* silent */ }
     };
