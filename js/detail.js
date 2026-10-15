@@ -730,8 +730,9 @@ function renderUploadBadge(status) {
             return `<span class="photo-upload-badge photo-upload-badge--uploaded" title="${label}" aria-label="${label}">✓</span>`;
         }
         case 'failed': {
+            // ⚠️ ❗ قرمز (نه ✕) تا با دکمه‌ی حذف عکس اشتباه نشود
             const label = i18nT('detail.photo.badge.failed');
-            return `<span class="photo-upload-badge photo-upload-badge--failed" title="${label}" aria-label="${label}">⚠</span>`;
+            return `<span class="photo-upload-badge photo-upload-badge--failed" title="${label}" aria-label="${label}">❗</span>`;
         }
         default:
             return '';

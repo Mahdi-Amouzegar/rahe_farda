@@ -15,7 +15,7 @@ import {
 } from '../js/media-cache.js';
 import { toServerOp } from '../js/sync-queue.js';
 import { sanitizeTask, enqueueNewPhotosForTask } from '../js/store.js';
-import { stripSharedPayload, enqueueGroupPhotosForUpload } from '../js/tasks/source.js';
+import { stripSharedPayload, enqueueSharedPhotosForUpload } from '../js/tasks/source.js';
 import { enqueueUpload } from '../js/media-upload.js';
 import { state } from '../js/core.js';
 
@@ -120,9 +120,10 @@ describe('stripSharedPayload — گروه/DM', () => {
         expect(out.photos[0].dataUrl).toBeUndefined();
         expect(out.photos[0].id).toBe('p1');
     });
-    it('DM: دست‌نخورده می‌ماند (flow آپلود/مجوز ندارد)', () => {
-        const task = { id: 't1', photos: [photo()] };
-        expect(stripSharedPayload(task, { type: 'peer' })).toBe(task);
+    it('DM هم strip می‌شود (آپلود/دانلود peer در سرور مجاز است)', () => {
+        const out = stripSharedPayload({ id: 't1', photos: [photo()] }, { type: 'peer' });
+        expect(out.photos[0].dataUrl).toBeUndefined();
+        expect(out.photos[0].id).toBe('p1');
     });
     it('بدون dest: دست‌نخورده', () => {
         const task = { id: 't1', photos: [photo()] };
@@ -130,7 +131,7 @@ describe('stripSharedPayload — گروه/DM', () => {
     });
 });
 
-describe('enqueueGroupPhotosForUpload', () => {
+describe('enqueueSharedPhotosForUpload', () => {
     const syncWas = { enabled: false, token: null };
     beforeEach(() => {
         syncWas.enabled = state.sync.enabled;
@@ -145,7 +146,7 @@ describe('enqueueGroupPhotosForUpload', () => {
     });
     const groupDest = { type: 'group', groupId: 'g1' };
     it('عکس جدید گروهی با groupId و taskId تهی enqueue می‌شود', async () => {
-        const res = await enqueueGroupPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: [] });
+        const res = await enqueueSharedPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: [] });
         expect(res).toEqual({ enqueued: 1 });
         expect(vi.mocked(enqueueUpload)).toHaveBeenCalledTimes(1);
         const arg = vi.mocked(enqueueUpload).mock.calls[0][0];
@@ -155,12 +156,21 @@ describe('enqueueGroupPhotosForUpload', () => {
         expect(arg.blob instanceof Blob).toBe(true);
     });
     it('عکس آپلودشده رد می‌شود', async () => {
-        const res = await enqueueGroupPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: ['p1'] });
+        const res = await enqueueSharedPhotosForUpload(groupDest, { id: 't1', photos: [photo()], mediaIds: ['p1'] });
         expect(res).toEqual({ enqueued: 0 });
         expect(vi.mocked(enqueueUpload)).not.toHaveBeenCalled();
     });
-    it('مقصد peer: هیچ enqueue (تا تغییر امنیتی سرور)', async () => {
-        const res = await enqueueGroupPhotosForUpload({ type: 'peer' }, { id: 't1', photos: [photo()], mediaIds: [] });
+    it('عکس جدید DM با taskId تسک و بدون groupId enqueue می‌شود', async () => {
+        const res = await enqueueSharedPhotosForUpload({ type: 'peer' }, { id: 'dm1', photos: [photo()], mediaIds: [] });
+        expect(res).toEqual({ enqueued: 1 });
+        expect(vi.mocked(enqueueUpload)).toHaveBeenCalledTimes(1);
+        const arg = vi.mocked(enqueueUpload).mock.calls[0][0];
+        expect(arg.mediaId).toBe('p1');
+        expect(arg.taskId).toBe('dm1');
+        expect(arg.groupId).toBeNull();
+    });
+    it('مقصد نامعتبر: هیچ enqueue', async () => {
+        const res = await enqueueSharedPhotosForUpload(null, { id: 't1', photos: [photo()], mediaIds: [] });
         expect(res).toEqual({ enqueued: 0 });
         expect(vi.mocked(enqueueUpload)).not.toHaveBeenCalled();
     });
