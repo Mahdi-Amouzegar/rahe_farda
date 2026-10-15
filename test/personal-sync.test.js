@@ -315,3 +315,42 @@ describe('store — diffTasksForSync (ویرایش bulk)', () => {
         expect(second.changed).toHaveLength(0);
     });
 });
+
+describe('personal-sync — syncOnLogin: push صف قبل از pull', () => {
+    it('delete صف‌مانده اول flush می‌شود تا merge زنده‌اش نکند', async () => {
+        loggedIn();
+        // سرور هنوز تسک را دارد؛ با اعمال delete از snapshot بعدی حذف می‌شود
+        let serverHasGone = true;
+        const postSync = vi.fn(async (body) => {
+            if (!body.requestFullResync && Array.isArray(body.ops) && body.ops.length > 0) {
+                if (body.ops.some(o => o.type === 'delete' && String(o.entityId) === 'gone')) {
+                    serverHasGone = false;
+                }
+                return { ok: true, data: { accepted: body.ops.map(o => ({ opId: o.id })), rejected: [] } };
+            }
+            return {
+                ok: true,
+                data: { fullSnapshot: serverHasGone ? [{ entityId: 'gone', data: { id: 'gone', text: 'z', updatedAt: '2026-01-01T00:00:00.000Z', revision: 1 }, revision: 1 }] : [] },
+            };
+        });
+        const removeOps = vi.fn(async () => {});
+        const persist = vi.fn(async () => {});
+        const r = await syncOnLogin({
+            readLocal: () => [],
+            postSync,
+            persist,
+            readQueue: async () => [{ id: 'op-del', type: 'delete', entityId: 'gone', entityType: 'task', data: null, timestamp: '2026-02-01T00:00:00.000Z' }],
+            removeOps,
+        });
+        // اول push صف، بعد pull
+        expect(postSync.mock.calls.length).toBeGreaterThanOrEqual(2);
+        expect(postSync.mock.calls[0][0].requestFullResync).toBe(false);
+        expect(postSync.mock.calls[0][0].ops.map(o => o.id)).toEqual(['op-del']);
+        expect(postSync.mock.calls[1][0].requestFullResync).toBe(true);
+        expect(removeOps).toHaveBeenCalledWith(['op-del']);
+        // merge نباید 'gone را زنده کند
+        const persisted = persist.mock.calls[0][0];
+        expect(persisted.find(t => String(t.id) === 'gone')).toBeUndefined();
+        expect(r.ok).toBe(true);
+    });
+});

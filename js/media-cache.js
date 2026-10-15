@@ -7,12 +7,16 @@
 //   - بایت دانلودشده در IDB (media_cache) می‌ماند؛ باز کردن دوباره‌ی
 //     جزئیات هیچ درخواستی نمی‌زند. فقط عکس‌های جدید (کش‌نشده) fetch می‌شوند.
 //
-// ⚠️ نسخه‌ی IDB باید با media-upload.js یکی باشد (هر دو spaceTodoDB).
-//    IDB_VERSION = 5 — media-upload.js هم به ۵ bump شده است.
-
-const IDB_NAME = 'spaceTodoDB';
+// ⚠️ دیتابیس جدا از spaceTodoDB (عمدی):
+//    هندل‌های باز spaceTodoDB هیچ‌وقت بسته نمی‌شوند؛ اگر کش همان DB را
+//    با version بالاتر باز کند، ارتقا برای همیشه blocked می‌ماند و
+//    خواندن کش (و رندر عکس) هیچ‌وقت برنمی‌گردد. DB جدا این بن‌بست را ندارد.
+const IDB_NAME = 'spaceTodoMedia';
 const IDB_MEDIA_CACHE = 'media_cache';
-export const IDB_VERSION = 5;
+const IDB_VERSION = 1;
+
+/** نام دیتابیس کش — برای تست جدایی از spaceTodoDB */
+export const MEDIA_CACHE_DB_NAME = IDB_NAME;
 
 /** @type {IDBDatabase|null} */
 let _db = null;

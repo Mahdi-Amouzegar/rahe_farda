@@ -500,6 +500,9 @@ export async function enqueueDirtyTasks() {
         } catch (err) {
             console.warn('[store] dirty-enqueue failed:', err);
         }
+        // ⚠️ عکس مسیر bulk هم باید enqueue آپلود شود (جزئیات/نقشه از saveTasks می‌آیند، نه saveTask).
+        // وگرنه ارجاعِ stripشده به سرور می‌رسد ولی بایت هرگز آپلود نمی‌شود (ارجاع مرده).
+        enqueueNewPhotosForTask(t).catch(() => {});
     }
     if (n > 0) {
         import('./personal-sync.js').then(m => {
@@ -710,7 +713,7 @@ async function saveTaskAndEnqueue(task, parent) {
  *
  * @param {object} task
  */
-async function enqueueNewPhotosForTask(task) {
+export async function enqueueNewPhotosForTask(task) {
     if (!task || !Array.isArray(task.photos) || task.photos.length === 0) {
         return;
     }

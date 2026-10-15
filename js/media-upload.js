@@ -49,7 +49,7 @@ import { isOnline } from './net.js';
 
 const IDB_NAME = 'spaceTodoDB';
 const IDB_MEDIA_UPLOADS = 'media_uploads';
-const IDB_VERSION = 5; // ⚠️ بالا رفت از ۴ به ۵ (object store جدید media_cache در media-cache.js — هر دو باید یکی باشند)
+const IDB_VERSION = 4;
 
 /** حداکثر تلاش مجدد برای هر آپلود */
 const MAX_UPLOAD_RETRIES = 5;

@@ -161,6 +161,13 @@ export async function syncOnLogin(deps) {
     const post = d.postSync || postSyncBatch;
     const removeOps = d.removeOps || dequeue;
 
+    // ⚠️ اول صف معلق را push کن (save/deleteهای هنوزنرفته)، بعد pull+merge.
+    // وگرنه merge نسخه‌ی سرور را برمی‌گرداند: حذف‌های صف‌مانده زنده می‌شوند
+    // و تغییرهای هنوزنرفته در تساوی مهر با نسخه‌ی سرور جایگزین می‌شوند.
+    try {
+        await pushPendingNow({ readQueue: d.readQueue, postSync: post, removeOps });
+    } catch { /* silent — pull/merge طبق روال ادامه می‌یابد */ }
+
     const pulled = await pullFullSnapshot({ postSync: post });
     if (!pulled.ok) {
         // pull شکست خورد → دست‌کم بک‌لاگ صف را push کن (بهتر از هیچی)

@@ -11,9 +11,10 @@ vi.mock('../js/media-upload.js', () => ({
 import {
     stripPhotoBytesForSync,
     classifyPhotoForDisplay,
+    MEDIA_CACHE_DB_NAME,
 } from '../js/media-cache.js';
 import { toServerOp } from '../js/sync-queue.js';
-import { sanitizeTask } from '../js/store.js';
+import { sanitizeTask, enqueueNewPhotosForTask } from '../js/store.js';
 import { stripSharedPayload, enqueueGroupPhotosForUpload } from '../js/tasks/source.js';
 import { enqueueUpload } from '../js/media-upload.js';
 import { state } from '../js/core.js';
@@ -162,5 +163,34 @@ describe('enqueueGroupPhotosForUpload', () => {
         const res = await enqueueGroupPhotosForUpload({ type: 'peer' }, { id: 't1', photos: [photo()], mediaIds: [] });
         expect(res).toEqual({ enqueued: 0 });
         expect(vi.mocked(enqueueUpload)).not.toHaveBeenCalled();
+    });
+});
+
+describe('media-cache — جدایی از spaceTodoDB', () => {
+    it('کش در دیتابیس جدا باز می‌شود (بن‌بست ارتقا ندارد)', () => {
+        expect(MEDIA_CACHE_DB_NAME).not.toBe('spaceTodoDB');
+    });
+});
+
+describe('enqueueNewPhotosForTask — مسیر bulk', () => {
+    const syncWas = { enabled: false, token: null };
+    beforeEach(() => {
+        syncWas.enabled = state.sync.enabled;
+        syncWas.token = state.sync.authToken;
+        state.sync.enabled = true;
+        state.sync.authToken = 'tok';
+        vi.mocked(enqueueUpload).mockClear();
+    });
+    afterEach(() => {
+        state.sync.enabled = syncWas.enabled;
+        state.sync.authToken = syncWas.token;
+    });
+    it('عکس dataUrlدار شخصی enqueue می‌شود (با taskId)', async () => {
+        await enqueueNewPhotosForTask({ id: 't1', photos: [photo()], mediaIds: [] });
+        expect(vi.mocked(enqueueUpload)).toHaveBeenCalledTimes(1);
+        const arg = vi.mocked(enqueueUpload).mock.calls[0][0];
+        expect(arg.mediaId).toBe('p1');
+        expect(arg.taskId).toBe('t1');
+        expect(arg.blob instanceof Blob).toBe(true);
     });
 });
