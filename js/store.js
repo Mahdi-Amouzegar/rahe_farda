@@ -408,8 +408,18 @@ export function sanitizeTask(t) {
  * ⚠️ ما این تابع را await نمی‌کنیم چون caller نمی‌خواهد صبر کند.
  *    عملیات در پس‌زمینه انجام می‌شود.
  */
+/**
+ * آیا op سطل است؟ سطل مفهوم local-only است — سرور سطل ندارد و
+ * فرستادن آن (به‌ویژه trash-add با payload کامل) هم پهنای‌باند و
+ * هم منطق حذف را خراب می‌کرد.
+ */
+export function isTrashOpType(type) {
+    return type === 'trash-add' || type === 'trash-delete';
+}
+
 function enqueueChange(entry) {
     if (!entry || !entry.type) return;
+    if (isTrashOpType(entry.type)) return;
     syncEnqueue({
         type: entry.type,
         entityId: String(entry.id ?? entry.entityId ?? ''),

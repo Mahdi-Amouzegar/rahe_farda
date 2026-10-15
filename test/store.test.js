@@ -2,7 +2,7 @@
 // test/store.test.js — تست‌های sanitization
 
 import { describe, it, expect, vi } from 'vitest';
-import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex } from '../js/store.js';
+import { sanitizeUrl, validLoc, sanitizeTask, saveTasks, loadTasks, validateSeriesStart, advanceRecur, rollforwardRecur, invalidateTaskIndex, isTrashOpType } from '../js/store.js';
 import { isDueFireable, DUE_CATCH_UP_MS, dayKey } from '../js/sessions.js';
 import { checkReminders, collectSharedDue, paintIfPending, rollforwardSharedCache, firedSharedKey, nextSessionAtMap, todaySessions } from '../js/notify.js';
 import { cacheSharedItems, getCachedSharedAll, sharedCacheKey, __resetSharedForTest, persistAdvancedShared, shouldRefreshSharedKey } from '../js/tasks/source.js';
@@ -808,5 +808,16 @@ describe('todaySessions — دایجست امروز شخصی+مشترک (10.19)'
     it('ورودی‌های خالی → خالی', () => {
         expect(todaySessions([], [], 'x')).toEqual([]);
         expect(todaySessions(null, null, 'x')).toEqual([]);
+    });
+});
+describe('store — isTrashOpType (سطل local-only)', () => {
+    it('trash-add و trash-delete سطل‌اند', () => {
+        expect(isTrashOpType('trash-add')).toBe(true);
+        expect(isTrashOpType('trash-delete')).toBe(true);
+    });
+    it('save و delete سطل نیستند', () => {
+        expect(isTrashOpType('save')).toBe(false);
+        expect(isTrashOpType('delete')).toBe(false);
+        expect(isTrashOpType(null)).toBe(false);
     });
 });
