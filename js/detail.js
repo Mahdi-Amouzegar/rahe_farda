@@ -200,6 +200,8 @@ let _lbPhotoId = null;
 let _lbUiWired = false;
 let _lbDrag = null;
 let _lbDragMoved = false;
+/** تا این زمان (ms)، کلیکِ بستن نادیده گرفته می‌شود — ضد کلیکِ بعد از درگ */
+let _lbSuppressCloseUntil = 0;
 
 function lightboxEls() {
     return {
@@ -262,11 +264,13 @@ function ensureLightboxUI() {
         setLightboxZoom(_lbZoom === LB_MIN_ZOOM ? 2 : LB_MIN_ZOOM);
     });
     viewport.addEventListener('click', e => {
-        // کلیکِ بعد از درگ (هدف‌گیری مجدد به viewport) نباید ببندد
+        // کلیکِ بعد از درگ (هر هدفی) نباید ببندد
         if (_lbDragMoved) { _lbDragMoved = false; return; }
+        if (Date.now() < _lbSuppressCloseUntil) return;
         if (e.target === viewport) closeLightbox();
     });
     lb.addEventListener('click', e => {
+        if (Date.now() < _lbSuppressCloseUntil) return;
         if (e.target === lb) closeLightbox();
     });
     viewport.addEventListener('wheel', e => {
@@ -285,7 +289,10 @@ function ensureLightboxUI() {
         if (!_lbDrag) return;
         const dx = e.clientX - _lbDrag.x;
         const dy = e.clientY - _lbDrag.y;
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _lbDragMoved = true;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+            _lbDragMoved = true;
+            _lbSuppressCloseUntil = Date.now() + 350;
+        }
         viewport.scrollLeft = _lbDrag.sx - dx;
         viewport.scrollTop = _lbDrag.sy - dy;
     });
@@ -1550,6 +1557,7 @@ export function bindDetailInputs() {
         }
     });
     document.getElementById('lightbox').addEventListener('click', () => {
+        if (Date.now() < _lbSuppressCloseUntil) return;
         closeLightbox();
     });
     document.getElementById('timerToggle').addEventListener('click', toggleTimer);
