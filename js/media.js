@@ -17,7 +17,9 @@
 // ⚠️ چرا این تصمیمات؟
 //   - عکس‌ها ممکن است شامل متن ریز باشند (فاکتور، رسید، قرارداد)
 //   - downscale تهاجمی، متن را نابود می‌کند
-//   - WebP خودش 25-35٪ صرفه‌جویی نسبت به JPEG می‌دهد
+//   - WebP معمولاً 25-35٪ صرفه‌جویی نسبت به JPEG می‌دهد — ولی نه همیشه:
+//     روی JPEG از قبل فشرده، خروجی ۰.۹ گاهی بزرگ‌تر می‌شود، پس اگر
+//     خروجی از ورودی بزرگ‌تر شد و ورودی قابل‌نمایش بود، همان ورودی می‌ماند.
 //
 // ⚠️ بدون کتابخانه‌ی خارجی:
 //   - همه‌چیز با HTMLCanvasElement + toBlob
@@ -254,6 +256,43 @@ export function validateImageFile(file) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Keep-original — اگر re-encode بزرگ‌تر شد، فایل اصلی می‌ماند
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * MIMEهایی که مرورگر مستقیم نمایش می‌دهد (بدون تبدیل).
+ * ⚠️ heic/heif عمداً نیست — همه‌جا رندر نمی‌شود و باید تبدیل بماند.
+ */
+const DIRECT_DISPLAYABLE_MIME = [
+    'image/jpeg',
+    'image/jpg',
+    'image/jfif',
+    'image/pjpeg',
+    'image/png',
+    'image/x-png',
+    'image/webp',
+    'image/gif',
+    'image/avif',
+    'image/bmp',
+];
+
+/**
+ * آیا مرورگر این MIME را مستقیم نمایش می‌دهد؟
+ */
+export function isDirectDisplayable(mime) {
+    return DIRECT_DISPLAYABLE_MIME.includes(String(mime || '').toLowerCase());
+}
+
+/**
+ * آیا فایل اصلی نگه داشته شود؟ وقتی خروجی re-encode از ورودی بزرگ‌تر شد
+ * (روی JPEG از قبل فشرده با کیفیت ۰.۹ رایج است) و ورودی قابل‌نمایش است.
+ */
+export function shouldKeepOriginalFile(fileType, fileSize, outSize) {
+    if (!Number.isFinite(+fileSize) || !Number.isFinite(+outSize)) return false;
+    return outSize >= fileSize && isDirectDisplayable(fileType);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Load Image
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -444,6 +483,26 @@ export async function processImageFile(file) {
         blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);
         contentType = 'image/jpeg';
         extension = 'jpeg';
+    }
+
+    // ─── ۶. اگر خروجی از ورودی بزرگ‌تر شد و ورودی قابل‌نمایش است، همان ورودی ───
+    // (re-encode با کیفیت بالا روی JPEG از قبل فشرده گاهی بزرگ‌تر می‌شود؛
+    //  کیفیت ۰.۹ برای خوانایی متن ریز است، نه برای حجم.)
+    if (shouldKeepOriginalFile(file.type, file.size, blob.size)) {
+        const origExt = getExtension(file.name).replace(/^\./, '')
+            || String(file.type).split('/')[1] || extension;
+        return {
+            blob: file,
+            contentType: file.type,
+            width: originalWidth,
+            height: originalHeight,
+            sizeBytes: file.size,
+            originalSizeBytes: file.size,
+            scaled: false,
+            originalWidth,
+            originalHeight,
+            extension: origExt,
+        };
     }
 
     return {

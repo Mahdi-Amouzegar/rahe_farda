@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { isWebPSupported, isAvifSupported, AVIF_QUALITY, WEBP_QUALITY, dataUrlToBlob } from '../js/media.js';
+import { isWebPSupported, isAvifSupported, AVIF_QUALITY, WEBP_QUALITY, dataUrlToBlob, isDirectDisplayable, shouldKeepOriginalFile } from '../js/media.js';
 
 describe('media format', () => {
     it('در jsdom (بدون canvas واقعی) هر دو false برمی‌گردند، نه throw', () => {
@@ -39,5 +39,23 @@ describe('dataUrlToBlob 10.11/BUG-02', () => {
         expect(() => dataUrlToBlob('https://example.com/x.png')).toThrow();
         expect(() => dataUrlToBlob('not-a-data-url')).toThrow();
         expect(() => dataUrlToBlob(null)).toThrow();
+    });
+});
+
+describe('keep-original (re-encode بزرگ‌تر از ورودی)', () => {
+    it('خروجی بزرگ‌تر + ورودی قابل‌نمایش → اصلی می‌ماند', () => {
+        expect(shouldKeepOriginalFile('image/jpeg', 297 * 1024, 461 * 1024)).toBe(true);
+        expect(shouldKeepOriginalFile('image/png', 100, 100)).toBe(true);
+    });
+    it('خروجی کوچک‌تر → تبدیل نگه داشته می‌شود', () => {
+        expect(shouldKeepOriginalFile('image/jpeg', 381 * 1024, 332 * 1024)).toBe(false);
+    });
+    it('heic قابل‌نمایش مستقیم نیست → همیشه تبدیل', () => {
+        expect(isDirectDisplayable('image/heic')).toBe(false);
+        expect(shouldKeepOriginalFile('image/heic', 100, 500)).toBe(false);
+    });
+    it('ورودی نامعتبر → false', () => {
+        expect(shouldKeepOriginalFile('', 100, 500)).toBe(false);
+        expect(shouldKeepOriginalFile('image/jpeg', NaN, 500)).toBe(false);
     });
 });
