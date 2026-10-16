@@ -160,6 +160,18 @@ export function classifyPhotoForDisplay(photo, ctx) {
 }
 
 /**
+ * آیا ارجاع عکس مرده است (نه بایت دارد، نه ارجاع سروری، نه در حال آپلود)؟
+ * ارجاع مرده نباید پیش‌نمایش (حتی ⏳) داشته باشد — فقط مخفی می‌شود.
+ */
+export function isDeadPhotoRef(photo, uploading) {
+    if (!photo || typeof photo !== 'object') return true;
+    if (typeof photo.dataUrl === 'string' && photo.dataUrl.startsWith('data:image')) return false;
+    if (typeof photo.serverMediaId === 'string' && photo.serverMediaId) return false;
+    if (uploading) return false;
+    return true;
+}
+
+/**
  * clamp زوم لایتباکس (ایده arasanad: بازه‌ی ۱ تا ۳).
  */
 export function clampZoom(scale, min = 1, max = 3) {

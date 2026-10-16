@@ -42,7 +42,7 @@ const BASELINE = new Set([
   'detail.js:el.innerHTML = `<div class="session-empty">${i18nT(\'detail.sessions.empty\')}</div>`;',
   'detail.js:el.innerHTML = list.map((s, i) => {',
   'detail.js:grid.innerHTML = `<div class="session-empty">${i18nT(\'detail.photo.empty\')}</div>`;',
-  'detail.js:grid.innerHTML = list.map((p, idx) => {',
+  'detail.js:grid.innerHTML = visible.map(({ p, upload, src }) => {',
   'detail.js:mc.innerHTML = mhtml;',
   'detail.js:wc.innerHTML = weekOrder.map(([key, v]) =>',
   'header-status.js:_el.innerHTML = `<span class="status-icon" aria-hidden="true">${status.icon}</span>${badgeHtml}`;',

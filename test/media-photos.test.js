@@ -14,6 +14,7 @@ import {
     MEDIA_CACHE_DB_NAME,
     clampZoom,
     extForContentType,
+    isDeadPhotoRef,
 } from '../js/media-cache.js';
 import { toServerOp } from '../js/sync-queue.js';
 import { sanitizeTask, enqueueNewPhotosForTask } from '../js/store.js';
@@ -190,6 +191,22 @@ describe('enqueueSharedPhotosForUpload', () => {
 describe('media-cache — جدایی از spaceTodoDB', () => {
     it('کش در دیتابیس جدا باز می‌شود (بن‌بست ارتقا ندارد)', () => {
         expect(MEDIA_CACHE_DB_NAME).not.toBe('spaceTodoDB');
+    });
+});
+
+describe('isDeadPhotoRef', () => {
+    it('بایت محلی → زنده', () => {
+        expect(isDeadPhotoRef(photo(), false)).toBe(false);
+    });
+    it('ارجاع سروری → زنده', () => {
+        expect(isDeadPhotoRef(photo({ dataUrl: undefined, serverMediaId: 's1' }), false)).toBe(false);
+    });
+    it('در حال آپلود → زنده (⏳)', () => {
+        expect(isDeadPhotoRef(photo({ dataUrl: undefined }), true)).toBe(false);
+    });
+    it('نه بایت نه ارجاع نه آپلود → مرده (مخفی)', () => {
+        expect(isDeadPhotoRef(photo({ dataUrl: undefined }), false)).toBe(true);
+        expect(isDeadPhotoRef(null, false)).toBe(true);
     });
 });
 

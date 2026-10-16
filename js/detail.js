@@ -26,6 +26,7 @@ import {
     getUploadStatus,
     cancelUpload,
     retryFailedUploads,
+    enqueueUpload,
 } from './media-upload.js';
 import {
     getCachedPhoto,
@@ -797,11 +798,6 @@ async function renderDetailPhotos() {
     if (!task) return;
     const list = task.photos || [];
     const countEl = document.getElementById('photoCount');
-    if (countEl) {
-        countEl.textContent = list.length
-            ? `(${formatNumber(list.length)} / ${formatNumber(MAX_PHOTOS_PER_TASK)})`
-            : '';
-    }
 
     // ⚠️ فاز ۴D.4b-fix: غیرفعال کردن دکمه‌ها وقتی به سقف رسیده‌ایم
     const isFull = list.length >= MAX_PHOTOS_PER_TASK;
@@ -853,27 +849,45 @@ async function renderDetailPhotos() {
         })
     );
 
+    // ─── ترمیم: عکس dataUrlدارِ بدون رکورد آپلود را دوباره enqueue کن ───
+    // (بستن جزئیات/کرش قبل از save نباید آپلود را برای همیشه بکشد.)
+    healMissingPhotoUploads(task, list, statuses);
+
     const altText = i18nT('detail.photo.alt');
     const delAria = i18nT('detail.photo.deleteAria');
     const sizeLabelPrefix = i18nT('detail.photo.sizePrefix');
 
     // ─── resolve منابع نمایش: کش → dataUrl → lazy fetch ───
-    prunePhotoObjectUrls(new Set(list.map(p => String(p && p.id))));
     const onlineNow = isOnline();
     const authedNow = Boolean(state.sync.enabled && state.sync.authToken);
-    const srcs = await Promise.all(list.map(p => resolvePhotoSrc(p).catch(() => (
-        (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image')) ? p.dataUrl : null
-    ))));
-
-    grid.innerHTML = list.map((p, idx) => {
+    const infos = await Promise.all(list.map(async (p, idx) => {
+        let src = null;
+        try {
+            src = await resolvePhotoSrc(p);
+        } catch {
+            src = (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:image')) ? p.dataUrl : null;
+        }
         const upload = statuses[idx];
+        const uploading = !!upload && (upload.status === 'pending' || upload.status === 'uploading');
+        return { p, upload, src, dead: !src && isDeadPhotoRef(p, uploading) };
+    }));
+    // ارجاع مرده (نه بایت، نه ارجاع سروری، نه در حال آپلود) مخفی می‌شود
+    const visible = infos.filter(x => !x.dead);
+
+    if (countEl) {
+        countEl.textContent = visible.length
+            ? `(${formatNumber(visible.length)} / ${formatNumber(MAX_PHOTOS_PER_TASK)})`
+            : '';
+    }
+
+    prunePhotoObjectUrls(new Set(visible.map(x => String(x.p && x.p.id))));
+    grid.innerHTML = visible.map(({ p, upload, src }) => {
         const sizeLabel = p.sizeBytes ? formatBytes(p.sizeBytes) : '';
         const title = sizeLabel ? `${sizeLabelPrefix}: ${sizeLabel}` : '';
 
         const uploadState = upload ? upload.status : null;
-        const uploadBadge = renderUploadBadge(uploadState);
+        const uploadBadge = renderUploadBadge(uploadState, p.id);
         const delBtn = `<button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>`;
-        const src = srcs[idx];
         if (!src) {
             return `
         <div class="photo-thumb photo-thumb--loading">
@@ -892,8 +906,10 @@ async function renderDetailPhotos() {
 
     // ─── lazy: فقط عکس‌های جدید (کش‌نشده) که ارجاع سروری دارند ───
     const taskId = task.id;
-    const missing = list.filter((p, idx) => !srcs[idx]
-        && classifyPhotoForDisplay(p, { cached: false, online: onlineNow, authed: authedNow }) === 'fetch');
+    const missing = visible
+        .filter(({ p, src }) => !src
+            && classifyPhotoForDisplay(p, { cached: false, online: onlineNow, authed: authedNow }) === 'fetch')
+        .map(({ p }) => p);
     if (missing.length > 0) {
         fetchMissingPhotos(missing).then(() => {
             if (String(state.currentDetailId) === String(taskId)) renderDetailPhotos().catch(() => {});
@@ -902,12 +918,67 @@ async function renderDetailPhotos() {
 }
 
 /**
+ * ترمیم صف آپلود: عکس dataUrlدارِ بدون رکورد آپلود را enqueue کن.
+ * (بستن جزئیات قبل از save نباید آپلود را برای همیشه بکشد.)
+ * فقط وقتی رکوردی نیست — failedها با دکمه‌ی تلاش مجدد دستی برمی‌گردند.
+ */
+function healMissingPhotoUploads(task, list, statuses) {
+    try {
+        if (!state.sync.enabled || !state.sync.authToken || !isOnline()) return;
+        const dest = task._shared && task._shared.dest;
+        if (dest && (!task._shared.mine || (dest.type !== 'group' && dest.type !== 'peer'))) return;
+        list.forEach((p, idx) => {
+            if (!p || statuses[idx]) return;
+            if (typeof p.dataUrl !== 'string' || !p.dataUrl.startsWith('data:')) return;
+            if (typeof p.contentType !== 'string' || typeof p.sizeBytes !== 'number') return;
+            const uploaded = Array.isArray(task.mediaIds) && task.mediaIds.some(id => String(id) === String(p.id));
+            if (uploaded || p.serverMediaId) return;
+            let blob = null;
+            try { blob = dataUrlToBlob(p.dataUrl); } catch { return; }
+            enqueueUpload({
+                mediaId: p.id,
+                taskId: dest ? (dest.type === 'peer' ? task.id : null) : task.id,
+                groupId: dest && dest.type === 'group' ? dest.groupId : null,
+                contentType: p.contentType,
+                sizeBytes: p.sizeBytes,
+                blob,
+            }).catch(() => {});
+        });
+    } catch { /* silent */ }
+}
+
+/**
+ * تلاش مجدد تکی برای یک عکس (دکمه‌ی ❗).
+ */
+async function retryPhotoUpload(task, photoId) {
+    const p = (task.photos || []).find(x => x && String(x.id) === String(photoId));
+    if (!p || typeof p.dataUrl !== 'string' || !p.dataUrl.startsWith('data:')) return false;
+    let blob = null;
+    try { blob = dataUrlToBlob(p.dataUrl); } catch { return false; }
+    const dest = task._shared && task._shared.dest;
+    try {
+        await enqueueUpload({
+            mediaId: p.id,
+            taskId: dest ? (dest.type === 'peer' ? task.id : null) : task.id,
+            groupId: dest && dest.type === 'group' ? dest.groupId : null,
+            contentType: p.contentType || blob.type,
+            sizeBytes: p.sizeBytes || blob.size,
+            blob,
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * رندر badge وضعیت آپلود.
  *
  * @param {string|null} status — 'pending' | 'uploading' | 'uploaded' | 'failed' | null
+ * @param {string} [photoId] — برای دکمه‌ی تلاش مجدد در حالت failed
  * @returns {string} HTML
  */
-function renderUploadBadge(status) {
+function renderUploadBadge(status, photoId) {
     if (!status) return '';
 
     switch (status) {
@@ -924,9 +995,10 @@ function renderUploadBadge(status) {
             return `<span class="photo-upload-badge photo-upload-badge--uploaded" title="${label}" aria-label="${label}">✓</span>`;
         }
         case 'failed': {
-            // ⚠️ ❗ قرمز (نه ✕) تا با دکمه‌ی حذف عکس اشتباه نشود
+            // ⚠️ ❗ قرمز (نه ✕) تا با دکمه‌ی حذف عکس اشتباه نشود — کلیک = تلاش مجدد
             const label = i18nT('detail.photo.badge.failed');
-            return `<span class="photo-upload-badge photo-upload-badge--failed" title="${label}" aria-label="${label}">❗</span>`;
+            const retry = photoId ? ` data-photo-retry="${escapeHtml(String(photoId))}"` : '';
+            return `<button type="button" class="photo-upload-badge photo-upload-badge--failed" title="${label}" aria-label="${label}"${retry}>❗</button>`;
         }
         default:
             return '';
@@ -1527,6 +1599,15 @@ export function bindDetailInputs() {
     });
     
     document.getElementById('photoGrid').addEventListener('click', async e => {
+        const retry = e.target.closest('[data-photo-retry]');
+        if (retry) {
+            const task = getDetailTask();
+            if (task) {
+                await retryPhotoUpload(task, retry.dataset.photoRetry);
+                await renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
+            }
+            return;
+        }
         const del = e.target.closest('[data-photo-del]');
         if (del) {
             const task = getDetailTask();

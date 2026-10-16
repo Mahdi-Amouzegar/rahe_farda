@@ -761,6 +761,13 @@
         color: var(--accent-pink);
     }
 
+    button.photo-upload-badge--failed {
+        pointer-events: auto;
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+    }
+
     /* ═══════════════════════════════════════════════════════════════════════
        ⚠️ فاز ۴D.4b-fix: Photo Limit UI
        ═══════════════════════════════════════════════════════════════════════ */
