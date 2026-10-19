@@ -1,37 +1,51 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
-// test/notify-scan.test.js — گیت تطبیقی اسکن پس‌زمینه یادآور (10.15)
+// test/notify-scan.test.js — گیت تازه‌سازی مقصد برای یادآور (10.17 → 10.20/BUG-19)
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+    cacheSharedItems,
+    cachedUpdatedAtMs,
+    shouldRefreshSharedKey,
+    __resetSharedForTest,
+} from '../js/tasks/source.js';
 
-vi.mock('../js/i18n.js', async (importOriginal) => {
-    const actual = await importOriginal();
-    return { ...actual, t: (key) => key };
-});
+const farFuture = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-import { shouldScanShared } from '../js/notify.js';
+function item(id, updatedAt) {
+    return { id, archived: false, updatedAt, sessions: [{ id: 's1', at: farFuture() }] };
+}
 
-const MIN = 60 * 1000;
+describe('notify — سیگنال فعالیت سروری (10.20/BUG-19)', () => {
+    beforeEach(() => { __resetSharedForTest(); });
+    afterEach(() => { __resetSharedForTest(); });
 
-describe('notify — گیت اسکن پس‌زمینه (10.15)', () => {
-    it('کش خالی → همیشه اسکن (پر کردن کش)', () => {
-        expect(shouldScanShared(1000, null, 0, true)).toBe(true);
+    it('جدیدترین updatedAt کش را برمی‌گرداند (null برای کش خالی)', () => {
+        expect(cachedUpdatedAtMs('peer:p1')).toBe(null);
+        cacheSharedItems('peer:p1', [
+            item('t1', '2026-10-19T10:00:00.000Z'),
+            item('t2', '2026-10-19T10:05:00.000Z'),
+        ]);
+        expect(cachedUpdatedAtMs('peer:p1')).toBe(new Date('2026-10-19T10:05:00.000Z').getTime());
     });
 
-    it('سررسید نزدیک (≤ ۱۵ دقیقه = مهلت جبران) → اسکن فوری', () => {
-        expect(shouldScanShared(1000, 15 * MIN, 1000, false)).toBe(true);
-        expect(shouldScanShared(1000, 1 * MIN, 1000, false)).toBe(true);
+    it('فعالیت جدیدتر از کش → تازه‌سازی فوری (حتی با سررسید دور و کش تازه)', () => {
+        cacheSharedItems('peer:p1', [item('t1', '2026-10-19T10:00:00.000Z')]);
+        expect(shouldRefreshSharedKey('peer:p1', '2026-10-19T10:06:00.000Z')).toBe(true);
     });
 
-    it('سررسید دور + اسکن اخیر → صرفه‌جویی (بدون درخواست)', () => {
-        expect(shouldScanShared(1000 + 5 * MIN, 30 * MIN, 1000, false)).toBe(false);
-        expect(shouldScanShared(1000 + 9 * MIN, 60 * MIN, 1000, false)).toBe(false);
+    it('فعالیت هم‌زمان/قدیمی‌تر از کش + سررسید دور → صرفه‌جویی', () => {
+        cacheSharedItems('peer:p1', [item('t1', '2026-10-19T10:00:00.000Z')]);
+        expect(shouldRefreshSharedKey('peer:p1', '2026-10-19T10:00:00.000Z')).toBe(false);
+        expect(shouldRefreshSharedKey('peer:p1', '2026-10-19T09:00:00.000Z')).toBe(false);
+        expect(shouldRefreshSharedKey('peer:p1', null)).toBe(false);
     });
 
-    it('سررسید دور + ۱۰ دقیقه از آخرین اسکن گذشته → اسکن', () => {
-        expect(shouldScanShared(1000 + 10 * MIN, 30 * MIN, 1000, false)).toBe(true);
+    it('مقصد تازه‌فعال‌شده (کش خالی + فعالیت سروری) → تازه‌سازی', () => {
+        cacheSharedItems('group:g1', []);
+        expect(shouldRefreshSharedKey('group:g1', '2026-10-19T10:00:00.000Z')).toBe(true);
     });
 
-    it('هیچ سررسیدی آینده‌ای نیست (null) + اسکن اخیر → صرفه‌جویی', () => {
-        expect(shouldScanShared(1000 + 1 * MIN, null, 1000, false)).toBe(false);
+    it('مقصد کش‌نشده → تازه‌سازی', () => {
+        expect(shouldRefreshSharedKey('group:g1', null)).toBe(true);
     });
 });

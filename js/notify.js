@@ -12,7 +12,7 @@
 import { state, uid } from './core.js';
 import { findTask, saveTasks, rollforwardRecur, advanceRecur, ROLLFORWARD_GUARD } from './store.js';
 import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
-import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared, shouldRefreshSharedKey, SHARED_SCAN_NEAR_MS, SHARED_SCAN_IDLE_MS } from './tasks/source.js';
+import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared, shouldRefreshSharedKey } from './tasks/source.js';
 import { isOnline } from './net.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
@@ -660,39 +660,18 @@ export function paintIfPending() {
 
 /**
  * تازه‌سازی کش مقصدها برای یادآور (پس‌زمینه: گیت ورود/آنلاین/هم‌پوشانی، best-effort).
- * ⚠️ 10.15: تطبیقی — سررسید نزدیک (≤ ۱۵ دقیقه، هم‌اندازه‌ی مهلت جبران)
- * یا کش خالی → هر چه زود؛ در سکون → حداکثر هر ۱۰ دقیقه. چون شلیک due
- * تا ۱۵ دقیقه بعد از سررسید ممکن است، هیچ یادآوری از دست نمی‌رود.
+ *
+ * ⚠️ 10.20/BUG-19: قبلاً «همه‌ی مقصدها هر ۱۰ دقیقه» بود؛ دو شکاف داشت:
+ *   ۱) مقصد باز، لیست تازه را می‌گرفت ولی در کش یادآور نوشته نمی‌شد.
+ *   ۲) تسک تازه‌ی طرف مقابل تا تیک بعدی (۱۰ دقیقه) دیده نمی‌شد و اگر نزدیک
+ *      سررسید ساخته می‌شد، از پنجره‌ی جبران ۱۵دقیقه‌ای جا می‌ماند.
+ * حالا اول یک سیگنال ارزان می‌گیریم و فقط مقصدِ تغییرکرده را می‌خوانیم:
+ *   - DM: `/api/dm/unread` هم شمارنده و هم `activity` (آخرین updated_at هر
+ *     مخاطب) را می‌دهد — همه‌ی مخاطبان، حتی اولین‌تماسِ تأییدنشده که در
+ *     `listConversations` (فقط accepted) نیست.
+ *   - گروه: `/api/groups` فیلد `lastActivity` هر گروه را دارد.
  */
-let _lastSharedScanAt = 0;
-
-// ⚠️ 10.19: نخستین اسکن مقصدهای مشترک تمام شده؟
-// (دایجست صبحگاهی تا آن موقع فقط وظایف شخصی را می‌شمارد)
 let _sharedFirstScanDone = false;
-
-/** آیا اسکن پس‌زمینه لازم است؟ (محض — برای تست) */
-export function shouldScanShared(nowMs, nearestMs, lastScanAt, cacheEmpty) {
-    if (cacheEmpty) return true;
-    if (nearestMs !== null && nearestMs <= SHARED_SCAN_NEAR_MS) return true;
-    return (nowMs - lastScanAt) >= SHARED_SCAN_IDLE_MS;
-}
-
-/** نزدیک‌ترین سررسید آینده در کش (ms)؛ null اگر هیچ‌کدام. */
-function nearestSharedDueMs() {
-    let best = null;
-    const now = Date.now();
-    try {
-        for (const t of getCachedSharedAll()) {
-            for (const s of (t && t.sessions) || []) {
-                const v = new Date(s.at).getTime();
-                if (!Number.isFinite(v)) continue;
-                const d = v - now;
-                if (d >= 0 && (best === null || d < best)) best = d;
-            }
-        }
-    } catch { /* silent */ }
-    return best;
-}
 
 let _sharedScanInflight = false;
 
@@ -702,33 +681,43 @@ async function refreshSharedCacheForReminders() {
     try { me = state.sync && state.sync.userId ? String(state.sync.userId) : null; } catch { me = null; }
     if (!me) return;
     try { if (!isOnline()) return; } catch { return; }
-    let cacheEmpty = true;
-    try { cacheEmpty = getCachedSharedAll().length === 0; } catch { /* silent */ }
-    if (!shouldScanShared(Date.now(), nearestSharedDueMs(), _lastSharedScanAt, cacheEmpty)) return;
     _sharedScanInflight = true;
-    _lastSharedScanAt = Date.now();
     try {
-        const [{ listConversations }, { listGroups }] = await Promise.all([
+        const [{ listConversations }, { listGroups }, { getDmUnread }] = await Promise.all([
             import('./communication/conversations.js'),
             import('./communication/groups.js'),
+            import('./communication/dm-tasks.js'),
         ]);
-        const [convs, groups] = await Promise.all([
+        const [convs, groups, unread] = await Promise.all([
             listConversations().catch(() => null),
             listGroups().catch(() => null),
+            getDmUnread().catch(() => null),
         ]);
-        const jobs = [];
-        const seen = new Set();
+
+        const nameByPeer = new Map();
         for (const c of ((convs && convs.conversations) || [])) {
             const pid = c && c.user && c.user.id;
             if (!pid) continue;
+            nameByPeer.set(String(pid), (c.user.displayName || c.user.username || null));
+        }
+
+        // سیگنال فعالیت: همه‌ی مخاطبان DM (accepted + اولین‌تماس) از unread.activity
+        const activityByPeer = new Map();
+        for (const row of ((unread && unread.ok && unread.unread && unread.unread.activity) || [])) {
+            if (!row || !row.peerId) continue;
+            activityByPeer.set(String(row.peerId), row.lastActivity || null);
+        }
+        // مخاطب accepted که هنوز هیچ تسکی ندارد هم یک بار کش شود (لیست خالی)
+        for (const pid of nameByPeer.keys()) {
+            if (!activityByPeer.has(pid)) activityByPeer.set(pid, null);
+        }
+
+        const jobs = [];
+        for (const [pid, activityAt] of activityByPeer) {
             const key = 'peer:' + pid;
-            if (seen.has(key)) continue;
-            // ⚠️ 10.17: مقصد ساکن (سررسید دور + کش تازه) را دوباره نمی‌خوانیم
-            if (!shouldRefreshSharedKey(key)) continue;
-            seen.add(key);
-            const nm = (c.user.displayName || c.user.username || '');
+            if (!shouldRefreshSharedKey(key, activityAt)) continue;
             jobs.push(
-                fetchPeerTasks(pid, me, nm)
+                fetchPeerTasks(pid, me, nameByPeer.get(pid) || null)
                     .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
                     .catch(() => {})
             );
@@ -736,10 +725,7 @@ async function refreshSharedCacheForReminders() {
         for (const g of ((groups && groups.groups) || [])) {
             if (!g || !g.id) continue;
             const key = 'group:' + g.id;
-            if (seen.has(key)) continue;
-            // ⚠️ 10.17: مقصد ساکن را دوباره نمی‌خوانیم (تا ۱۰ دقیقه صبر)
-            if (!shouldRefreshSharedKey(key)) continue;
-            seen.add(key);
+            if (!shouldRefreshSharedKey(key, g.lastActivity)) continue;
             jobs.push(
                 // ⚠️ 10.15: lite — نام/آواتار برای یادآور لازم نیست (نصف درخواست‌ها)
                 fetchGroupTasks(g.id, me, { lite: true })
@@ -747,7 +733,10 @@ async function refreshSharedCacheForReminders() {
                     .catch(() => {})
             );
         }
-        if (jobs.length > 0) await Promise.all(jobs);
+        if (jobs.length > 0) {
+            try { console.debug('[remind] shared refresh:', jobs.length); } catch { /* silent */ }
+            await Promise.all(jobs);
+        }
     } catch { /* silent */ }
     finally { _sharedScanInflight = false; }
 }

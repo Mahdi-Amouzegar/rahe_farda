@@ -142,15 +142,44 @@ export const SHARED_SCAN_NEAR_MS = 15 * 60 * 1000;
 export const SHARED_SCAN_IDLE_MS = 10 * 60 * 1000;
 
 /**
- * آیا این مقصد برای اسکنر یادآور نیاز به تازه‌سازی دارد؟ (10.17)
- * سررسید نزدیک (≤ ۱۵ دقیقه) → بله (هر ۶۰ ثانیه).
- * در سکون → حداکثر هر ۱۰ دقیقه: جلسه‌ای که دستگاه دیگر ایجاد کند
- * تا ۱۰ دقیقه دیر دیده می‌شود — هنوز در پنجره‌ی جبران ۱۵ دقیقه‌ای است.
+ * جدیدترین `updatedAt` کش یک مقصد (ms) — برای مقایسه با فعالیت سروری.
+ * null یعنی کش خالی است یا آیتم‌ها مهر نسخه ندارند.
  */
-export function shouldRefreshSharedKey(key) {
+export function cachedUpdatedAtMs(key) {
+    const entry = _sharedCache.get(key);
+    if (!entry || !Array.isArray(entry.items) || entry.items.length === 0) return null;
+    let max = 0;
+    for (const t of entry.items) {
+        const v = new Date(t && t.updatedAt).getTime();
+        if (Number.isFinite(v) && v > max) max = v;
+    }
+    return max > 0 ? max : null;
+}
+
+/**
+ * آیا این مقصد برای اسکنر یادآور نیاز به تازه‌سازی دارد؟ (10.17 / 10.20)
+ *
+ * ⚠️ 10.20: سیگنال ارزان `activityAt` (lastActivity سرور برای همان مقصد) —
+ * اگر سرور فعالیت تازه‌تری از کش دارد (تسک تازه‌ی طرف مقابل)، فوری تازه کن.
+ * بدون این، تسکی که ۱-۲ دقیقه قبل از سررسید ساخته شود تا تیک ۱۰دقیقه‌ای
+ * بعدی دیده نمی‌شد و هشدار گیرنده از دست می‌رفت.
+ *
+ * بقیه‌ی قواعد:
+ * سررسید نزدیک (≤ ۱۵ دقیقه) → بله (هر ۶۰ ثانیه).
+ * در سکون → حداکثر هر ۱۰ دقیقه.
+ */
+export function shouldRefreshSharedKey(key, activityAt) {
     const entry = _sharedCache.get(key);
     if (!entry || !Array.isArray(entry.items)) return true;
     const now = Date.now();
+    if (activityAt) {
+        const act = new Date(activityAt).getTime();
+        if (Number.isFinite(act)) {
+            const cached = cachedUpdatedAtMs(key);
+            // مقصد تازه‌فعال‌شده (کش خالی) یا فعالیت جدیدتر از کش → فوری
+            if (cached === null || act > cached) return true;
+        }
+    }
     let nearest = null;
     for (const t of entry.items) {
         if (!t || t.archived) continue;

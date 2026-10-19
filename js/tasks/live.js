@@ -22,6 +22,8 @@ import {
     setSharedItems,
     fetchPeerTasks,
     fetchGroupTasks,
+    cacheSharedItems,
+    sharedCacheKey,
 } from './source.js';
 import { getDmUnread } from '../communication/dm-tasks.js';
 import { listConversations, refreshConversationBadges } from '../communication/conversations.js';
@@ -175,6 +177,10 @@ async function refreshOpenDestination(dest, opts) {
         }
     } catch { /* silent */ }
     if (!fresh) return activity;
+    // ⚠️ 10.20/BUG-19: هر fetch مقصد باز، کش یادآور را هم تازه می‌کند.
+    // قبلاً فقط `setSharedItems` بود؛ تسک تازه‌ی طرف مقابل روی صفحه دیده می‌شد
+    // ولی یادآور همچنان از کش قدیمی می‌خواند (هشدار گیرنده از دست می‌رفت).
+    try { cacheSharedItems(sharedCacheKey(d), fresh); } catch { /* silent */ }
     const current = getSharedItems();
     const { added, updated, removed } = diffSharedItems(current, fresh);
     if (added.length === 0 && updated.length === 0 && removed.length === 0) return activity;

@@ -533,6 +533,16 @@ describe('notify — collectSharedDue REQ-02', () => {
         expect(out.map(o => o.kind)).toEqual(['due']);
         expect(out[0].key).toBe('shr:g1:s1');
     });
+    it('آیتم ارسالی طرف مقابل (mine=false) هم هشدار می‌دهد — BUG-19', () => {
+        const remote = [{
+            id: 'r1', text: 'تسک مخاطب', archived: false,
+            _shared: { mine: false, dest: { type: 'peer', peerId: 'p1' } },
+            sessions: [{ id: 'rs1', at: new Date(V).toISOString(), remindMin: null }],
+        }];
+        const out = collectSharedDue(remote, V + 1000, {});
+        expect(out.map(o => o.kind)).toEqual(['due']);
+        expect(out[0].owner).toBe('تسک مخاطب');
+    });
     it('۴ دقیقه قبل lead و dueSoon را برمی‌گرداند', () => {
         const out = collectSharedDue(items, V - 4 * 60000, {});
         expect(out.map(o => o.kind).sort()).toEqual(['dueSoon', 'lead']);
