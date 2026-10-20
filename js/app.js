@@ -99,6 +99,7 @@ import {
 } from './map.js';
 import {
     startReminderLoop,
+    installAudioUnlock,
     ensureNotifPerm,
     fireNotification,
     getSoundPresets,
@@ -133,7 +134,8 @@ import {
     cancelEdit,
     showUndoFor,
     showToast,
-    resetRenderSignature
+    resetRenderSignature,
+    startDueLineTicker
 } from './ui.js';
 
 /**
@@ -3156,6 +3158,11 @@ initI18n().then(async () => {
     initMapSearch();
     syncServerTime();
     startReminderLoop();
+    // ⚠️ 10.21/BUG-21: آنلاک صوتی روی نخستین ژست (رفع هشدار AudioContext)
+    try { installAudioUnlock(); } catch { /* silent */ }
+    // ⚠️ 10.21/BUG-20: due-line زنده — با گذشتن سررسید/نیمه‌شب، متن
+    // «جلسه‌ی بعدی/سررسید گذشته» بدون رفرش عوض می‌شود (شخصی + DM + گروه)
+    try { startDueLineTicker(); } catch { /* silent */ }
     bindWeatherModal();
     // رهگیری خواندن تدریجی لیست مشترک با اسکرول
     try {

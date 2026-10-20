@@ -54,11 +54,41 @@ function tr(key, fallback) {
 // Data
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function listGroups() {
-    const res = await apiFetch('/api/groups');
-    if (!res.ok) return res;
-    _groups = (res.data && res.data.groups) || [];
-    return { ok: true, groups: _groups };
+// ⚠️ 10.21/BUG-22: `/api/groups` هم‌زمان از چند جا صدا زده می‌شود (پالس
+// دراور هر ۲ دقیقه، اسکنر یادآور هر ۶۰ ثانیه، پیش‌بارگذاری ورود). بدون
+// dedupe، در شبکه‌ی کند چند درخواست موازی روی هم می‌افتادند و در کنسول
+// `net::ERR_TIMED_OUT` می‌دادند. حالا یک درخواست در پرواز + backoff کوتاه
+// بعد از خطای شبکه (force برای مسیرهای کاربری مثل بکاپ).
+let _listInflight = null;
+let _listFailedAt = 0;
+const LIST_BACKOFF_MS = 20000;
+
+export async function listGroups(opts) {
+    const force = !!(opts && opts.force);
+    if (_listInflight) return _listInflight;
+    if (!force && _listFailedAt && (Date.now() - _listFailedAt) < LIST_BACKOFF_MS) {
+        return {
+            ok: false,
+            error: { code: 'BACKOFF', message: '', status: null },
+            groups: _groups,
+        };
+    }
+    _listInflight = (async () => {
+        const res = await apiFetch('/api/groups');
+        if (!res.ok) {
+            const code = res.error && res.error.code;
+            if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') _listFailedAt = Date.now();
+            return res;
+        }
+        _listFailedAt = 0;
+        _groups = (res.data && res.data.groups) || [];
+        return { ok: true, groups: _groups };
+    })();
+    try {
+        return await _listInflight;
+    } finally {
+        _listInflight = null;
+    }
 }
 
 async function fetchTimeline(groupId, cursor) {
@@ -501,7 +531,7 @@ export async function openGroupMenuFor(groupId, anchor) {
  * تازه‌سازی خانه‌ی گروه‌ها بعد از تغییر (لیست + بج + خروج از مقصد حذف‌شده).
  */
 async function refreshGroupsHome() {
-    await listGroups().catch(() => {});
+    await listGroups({ force: true }).catch(() => {});
     await refreshGroupBadges().catch(() => {});
     await refreshGroupInbox().catch(() => {});
     try {
@@ -572,7 +602,7 @@ export async function createGroup({ name, visibility }) {
     });
     if (!res.ok || !res.data || !res.data.group) return res;
     try {
-        await listGroups();
+        await listGroups({ force: true });
         await refreshGroupBadges();
     } catch { /* best-effort */ }
     return res;

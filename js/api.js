@@ -17,6 +17,14 @@ import { t as i18nT } from './i18n.js';
 const DEFAULT_ENDPOINT = 'https://rahe-farda-sync.mhdamouz.workers.dev';
 
 /**
+ * ⚠️ 10.21/BUG-22: بدون timeout، یک درخواست گیرکرده تا سقف مرورگر
+ * (~۳۰-۶۰ ثانیه) باز می‌ماند و در کنسول `net::ERR_TIMED_OUT` می‌دهد؛
+ * بدتر: درخواست‌های بعدی (پالس دراور/یادآور) روی همان اتصال‌های اشغال‌شده
+ * صف می‌شوند. سقف ۱۲ ثانیه یعنی شکست سریع + تلاش بعدی در تیک بعدی.
+ */
+const DEFAULT_TIMEOUT_MS = 12000;
+
+/**
  * آدرس پایه‌ی Worker.
  */
 export function getApiEndpoint() {
@@ -46,6 +54,7 @@ export function getAuthToken() {
  * @param {string} [options.method='GET']
  * @param {Object} [options.body]
  * @param {boolean} [options.auth=true] - اگر false، هدر Authorization نمی‌فرستد
+ * @param {number} [options.timeoutMs] - سقف زمان (پیش‌فرض ۱۲ ثانیه)
  * @returns {Promise<{ok:true,data:any}|{ok:false,error:{code:string,message:string,status:number|null}}>}
  */
 export async function apiFetch(path, options) {
@@ -65,17 +74,34 @@ export async function apiFetch(path, options) {
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers['Authorization'] = 'Bearer ' + token;
 
+    // ⚠️ 10.21/BUG-22: سقف زمان برای هر درخواست (شامل خواندن بدنه).
+    const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : DEFAULT_TIMEOUT_MS;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timer = null;
+    if (ctrl) {
+        timer = setTimeout(() => {
+            try { ctrl.abort(); } catch { /* silent */ }
+        }, timeoutMs);
+    }
+
     let response;
     try {
         response = await fetch(getApiEndpoint() + path, {
             method,
             headers,
             body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+            signal: ctrl ? ctrl.signal : undefined,
         });
-    } catch {
+    } catch (err) {
+        if (timer) clearTimeout(timer);
+        const aborted = !!(err && (err.name === 'AbortError' || err.code === 20));
         return {
             ok: false,
-            error: { code: 'NETWORK_ERROR', message: i18nT('errors.network'), status: null },
+            error: {
+                code: aborted ? 'TIMEOUT' : 'NETWORK_ERROR',
+                message: i18nT('errors.network'),
+                status: null,
+            },
         };
     }
 
@@ -84,6 +110,8 @@ export async function apiFetch(path, options) {
         payload = await response.json();
     } catch {
         payload = null;
+    } finally {
+        if (timer) clearTimeout(timer);
     }
 
     if (response.ok && payload && payload.ok === true) {

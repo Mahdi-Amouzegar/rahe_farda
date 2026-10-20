@@ -81,7 +81,7 @@ export async function exportBackupV2(options) {
     if (isLoggedIn() && me) {
         // گروه‌های من
         try {
-            const gres = await listGroups();
+            const gres = await listGroups({ force: true });
             const mine = ((gres.ok && gres.groups) || []).filter((g) => g);
             for (const g of mine) {
                 if (g.ownerId === me) groups.created.push(g);

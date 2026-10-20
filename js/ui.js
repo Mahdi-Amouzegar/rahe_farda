@@ -32,6 +32,7 @@ import {
     hasSessionOn,
     allSessions,
     sessionSummaryHtml,
+    dueLinePhase,
     taskMatches,
     visibleChildren
 } from './sessions.js';
@@ -1084,7 +1085,13 @@ export function render() {
         ((t.sessions || []).map(s => s.at).join(',')) + '#' +
         (((t.children || []).map(c => (c.sessions || []).map(s => s.at).join(',')).join(';')))
     ).join('|');
-    const signature = buildRenderSignature(state, visibleIds) + '::' + sessFp;
+    // ⚠️ 10.21/BUG-20: due-line به زمان وابسته است (نزدیک‌ترین جلسه / سررسید گذشته /
+    // «امروز-فردا-n روز دیگر»). بدون فاز، گذشتن زمان هیچ رندری تحریک نمی‌کرد و
+    // متن تا رفرش دستی کهنه می‌ماند — خصوصاً در پیام خصوصی/گروه که داده از سرور می‌آید.
+    const dueFp = filtered.map(t =>
+        dueLinePhase(t) + (t.children ? '/' + t.children.map(c => dueLinePhase(c)).join(',') : '')
+    ).join('|');
+    const signature = buildRenderSignature(state, visibleIds) + '::' + sessFp + '::' + dueFp;
 
         if (signature !== _lastRenderSignature) {
         renderFull(filtered, total, done);
@@ -1139,4 +1146,73 @@ function updateTaskListStatus(msg) {
 export function resetRenderSignature() {
     _lastRenderSignature = '';
     _lastVisibleTasks = [];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// due-line زنده (10.21/BUG-20)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ مشکل: `sessionSummaryHtml` به زمان وابسته است. با گذشتن سررسید باید
+// «فردا/امروز» → «سررسید گذشته» شود (و برای دوره، جلسه‌ی بعدی نمایش داده
+// شود). ولی هیچ رخدادی این تغییر را تحریک نمی‌کرد؛ کاربر تا رفرش دستی متن
+// کهنه می‌دید — در پیام خصوصی/گروه هم همین‌طور.
+//
+// راه‌حل: یک تیک سبک که فقط «اثر انگشت فاز» را می‌سازد (رشته، بدون DOM).
+// تا وقتی فاز عوض نشده، هیچ رندری اجرا نمی‌شود؛ با اولین تغییر (سررسید،
+// نیمه‌شب، تکمیل/جلو رفتن دوره) امضا ریست و لیست کامل بازسازی می‌شود.
+// در تب مخفی صفر کار (برگشت به تب، تیک بعدی جبران می‌کند).
+
+const DUE_TICK_MS = 15000;
+let _dueTicker = null;
+
+/** اثر انگشت فاز due-line برای آیتم‌های قابل‌مشاهده (خالص، بدون DOM). */
+export function dueLineFingerprint() {
+    try {
+        const source = visibleSource();
+        const parts = [];
+        for (const t of source) {
+            parts.push(dueLinePhase(t));
+            if (t && t.children) {
+                for (const c of t.children) parts.push(dueLinePhase(c));
+            }
+        }
+        return parts.join('|');
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * شروع تیک due-line. idempotent است (دو بار صدا زدن بی‌اثر).
+ * @param {number} [intervalMs]
+ */
+export function startDueLineTicker(intervalMs) {
+    if (_dueTicker) return _dueTicker;
+    if (typeof setInterval !== 'function') return null;
+    const ms = Number(intervalMs) > 0 ? Number(intervalMs) : DUE_TICK_MS;
+    let last = dueLineFingerprint();
+    _dueTicker = setInterval(() => {
+        try {
+            if (typeof document !== 'undefined' && document.hidden) return;
+            // ⚠️ ویرایش درجا نباید با رندر خودکار پاک شود — تیک بعدی جبران می‌کند.
+            if (state.editingId != null) return;
+            const fp = dueLineFingerprint();
+            if (fp === last) return;
+            last = fp;
+            resetRenderSignature();
+            render();
+        } catch { /* silent */ }
+    }, ms);
+    return _dueTicker;
+}
+
+export function stopDueLineTicker() {
+    if (!_dueTicker) return;
+    clearInterval(_dueTicker);
+    _dueTicker = null;
+}
+
+// ⚠️ فقط برای تست
+export function __resetDueLineTickerForTest() {
+    stopDueLineTicker();
 }

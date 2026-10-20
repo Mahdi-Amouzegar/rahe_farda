@@ -74,6 +74,48 @@ export function nearestUpcoming(task) {
 }
 
 /**
+ * اثر انگشت «فاز» due-line یک آیتم (10.21/BUG-20) — محض و ارزان.
+ *
+ * ⚠️ چرا لازم است: `sessionSummaryHtml` به زمان وابسته است (نزدیک‌ترین جلسه‌ی
+ * آینده → «فردا/امروز/N روز دیگر»، و وقتی همه‌ی جلسات گذشته‌اند → «سررسید
+ * گذشته»). امضای رندر قبلاً فقط id/متن/جلسات را می‌دید، پس با گذشتن زمان
+ * هیچ رندری تحریک نمی‌شد و due-line تا رفرش دستی کهنه می‌ماند.
+ *
+ * این تابع خروجی کوتاهی می‌دهد که با هر تغییرِ قابل‌مشاهده عوض می‌شود:
+ *   ''            → بدون جلسه (due-line ای رندر نمی‌شود)
+ *   'c<n>'        → تکمیل‌شده (فقط شمارش)
+ *   'u<at>#<d>'   → نزدیک‌ترین جلسه‌ی آینده + فاصله‌ی روز (امروز/فردا/n روز)
+ *   'o<at>'       → همه گذشته (سررسید گذشته، آخرین جلسه)
+ *
+ * @param {object} task
+ * @param {number} [nowMs] — برای تست؛ پیش‌فرض ساعت تصحیح‌شده‌ی getNow()
+ * @returns {string}
+ */
+export function dueLinePhase(task, nowMs) {
+    const sessions = (task && task.sessions) || [];
+    if (!Array.isArray(sessions) || sessions.length === 0) return '';
+    if (task.completed) return 'c' + sessions.length;
+    const now = Number.isFinite(nowMs) ? new Date(nowMs) : getNow();
+    const nowVal = now.getTime();
+    let nearest = null;
+    let latest = null;
+    for (const s of sessions) {
+        const v = new Date(s && s.at).getTime();
+        if (!Number.isFinite(v)) continue;
+        if (v >= nowVal) {
+            if (nearest === null || v < nearest) nearest = v;
+        }
+        if (latest === null || v > latest) latest = v;
+    }
+    if (nearest !== null) {
+        const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const diffDays = Math.round((startOf(new Date(nearest)) - startOf(now)) / 86400000);
+        return 'u' + nearest + '#' + diffDays;
+    }
+    return 'o' + latest;
+}
+
+/**
  * هشدار سررسید چند دقیقه قبل است (همان پنجره‌ی شاخه due در notify.js).
  */
 export const NEAR_DUE_MIN = 5;

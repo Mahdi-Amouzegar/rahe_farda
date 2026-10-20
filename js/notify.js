@@ -12,7 +12,7 @@
 import { state, uid } from './core.js';
 import { findTask, saveTasks, rollforwardRecur, advanceRecur, ROLLFORWARD_GUARD } from './store.js';
 import { allSessions, faShort, dayKey, isDueFireable, NEAR_DUE_MIN } from './sessions.js';
-import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared, shouldRefreshSharedKey } from './tasks/source.js';
+import { getCachedSharedAll, cacheSharedItems, fetchPeerTasks, fetchGroupTasks, persistAdvancedShared, shouldRefreshSharedKey, getSharedItems } from './tasks/source.js';
 import { isOnline } from './net.js';
 import { events, EV } from './events.js';
 import { getNow } from './time.js';
@@ -63,9 +63,60 @@ export async function ensureNotifPerm() {
 
 let audioCtx = null;
 
+// ⚠️ 10.21/BUG-21: ساخت AudioContext بدون ژست کاربر → هشدار کروم
+// «The AudioContext was not allowed to start...» و کانتکست در حالت
+// suspended می‌ماند (صدای یادآور بی‌صدا). پس تا نخستین ژست واقعی
+// هیچ کانتکستی نمی‌سازیم؛ ژست با `installAudioUnlock()` گرفته می‌شود.
+let _audioGestureSeen = false;
+let _audioUnlockBound = false;
+
+/**
+ * ساخت/آنلاک کانتکست صوتی. باید از داخل ژست کاربر صدا زده شود.
+ * @returns {boolean} — آیا کانتکست آماده (running) است؟
+ */
+export function unlockAudio() {
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        if (!audioCtx) audioCtx = new AC();
+        _audioGestureSeen = true;
+        if (audioCtx.state === 'suspended') {
+            const p = audioCtx.resume();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        }
+        return audioCtx.state === 'running';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * نصب آنلاک صوتی روی نخستین تعامل کاربر (یک بار).
+ * ⚠️ capture=true تا قبل از هندلر خود دکمه اجرا شود.
+ */
+export function installAudioUnlock() {
+    if (_audioUnlockBound) return;
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    _audioUnlockBound = true;
+    const types = ['pointerdown', 'keydown', 'touchstart'];
+    const handler = () => {
+        let ok = false;
+        try { ok = unlockAudio(); } catch { ok = false; }
+        if (!ok) return; // کانتکست ساخته شد ولی هنوز suspended → ژست بعدی
+        for (const t of types) {
+            try { document.removeEventListener(t, handler, true); } catch { /* silent */ }
+        }
+    };
+    for (const t of types) {
+        try { document.addEventListener(t, handler, true); } catch { /* silent */ }
+    }
+}
+
 export function ensureAudio() {
     try {
         if (!audioCtx) {
+            // ⚠️ 10.21: بدون ژست نساز (هشدار + کانتکست مرده)
+            if (!_audioGestureSeen) return null;
             const AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return null;
             audioCtx = new AC();
@@ -325,6 +376,9 @@ export function stopTts() {
 export function playChime(titleText) {
     // سازگاری: soundOn قدیمی به عنوان master switch
     if (state.prefs.soundOn === false) return;
+    // ⚠️ 10.21/BUG-21: بدون ژست کاربر هم Web Audio و هم <audio> مسدودند
+    // (نتیجه: هشدار کنسول + بی‌صدایی). تا آنلاک نشدن تلاش نمی‌کنیم.
+    if (!_audioGestureSeen) return;
 
     const wantDefault = state.prefs.soundDefault !== false;
     const wantPreset = state.prefs.soundPresetOn === true && state.prefs.soundPreset;
@@ -549,6 +603,24 @@ export function checkReminders() {
         }
     }
 
+    // ⚠️ 10.21/BUG-20: سری‌های مشترک (DM/گروه) هم باید مستقل از تنظیم اعلان
+    // جلو بروند — دقیقاً همان دلیلی که 10.11-fix برای شخصی حل کرد. قبلاً این
+    // کار داخل `scanCachedShared` و پشت گیت‌های remindOn/notifGranted بود؛
+    // با اعلان خاموش، due-line تسک مشترک هرگز به «جلسه‌ی بعدی» نمی‌رفت.
+    let sharedAdvanced = [];
+    try {
+        sharedAdvanced = rollforwardSharedCache(now);
+    } catch {
+        sharedAdvanced = [];
+    }
+    if (sharedAdvanced.length > 0) {
+        if (typeof document === 'undefined' || !document.hidden) {
+            paintSharedAdvanced(sharedAdvanced);
+        } else {
+            _pendingPaint = true;
+        }
+    }
+
     if (!state.prefs.remindOn) return;
     if (!notifGranted()) return;
 
@@ -644,6 +716,16 @@ function paintAdvanced(advanced) {
             }).catch(() => {});
         }
     } catch { /* silent */ }
+}
+
+/**
+ * repaint بعد از جلو رفتن سری مشترک (10.21/BUG-20).
+ * ⚠️ جزئیات (detail.js) فقط تسک‌های شخصی را می‌شناسد (`findTask`) — آیتم
+ * مشترک read-only است و در همان لیست دیده می‌شود؛ پس فقط رندر لیست لازم است.
+ */
+function paintSharedAdvanced(advanced) {
+    if (!advanced || advanced.length === 0) return;
+    try { events.emit(EV.UI_RENDER_REQUESTED); } catch { /* silent */ }
 }
 
 /**
@@ -793,19 +875,44 @@ function advanceSharedRecur(t, nowMs) {
  * جلو بردن سری‌های مشترک در کش مقصدها (حلقه‌ی یادآور).
  * آیتم‌های خودی را به سرور می‌نویسد (fire-and-forget؛ شکست →
  * دوره‌ی بعدی بعد از تازه‌سازی کش دوباره تلاش می‌کند).
- * @returns {Array} آیتم‌های جلو رفته
+ *
+ * ⚠️ 10.21/BUG-20: علاوه بر کش، **لیست روی صفحه** هم جلو برده می‌شود.
+ * دلیل: کش و لیست می‌توانند دو آرایه/آبجکت جدا با همان id باشند (اسکن
+ * پس‌زمینه آرایه‌ی تازه می‌سازد و تا تیک بعدی موتور زنده، لیست صفحه
+ * همان قبلی می‌ماند). بدون این، due-line نمای باز تا رفرش دستی کهنه بود.
+ * id جلسه قطعی است (`taskId@at`) پس هر دو نسخه به یک نتیجه می‌رسند.
+ *
+ * @returns {Array} آیتم‌های جلو رفته (هر id حداکثر یک بار)
  */
 export function rollforwardSharedCache(nowMs) {
     const advanced = [];
-    try {
-        for (const t of getCachedSharedAll()) {
-            if (advanceSharedRecur(t, nowMs)) advanced.push(t);
+    const seenObj = new Set();
+    const seenId = new Set();
+    const persistList = [];
+    const persistIds = new Set();
+    const lists = [];
+    try { lists.push(getCachedSharedAll()); } catch { /* silent */ }
+    try { lists.push(getSharedItems()); } catch { /* silent */ }
+    for (const list of lists) {
+        for (const t of (list || [])) {
+            if (!t || seenObj.has(t)) continue;
+            seenObj.add(t);
+            let changed = false;
+            try { changed = advanceSharedRecur(t, nowMs); } catch { changed = false; }
+            if (!changed) continue;
+            const id = String(t.id);
+            if (!seenId.has(id)) {
+                seenId.add(id);
+                advanced.push(t);
+            }
+            if (t._shared && t._shared.mine && !persistIds.has(id)) {
+                persistIds.add(id);
+                persistList.push(t);
+            }
         }
-    } catch { /* silent */ }
-    for (const t of advanced) {
-        if (t._shared && t._shared.mine) {
-            persistAdvancedShared(t).catch(() => { /* آفلاین */ });
-        }
+    }
+    for (const t of persistList) {
+        persistAdvancedShared(t).catch(() => { /* آفلاین */ });
     }
     return advanced;
 }
@@ -955,5 +1062,8 @@ export function startReminderLoop() {
  * @param {string} [titleText]
  */
 export function testAudioReminder(titleText) {
+    // ⚠️ 10.21: این تابع از دکمه‌ی «تست» صدا زده می‌شود (ژست کاربر) — همان‌جا
+    // کانتکست را آنلاک کن تا در بازکردن اول با هشدار کروم روبه‌رو نشویم.
+    try { unlockAudio(); } catch { /* silent */ }
     playChime(titleText || i18nT('notifications.testReminder'));
 }
