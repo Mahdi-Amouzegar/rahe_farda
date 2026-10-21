@@ -6,6 +6,7 @@ dist/
 
 # Vite cache
 .vite/
+vite.config.js.timestamp-*.mjs
 
 # Editor
 .vscode/
