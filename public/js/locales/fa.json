@@ -1351,7 +1351,21 @@
       "title": "اعلان آزمایشی",
       "body": "مجوز اعلان فعال است."
     },
-    "testReminder": "این یک یادآور آزمایشی است"
+    "testReminder": "این یک یادآور آزمایشی است",
+    "sharedNew": {
+      "dmTitle": "📥 وظیفه‌ی تازه از {sender}",
+      "groupTitle": "📥 وظیفه‌ی تازه در «{group}»",
+      "body": "{sender} — «{title}»",
+      "bodyMany": "{sender} — {n} وظیفه‌ی تازه",
+      "dmToast": "👤 {sender} در پیام خصوصی وظیفه‌ی «{title}» را اضافه کرد",
+      "groupToast": "👥 {sender} در «{group}» وظیفه‌ی «{title}» را اضافه کرد",
+      "dmToastMany": "👤 {sender} {n} وظیفه‌ی تازه در پیام خصوصی اضافه کرد",
+      "groupToastMany": "👥 {sender} {n} وظیفه‌ی تازه در «{group}» اضافه کرد",
+      "unknownPeer": "مخاطب",
+      "unknownMember": "یکی از اعضا",
+      "unknownGroup": "گروه",
+      "untitled": "بدون عنوان"
+    }
   },
   "bottomActions": {
     "newTask": "کار جدید",

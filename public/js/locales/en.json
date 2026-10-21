@@ -1351,7 +1351,21 @@
       "title": "Test notification",
       "body": "Notification permission is enabled."
     },
-    "testReminder": "This is a test reminder"
+    "testReminder": "This is a test reminder",
+    "sharedNew": {
+      "dmTitle": "📥 New task from {sender}",
+      "groupTitle": "📥 New task in \"{group}\"",
+      "body": "{sender} — \"{title}\"",
+      "bodyMany": "{sender} — {n} new tasks",
+      "dmToast": "👤 {sender} added \"{title}\" in your private chat",
+      "groupToast": "👥 {sender} added \"{title}\" in \"{group}\"",
+      "dmToastMany": "👤 {sender} added {n} new tasks in your private chat",
+      "groupToastMany": "👥 {sender} added {n} new tasks in \"{group}\"",
+      "unknownPeer": "your contact",
+      "unknownMember": "a member",
+      "unknownGroup": "group",
+      "untitled": "Untitled"
+    }
   },
   "bottomActions": {
     "newTask": "New task",

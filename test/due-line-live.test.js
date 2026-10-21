@@ -115,6 +115,30 @@ describe('rollforwardSharedCache — لیست روی صفحه هم جلو می�
         expect(new Date(visible.sessions[1].at).getTime()).toBeGreaterThan(Date.now());
     });
 
+    it('برنامه‌ی مشترک: زیرکارِ دوره‌ای هم جلو می‌رود (10.22)', () => {
+        const child = {
+            id: 'c1', text: 'زیرکار', recur: 'daily', archived: false, completed: false,
+            sessions: [{ id: 's0', at: new Date(Date.now() - H).toISOString() }],
+        };
+        const plan = {
+            id: 'p1', text: 'برنامه', kind: 'plan', recur: 'none', archived: false, completed: false,
+            sessions: [{ id: 'ps0', at: new Date(Date.now() - 2 * H).toISOString() }],
+            children: [child],
+            _shared: { mine: false, dest: { type: 'group', groupId: 'g1' } },
+        };
+        source.cacheSharedItems('group:g1', [plan]);
+
+        const advanced = notify.rollforwardSharedCache(Date.now());
+
+        // خود برنامه دوره‌ای نیست → فقط فرزند جلو می‌رود، ولی آیتم والد گزارش می‌شود
+        expect(advanced).toHaveLength(1);
+        expect(plan.sessions.length).toBe(1);
+        expect(child.sessions.length).toBe(2);
+        expect(new Date(child.sessions[1].at).getTime()).toBeGreaterThan(Date.now());
+        // id قطعی: چند دستگاه روی یک سررسید همگرا شوند
+        expect(child.sessions[1].id).toBe('c1@' + child.sessions[1].at);
+    });
+
     it('همان آبجکت در کش و لیست → فقط یک بار جلو می‌رود (بدون جلسه‌ی تکراری)', () => {
         const t = {
             id: 't1', text: 'x', recur: 'daily', archived: false, completed: false,

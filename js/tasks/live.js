@@ -180,7 +180,7 @@ async function refreshOpenDestination(dest, opts) {
     // ⚠️ 10.20/BUG-19: هر fetch مقصد باز، کش یادآور را هم تازه می‌کند.
     // قبلاً فقط `setSharedItems` بود؛ تسک تازه‌ی طرف مقابل روی صفحه دیده می‌شد
     // ولی یادآور همچنان از کش قدیمی می‌خواند (هشدار گیرنده از دست می‌رفت).
-    try { cacheSharedItems(sharedCacheKey(d), fresh); } catch { /* silent */ }
+    try { cacheSharedItems(sharedCacheKey(d), fresh, d.name); } catch { /* silent */ }
     const current = getSharedItems();
     const { added, updated, removed } = diffSharedItems(current, fresh);
     if (added.length === 0 && updated.length === 0 && removed.length === 0) return activity;
@@ -196,9 +196,10 @@ async function refreshOpenDestination(dest, opts) {
         render();
     }
     const label = d.type === 'group' ? d.name : null;
-    for (const t of added) {
-        showLiveToast(i18nT('dm.toast', { name: senderOf(t, label) }));
-    }
+    // ⚠️ 10.23: toast «تسک تازه» اینجا زده نمی‌شود — `cacheSharedItems`
+    // (بالاتر، در همین تابع) رویداد SHARED_NEW_TASK را می‌دهد و متن دقیق‌تر
+    // (فرستنده + گروه + عنوان تسک) در app.js ساخته می‌شود. بدون این،
+    // دو toast پشت سر هم می‌آمد.
     for (const t of updated) {
         showLiveToast(i18nT('dm.edited', { name: senderOf(t, label) }));
     }

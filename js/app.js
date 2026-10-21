@@ -101,7 +101,9 @@ import {
     startReminderLoop,
     installAudioUnlock,
     ensureNotifPerm,
+    notifGranted,
     fireNotification,
+    buildSharedNewTaskNotice,
     getSoundPresets,
     getVoicesForLang,
     ttsSupported,
@@ -2270,6 +2272,25 @@ function initSystemPermissions() {
     document.getElementById('permissionMicTestBtn')?.addEventListener('click', requestMicrophonePermission);
 }
 
+/**
+ * اعلان تسک تازه‌ی طرف مقابل (10.23).
+ * ⚠️ انتخاب کانال: تب پنهان → نوتیف سیستمی (تنها راه دیده‌شدن)؛
+ * تب دیده‌شده → toast داخل صفحه (نوتیف سیستمی اینجا تکراری و مزاحم است).
+ */
+function bindSharedTaskNotices() {
+    events.on(EV.SHARED_NEW_TASK, (payload) => {
+        const notice = buildSharedNewTaskNotice(payload);
+        if (!notice) return;
+        const hidden = typeof document !== 'undefined' && document.hidden === true;
+        if (hidden && notifGranted()) {
+            const tag = 'shared-new-' + String((payload && payload.key) || '');
+            fireNotification(notice.title, notice.body, tag).catch(() => {});
+            return;
+        }
+        showToast(notice.toast, 7000);
+    });
+}
+
 function applyProMode() {
     const on = state.prefs.proMode === true;
     document.body.classList.toggle('pro-mode', on);
@@ -3163,6 +3184,9 @@ initI18n().then(async () => {
     // ⚠️ 10.21/BUG-20: due-line زنده — با گذشتن سررسید/نیمه‌شب، متن
     // «جلسه‌ی بعدی/سررسید گذشته» بدون رفرش عوض می‌شود (شخصی + DM + گروه)
     try { startDueLineTicker(); } catch { /* silent */ }
+    // ⚠️ 10.23: اعلان «تسک تازه از طرف مقابل» — تب پنهان → نوتیف سیستمی،
+    // وگرنه toast داخل صفحه (۷ ثانیه، خودکار پاک می‌شود)
+    try { bindSharedTaskNotices(); } catch { /* silent */ }
     bindWeatherModal();
     // رهگیری خواندن تدریجی لیست مشترک با اسکرول
     try {

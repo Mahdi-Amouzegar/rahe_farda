@@ -201,12 +201,97 @@ export function sharedCacheKey(dest) {
     return null;
 }
 
-export function cacheSharedItems(key, items) {
+/**
+ * idهای «دیده‌شده»ی هر مقصد — روی دیسک می‌ماند (10.23).
+ *
+ * ⚠️ چرا روی دیسک؟ کش درون‌حافظه‌ای با رفرش/بستن برنامه پاک می‌شود و همه‌چیز
+ * دوباره «بیس‌لاین» می‌شد؛ یعنی تسکی که وقتی برنامه بسته بود اضافه شده،
+ * هرگز اعلان نمی‌گرفت. با ماندگاری، در نخستین اسکن بعد از بازگشایی اعلان می‌آید.
+ * ⚠️ نخستین باری که یک مقصد دیده می‌شود = بیس‌لاین (بدون اعلان).
+ */
+const SEEN_STORAGE_KEY = 'spaceTodoSharedSeen';
+const SEEN_MAX_DESTS = 25;
+const SEEN_MAX_IDS = 300;
+
+let _seen = null; // Map<string, string[]> | null
+
+function seenMap() {
+    if (_seen) return _seen;
+    _seen = new Map();
+    try {
+        const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+        const obj = raw ? JSON.parse(raw) : null;
+        for (const [k, v] of Object.entries(obj || {})) {
+            if (Array.isArray(v)) _seen.set(k, v.map(String));
+        }
+    } catch { /* بدون localStorage: فقط درون‌حافظه */ }
+    return _seen;
+}
+
+function persistSeen() {
+    try {
+        const obj = {};
+        for (const [k, ids] of seenMap()) obj[k] = ids;
+        localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(obj));
+    } catch { /* silent */ }
+}
+
+/**
+ * کش آیتم‌های یک مقصد + تشخیص «تسک تازه‌ی طرف مقابل» (10.23).
+ *
+ * @param {string} key  کلید مقصد (`peer:<id>` / `group:<id>`)
+ * @param {Array} items آیتم‌های تازه
+ * @param {string|null} [destName] نام نمایشی مقصد (برای متن اعلان گروه)
+ */
+export function cacheSharedItems(key, items, destName) {
     if (!key) return;
-    _sharedCache.set(key, { items: Array.isArray(items) ? items : [], at: Date.now() });
+    const next = Array.isArray(items) ? items : [];
+    _sharedCache.set(key, { items: next, at: Date.now() });
     while (_sharedCache.size > SHARED_CACHE_CAP) {
         _sharedCache.delete(_sharedCache.keys().next().value);
     }
+
+    const seen = seenMap();
+    const prevIds = seen.get(key);
+    const known = prevIds ? new Set(prevIds) : null;
+    const addedIds = [];
+    const fresh = [];
+    for (const t of next) {
+        if (!t || t.id == null) continue;
+        const id = String(t.id);
+        if (known && !known.has(id)) {
+            addedIds.push(id);
+            if (t._shared && !t._shared.mine) fresh.push(t);
+        }
+    }
+    // ⚠️ نخستین دیدن این مقصد = بیس‌لاین: ثبت بدون اعلان.
+    // ⚠️ ادغام ترتیبی: idهای تازه به **انتها** اضافه می‌شوند تا سقف
+    // SEEN_MAX_IDS قدیمی‌ترین‌ها را بیندازد (وگرنه یک تسک تازه در مقصد
+    // پرحجم از حافظه بیرون می‌افتاد و هر اسکن دوباره اعلان می‌داد).
+    if (!known || addedIds.length > 0) {
+        const merged = prevIds ? prevIds.slice() : [];
+        const have = new Set(merged);
+        for (const t of next) {
+            if (!t || t.id == null) continue;
+            const id = String(t.id);
+            if (!have.has(id)) {
+                have.add(id);
+                merged.push(id);
+            }
+        }
+        seen.set(key, merged.slice(-SEEN_MAX_IDS));
+        while (seen.size > SEEN_MAX_DESTS) seen.delete(seen.keys().next().value);
+        persistSeen();
+    }
+    if (!known || fresh.length === 0) return;
+    try {
+        events.emit(EV.SHARED_NEW_TASK, {
+            key,
+            destName: destName || null,
+            dest: (fresh[0]._shared && fresh[0]._shared.dest) || null,
+            tasks: fresh,
+        });
+    } catch { /* silent */ }
 }
 
 export function getCachedSharedAll() {
@@ -260,7 +345,7 @@ export async function refreshSharedList() {
         }
         _items = res.items || [];
         // ⚠️ REQ-02: بازدید هم کش یادآور را تازه می‌کند
-        cacheSharedItems(sharedCacheKey(dest), _items);
+        cacheSharedItems(sharedCacheKey(dest), _items, dest.name);
         return { ok: true, items: _items };
     } finally {
         _loading = false;
@@ -271,9 +356,11 @@ export async function refreshSharedList() {
 export function __resetSharedForTest() {
     _items = [];
     _sharedCache.clear();
+    _seen = null;
     _loading = false;
     _error = null;
     _detailBridge = null;
+    try { localStorage.removeItem(SEEN_STORAGE_KEY); } catch { /* silent */ }
 }
 
 // ⚠️ فقط برای تست

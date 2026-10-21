@@ -467,6 +467,52 @@ function markReminded(taskId, sessId, which) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// اعلان «تسک تازه از طرف مقابل» (10.23)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * متن اعلان تسک تازه‌ی دیگران — خالص و تست‌پذیر (بدون DOM/شبکه).
+ *
+ * @param {{destName?:string|null, dest?:object|null, tasks?:Array}} payload
+ * @returns {{title:string, body:string, toast:string}|null} null یعنی چیزی برای گفتن نیست
+ */
+export function buildSharedNewTaskNotice(payload) {
+    const tasks = (payload && Array.isArray(payload.tasks))
+        ? payload.tasks.filter(t => t && !(t._shared && t._shared.mine))
+        : [];
+    if (tasks.length === 0) return null;
+    const first = tasks[0];
+    const dest = (payload && payload.dest) || (first._shared && first._shared.dest) || {};
+    const isGroup = dest.type === 'group';
+    const sender = String((first._shared && first._shared.senderName) || '').trim()
+        || i18nT(isGroup ? 'notifications.sharedNew.unknownMember' : 'notifications.sharedNew.unknownPeer');
+    const group = String((payload && payload.destName) || '').trim()
+        || i18nT('notifications.sharedNew.unknownGroup');
+    const n = tasks.length;
+    const title = isGroup
+        ? i18nT('notifications.sharedNew.groupTitle', { group })
+        : i18nT('notifications.sharedNew.dmTitle', { sender });
+    if (n === 1) {
+        const name = String(first.text || '').trim().slice(0, 80)
+            || i18nT('notifications.sharedNew.untitled');
+        return {
+            title,
+            body: i18nT('notifications.sharedNew.body', { sender, title: name }),
+            toast: isGroup
+                ? i18nT('notifications.sharedNew.groupToast', { sender, group, title: name })
+                : i18nT('notifications.sharedNew.dmToast', { sender, title: name }),
+        };
+    }
+    return {
+        title,
+        body: i18nT('notifications.sharedNew.bodyMany', { sender, n: formatNumber(n) }),
+        toast: isGroup
+            ? i18nT('notifications.sharedNew.groupToastMany', { sender, group, n: formatNumber(n) })
+            : i18nT('notifications.sharedNew.dmToastMany', { sender, n: formatNumber(n) }),
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Shared reminders — پرچم محلی هر دستگاه (REQ-02)
 // ═══════════════════════════════════════════════════════════════════════════
 //
@@ -534,19 +580,48 @@ export function nextSessionAtMap(entries, nowMs) {
     return map;
 }
 
+/**
+ * واحدهای دارای جلسه در یک آیتم مشترک (10.23).
+ * ⚠️ برنامه‌ی مشترک جلسه‌هایش را در زیرکارها دارد؛ بدون این، سررسید
+ * زیرکار هیچ هشداری نمی‌داد (فقط due-line‌اش زنده می‌شد).
+ * @returns {Array<{id:string, owner:string, createdAt:(string|null), sessions:Array}>}
+ */
+export function sharedDueUnits(items) {
+    const units = [];
+    for (const t of items || []) {
+        if (!t || t.archived) continue;
+        units.push({
+            id: String(t.id),
+            owner: t.text || '',
+            createdAt: t.createdAt || null,
+            sessions: Array.isArray(t.sessions) ? t.sessions : [],
+        });
+        if (t.kind === 'plan' && Array.isArray(t.children)) {
+            for (const c of t.children) {
+                if (!c || c.archived) continue;
+                units.push({
+                    id: String(c.id),
+                    owner: c.text || '',
+                    createdAt: c.createdAt || null,
+                    sessions: Array.isArray(c.sessions) ? c.sessions : [],
+                });
+            }
+        }
+    }
+    return units;
+}
+
 export function collectSharedDue(items, nowMs, flags) {
     const out = [];
     const seenKey = new Set();
     const rmDefault = (() => { try { return state.prefs.remindMin; } catch { return null; } })();
+    const units = sharedDueUnits(items);
     // ⚠️ 10.18: هشدار ۵ دقیقه‌ای فقط برای جلسه‌ی فعلی هر تسک
     const nextAt = nextSessionAtMap(
-        (items || []).flatMap(t => (t && !t.archived && Array.isArray(t.sessions))
-            ? t.sessions.map(s => ({ taskId: t.id, at: s.at }))
-            : []),
+        units.flatMap(u => u.sessions.map(s => ({ taskId: u.id, at: s.at }))),
         nowMs);
-    for (const t of items || []) {
-        if (!t || t.archived) continue;
-        for (const s of (t.sessions || [])) {
+    for (const t of units) {
+        for (const s of t.sessions) {
             if (!s) continue;
             const v = new Date(s.at).getTime();
             if (!Number.isFinite(v)) continue;
@@ -555,7 +630,7 @@ export function collectSharedDue(items, nowMs, flags) {
             if (seenKey.has(key)) continue;
             seenKey.add(key);
             const f = (flags && flags[key]) || {};
-            const owner = t.text || '';
+            const owner = t.owner || '';
             const rm = (s.remindMin != null) ? s.remindMin : rmDefault;
             const regAt = s.regAt != null ? s.regAt : t.createdAt;
             if (rm && rm > 0 && !f.reminded && nowMs >= v - rm * 60 * 1000 && nowMs < v
@@ -800,7 +875,7 @@ async function refreshSharedCacheForReminders() {
             if (!shouldRefreshSharedKey(key, activityAt)) continue;
             jobs.push(
                 fetchPeerTasks(pid, me, nameByPeer.get(pid) || null)
-                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
+                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items, nameByPeer.get(pid) || null); })
                     .catch(() => {})
             );
         }
@@ -809,9 +884,11 @@ async function refreshSharedCacheForReminders() {
             const key = 'group:' + g.id;
             if (!shouldRefreshSharedKey(key, g.lastActivity)) continue;
             jobs.push(
-                // ⚠️ 10.15: lite — نام/آواتار برای یادآور لازم نیست (نصف درخواست‌ها)
-                fetchGroupTasks(g.id, me, { lite: true })
-                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items); })
+                // ⚠️ 10.23: lite حذف شد — نام فرستنده برای اعلان «تسک تازه»
+                // لازم است. اسکن فقط مقصدهای تغییرکرده را می‌خواند، پس
+                // هزینه‌ی members تنها وقتی است که واقعاً چیز تازه‌ای هست.
+                fetchGroupTasks(g.id, me)
+                    .then(res => { if (res && res.ok) cacheSharedItems(key, res.items, g.name); })
                     .catch(() => {})
             );
         }
@@ -824,13 +901,13 @@ async function refreshSharedCacheForReminders() {
 }
 
 /**
- * جلو بردن یک آیتم مشترک (معادل visit در rollforwardRecur).
+ * جلو بردن سری **یک** آیتم (بدون فرزندان) — معادل visit در rollforwardRecur.
  * ⚠️ 10.16: سری‌های مشترک روی سرور فقط جلسات زمان ساخت را دارند —
  * بدون این، هشدار به‌موقع و سررسید بعدی هرگز ظاهر نمی‌شوند.
  * id جلسه‌ی ساخته‌شده قطعی است (taskId@at) تا چند دستگاه روی یک
  * سررسید همگرا شوند و هشدار دوگانه نیاید.
  */
-function advanceSharedRecur(t, nowMs) {
+function advanceSharedOne(t, nowMs) {
     if (!t || t.archived || t.completed) return false;
     if (!t.recur || t.recur === 'none') return false;
     const list = t.sessions;
@@ -866,6 +943,22 @@ function advanceSharedRecur(t, nowMs) {
             const s = scratch.sessions[scratch.sessions.length - 1];
             s.id = String(t.id) + '@' + s.at;
             t.sessions = scratch.sessions.slice(-1);
+        }
+    }
+    return changed;
+}
+
+/**
+ * جلو بردن یک آیتم مشترک **و زیرکارهای برنامه** (10.22).
+ * ⚠️ معادل visit در `rollforwardRecur` (شخصی): زیرکارِ دوره‌ای داخل یک
+ * برنامه‌ی مشترک هم باید سری‌اش جلو برود — نه فقط نمایشش.
+ * id جلسه‌ی فرزند هم قطعی است (`childId@at`) تا چند دستگاه همگرا شوند.
+ */
+function advanceSharedRecur(t, nowMs) {
+    let changed = advanceSharedOne(t, nowMs);
+    if (t && t.kind === 'plan' && Array.isArray(t.children)) {
+        for (const c of t.children) {
+            if (advanceSharedOne(c, nowMs)) changed = true;
         }
     }
     return changed;
