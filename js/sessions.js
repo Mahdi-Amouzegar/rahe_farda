@@ -89,6 +89,66 @@ export function nearestUpcoming(task) {
 }
 
 /**
+ * شناسه‌ی جلسه‌ی «فعال» یک آیتم (10.26).
+ *
+ * ⚠️ جلسه‌ی فعال = نزدیک‌ترین جلسه‌ی آینده‌ی مصرف‌نشده. در صفحه‌ی جزئیات فقط
+ * همین ردیف کنترل دارد (یادآور/مکان/حذف)؛ بقیه غیرفعال‌اند.
+ *
+ * @param {object} task
+ * @returns {string|null}
+ */
+export function activeSessionId(task) {
+    const n = nearestUpcoming(task);
+    return n ? String(n.id) : null;
+}
+
+/**
+ * آیا این جلسه «غیرفعال» است؟ (گذشته یا مصرف‌شده با تیک دوره)
+ *
+ * @param {object} s
+ * @param {number} [nowMs]
+ * @returns {boolean}
+ */
+export function isSessionInactive(s, nowMs) {
+    if (!s) return true;
+    if (isSessionDone(s)) return true;
+    const now = Number.isFinite(nowMs) ? nowMs : getNow().getTime();
+    const v = new Date(s.at).getTime();
+    if (!Number.isFinite(v)) return true;
+    return v < now;
+}
+
+/**
+ * ارتقای جلسه‌ی قبلی به «فعال» بعد از حذف جلسه‌ی فعال (10.26).
+ *
+ * ⚠️ سناریوی گزارش‌شده: در یک دوره، جلسه‌ی فعال (آخرین سررسید پیش‌رو) را با ✕
+ * حذف می‌کنیم. اگر جلسه‌ی قبلی‌اش هنوز تاریخش بعد از «حالا» باشد، باید دوباره
+ * فعال شود و due-line لیست هم همان را نشان بدهد — نه «سررسید گذشته».
+ *
+ * جلسه‌ی قبلی ممکن است با تیک دوره `doneAt` خورده باشد؛ مهرش برداشته می‌شود و
+ * فلگ‌های یادآور صفر می‌شوند تا هشدار سررسید برای تاریخ جدید هم شلیک کند.
+ *
+ * @param {object} task
+ * @param {number} [nowMs] — برای تست
+ * @returns {boolean} آیا جلسه‌ای ارتقا یافت؟
+ */
+export function promoteFutureSession(task, nowMs) {
+    if (!task) return false;
+    // اگر هنوز جلسه‌ی آینده‌ی مصرف‌نشده هست، کاری لازم نیست.
+    if (nearestUpcoming(task)) return false;
+    const now = Number.isFinite(nowMs) ? nowMs : getNow().getTime();
+    const cand = (task.sessions || [])
+        .filter(s => s && Number.isFinite(new Date(s.at).getTime()) && new Date(s.at).getTime() > now)
+        .sort((a, b) => new Date(b.at) - new Date(a.at))[0];
+    if (!cand) return false;
+    delete cand.doneAt;
+    cand.reminded = false;
+    cand.remindedDue = false;
+    cand.remindedDueSoon = false;
+    return true;
+}
+
+/**
  * اثر انگشت «فاز» due-line یک آیتم (10.21/BUG-20) — محض و ارزان.
  *
  * ⚠️ چرا لازم است: `sessionSummaryHtml` به زمان وابسته است (نزدیک‌ترین جلسه‌ی

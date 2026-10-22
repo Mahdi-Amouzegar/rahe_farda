@@ -15,6 +15,7 @@ import { dataUrlToBlob } from '../media.js';
 import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { getDestination } from './destination.js';
+import { t as i18nT } from '../i18n.js';
 // ⚠️ 10.24: منطق دوره در sessions.js است (بدون چرخه‌ی import با store.js).
 import { advanceRecurOnTick } from '../sessions.js';
 
@@ -729,8 +730,12 @@ export async function fetchGroupTasks(groupId, myId, opts) {
     const members = (mres && mres.ok && mres.data && mres.data.members) || [];
     const nameOf = (uid) => {
         const m = members.find((x) => String(x.userId) === String(uid));
-        if (!m) return String(uid || '').slice(0, 8);
-        return m.displayName || m.username || String(m.userId).slice(0, 8);
+        // ⚠️ 10.26: قبلاً fallback «۸ کاراکتر اول UUID» بود و در لیست گروه
+        // «از 79715d2a» دیده می‌شد (کاربران تلگرام username ندارند و نامشان
+        // فقط در profile.displayName است). حالا نام نمایشی هم خوانده می‌شود و
+        // اگر هیچ نامی نبود، برچسب عمومی نشان داده می‌شود نه شناسه‌ی خام.
+        if (!m) return i18nT('tasks.unknownMember');
+        return m.displayName || m.username || i18nT('tasks.unknownMember');
     };
     const avatarOf = (uid) => {
         const m = members.find((x) => String(x.userId) === String(uid));

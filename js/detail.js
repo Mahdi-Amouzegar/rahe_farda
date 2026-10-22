@@ -14,7 +14,7 @@
 import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, enqueueDirtyTasks, moveToTrashById, sanitizeUrl } from './store.js';
-import { faShort, hasSessionAt, parseDateText, validatePlanRange } from './sessions.js';
+import { faShort, hasSessionAt, parseDateText, validatePlanRange, activeSessionId, isSessionInactive, promoteFutureSession } from './sessions.js';
 import {
     processImageFile,
     validateImageFile,
@@ -814,25 +814,29 @@ export function renderDetailSessions() {
         return;
     }
     const now = getNow().getTime();
+    // ⚠️ 10.26: در یک دوره فقط «جلسه‌ی فعال» (نزدیک‌ترین سررسید پیش‌رو) کنترل
+    // دارد. ردیف‌های گذشته/مصرف‌شده غیرفعال‌اند: نه انتخاب یادآور، نه 📍، نه ✕.
+    // (برای تسک غیرتکراری رفتار قبلی حفظ می‌شود تا حذف تاریخ اشتباه ممکن بماند.)
+    const isRecur = !!(task.recur && task.recur !== 'none');
+    const activeId = activeSessionId(task);
     el.innerHTML = list.map((s, i) => {
-        const past = new Date(s.at).getTime() < now;
-        // ⚠️ 10.24: جلسه‌ی مصرف‌شده (تیک دوره) در آینده است ولی «پیش‌رو» نیست —
-        // باید صریح علامت بخورد، وگرنه با due-line (که به جلسه‌ی بعد رفته) نمی‌خواند.
-        const done = !past && Boolean(s.doneAt);
+        const inactive = isSessionInactive(s, now);
+        const active = !inactive && (!isRecur || String(s.id) === String(activeId));
+        const canEdit = !_readOnly && (!isRecur || active);
         const sessionLoc = s.location || task.location;
         const weatherLabel = i18nT('taskItem.weather.buttonAria');
-        const weatherBtn = !past && !done && sessionLoc
+        const weatherBtn = active && sessionLoc
             ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" data-weather-session="${escapeHtml(String(s.id))}" aria-label="${weatherLabel}" title="${weatherLabel}">🌡️</button>`
             : '';
-        const pastLabel = past
-            ? ` ${i18nT('detail.session.past')}`
-            : (done ? ` ${i18nT('detail.session.done')}` : '');
+        const pastLabel = s.doneAt
+            ? ` ${i18nT('detail.session.done')}`
+            : (inactive ? ` ${i18nT('detail.session.past')}` : '');
         const remindAria = i18nT('detail.session.remindAria');
         const locAria = i18nT('detail.session.locationAria');
         const delAria = i18nT('detail.session.removeAria', { n: formatNumber(i + 1) });
         // ⚠️ 10.25: در حالت فقط‌خواندنی، انتخاب یادآور قفل و دکمه‌های
         // مکان/حذف پنهان‌اند (کاربر فقط تاریخ‌ها را می‌بیند).
-        const remindSelect = `<select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}"${_readOnly ? ' disabled' : ''}>
+        const remindSelect = canEdit ? `<select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}">
                 <option value=""${s.remindMin == null ? ' selected' : ''}>${i18nT('detail.session.remindDefault')}</option>
                 <option value="5"${s.remindMin === 5 ? ' selected' : ''}>${i18nT('detail.session.remind5')}</option>
                 <option value="15"${s.remindMin === 15 ? ' selected' : ''}>${i18nT('detail.session.remind15')}</option>
@@ -841,12 +845,19 @@ export function renderDetailSessions() {
                 <option value="180"${s.remindMin === 180 ? ' selected' : ''}>${i18nT('detail.session.remind180')}</option>
                 <option value="1440"${s.remindMin === 1440 ? ' selected' : ''}>${i18nT('detail.session.remind1440')}</option>
                 <option value="0"${s.remindMin === 0 ? ' selected' : ''}>${i18nT('detail.session.remindOff')}</option>
-            </select>`;
-        const locBtn = _readOnly ? '' :
-            `<button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>`;
-        const delBtn = _readOnly ? '' :
-            `<button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>`;
-        return `<div class="session-item ${past ? 'past' : ''}${done ? ' done' : ''}">
+            </select>` : '';
+        const locBtn = canEdit
+            ? `<button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>`
+            : '';
+        const delBtn = canEdit
+            ? `<button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>`
+            : '';
+        const cls = ['session-item'];
+        if (inactive) cls.push('inactive');
+        if (inactive && new Date(s.at).getTime() < now) cls.push('past');
+        if (s.doneAt) cls.push('done');
+        if (active) cls.push('active');
+        return `<div class="${cls.join(' ')}">
             <span class="session-num">${formatNumber(i + 1)}</span>
             <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
             ${remindSelect}
@@ -1405,6 +1416,10 @@ export function bindDetailInputs() {
         const task = getDetailTask();
         if (!task) return;
         task.sessions = task.sessions.filter(s => String(s.id) !== btn.dataset.sess);
+        // ⚠️ 10.26: اگر جلسه‌ی فعال حذف شد و جلسه‌ی قبلی‌اش هنوز تاریخش بعد از
+        // «حالا» است، همان فعال می‌شود (مهر doneAt برداشته می‌شود) تا due-line
+        // لیست هم به همان تاریخ برگردد.
+        promoteFutureSession(task);
         saveTasks();
         renderDetailSessions();
         call('render');

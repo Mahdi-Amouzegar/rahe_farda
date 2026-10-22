@@ -14,7 +14,10 @@ import {
     nearestUpcoming,
     validatePlanRange,
     advanceRecurOnTick,
-    dueLinePhase
+    dueLinePhase,
+    activeSessionId,
+    isSessionInactive,
+    promoteFutureSession
 } from '../js/sessions.js';
 import { state } from '../js/core.js';
 
@@ -380,6 +383,66 @@ describe('sessions — advanceRecurOnTick', () => {
         expect(advanceRecurOnTick(t)).toBe(true);
         expect(t.sessions[0].doneAt).toBeUndefined();
         expect(nearestUpcoming(t)).not.toBe(null);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// activeSessionId / isSessionInactive / promoteFutureSession (10.26)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('sessions — جلسه‌ی فعال و ارتقای جلسه‌ی قبلی (10.26)', () => {
+    const H = 3600 * 1000;
+    const iso = (ms) => new Date(ms).toISOString();
+
+    it('activeSessionId نزدیک‌ترین جلسه‌ی آینده‌ی مصرف‌نشده است', () => {
+        const now = Date.now();
+        const task = {
+            sessions: [
+                { id: 'a', at: iso(now + 1 * H) },
+                { id: 'b', at: iso(now + 3 * H) },
+                { id: 'c', at: iso(now + 2 * H), doneAt: iso(now) },
+            ],
+        };
+        expect(activeSessionId(task)).toBe('a');
+    });
+
+    it('isSessionInactive برای گذشته و مصرف‌شده true است', () => {
+        const now = Date.now();
+        expect(isSessionInactive({ id: 'a', at: iso(now - H) }, now)).toBe(true);
+        expect(isSessionInactive({ id: 'b', at: iso(now + H), doneAt: iso(now) }, now)).toBe(true);
+        expect(isSessionInactive({ id: 'c', at: iso(now + H) }, now)).toBe(false);
+        expect(isSessionInactive(null, now)).toBe(true);
+    });
+
+    it('حذف جلسه‌ی فعال: جلسه‌ی قبلیِ هنوز آینده فعال می‌شود (مهر doneAt برداشته می‌شود)', () => {
+        const now = Date.now();
+        const s1 = { id: 'a', at: iso(now + 24 * H), doneAt: iso(now), remindedDue: true };
+        const s2 = { id: 'b', at: iso(now + 48 * H) };
+        const task = { sessions: [s1, s2] };
+        expect(activeSessionId(task)).toBe('b');
+        // حذف جلسه‌ی فعال (b)
+        task.sessions = task.sessions.filter(s => s.id !== 'b');
+        expect(promoteFutureSession(task)).toBe(true);
+        expect(s1.doneAt).toBeUndefined();
+        expect(s1.remindedDue).toBe(false);
+        expect(activeSessionId(task)).toBe('a');
+        expect(dueLinePhase(task).startsWith('u')).toBe(true);
+    });
+
+    it('اگر جلسه‌ی قبلی گذشته باشد، چیزی ارتقا نمی‌یابد', () => {
+        const now = Date.now();
+        const past = { id: 'a', at: iso(now - 24 * H), doneAt: iso(now - 25 * H) };
+        const task = { sessions: [past] };
+        expect(promoteFutureSession(task)).toBe(false);
+        expect(past.doneAt).toBeDefined();
+        expect(activeSessionId(task)).toBe(null);
+    });
+
+    it('اگر هنوز جلسه‌ی آینده‌ی دیگری هست، ارتقا لازم نیست', () => {
+        const now = Date.now();
+        const task = { sessions: [{ id: 'a', at: iso(now + H) }, { id: 'b', at: iso(now + 2 * H) }] };
+        expect(promoteFutureSession(task)).toBe(false);
+        expect(activeSessionId(task)).toBe('a');
     });
 });
 

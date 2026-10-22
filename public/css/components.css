@@ -786,6 +786,28 @@
     .task-item.prio-medium { border-inline-end-color: var(--accent-yellow); }
     .task-item.prio-low { border-inline-end-color: var(--accent-cyan); }
 
+    /* ⚠️ 10.26: نمای مشترک (پیام خصوصی/گروه) — تشخیص کارت خودی از مخاطب.
+       نوار رنگی اولویت برای همه سمت چپ بود؛ حالا کارت خودی نوار را سمت راست
+       می‌گیرد (inline-start در RTL) و کارت مخاطب/عضو همان سمت چپ می‌ماند. */
+    .task-item.shared-mine {
+        border-inline-end-width: 1.5px;
+        border-inline-end-color: var(--border-subtle);
+        border-inline-start-width: 5px;
+    }
+
+    .task-item.shared-mine.prio-high { border-inline-start-color: var(--accent-pink); }
+    .task-item.shared-mine.prio-medium { border-inline-start-color: var(--accent-yellow); }
+    .task-item.shared-mine.prio-low { border-inline-start-color: var(--accent-cyan); }
+
+    /* کارت خودی کمی از لبه فاصله می‌گیرد تا سمت پیام‌ها در یک نگاه معلوم شود */
+    .task-item.shared-mine {
+        margin-inline-end: 6px;
+    }
+
+    .task-item.shared-other {
+        margin-inline-start: 6px;
+    }
+
     .task-item:has(.operation-trigger[aria-expanded="true"]) {
         z-index: 100;
         position: relative;

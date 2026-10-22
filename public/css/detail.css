@@ -281,6 +281,18 @@
         border-color: var(--accent-green-border, var(--accent-pink-border));
     }
 
+    /* ⚠️ 10.26: ردیف غیرفعال دوره (گذشته یا مصرف‌شده) — بدون یادآور/مکان/حذف */
+    .session-item.inactive {
+        opacity: 0.55;
+        background: transparent;
+    }
+
+    /* جلسه‌ی فعال دوره: تنها ردیفی که کنترل دارد (تاریخی که به آن می‌رسیم) */
+    .session-item.active {
+        border-color: var(--accent-cyan-border);
+        box-shadow: inset 0 0 0 1px var(--accent-cyan-soft);
+    }
+
     .session-num {
         width: 26px;
         height: 26px;

@@ -415,6 +415,7 @@
   "tasks": {
     "add": "افزودن",
     "sharedFrom": "از {name}",
+    "unknownMember": "یکی از اعضای گروه",
     "new": "کار جدید",
     "newPlaceholder": "کار جدید را بنویسید...",
     "planPlaceholder": "نام برنامه (مثلاً سفر به تهران)...",
