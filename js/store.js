@@ -16,7 +16,7 @@ import {
     SCHEMA_VERSION,
     computeChecksum
 } from './core.js';
-import { sameMinute, nearestUpcoming, allSessions, hasSessionAt, visibleChildren } from './sessions.js';
+import { sameMinute, nearestUpcoming, allSessions, hasSessionAt, visibleChildren, advanceRecur, advanceRecurOnTick } from './sessions.js';
 import { getNow } from './time.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
 import {
@@ -290,6 +290,9 @@ export function sanitizeTask(t) {
                 location: validLoc(s.location),
                 remindMin: (s.remindMin === null || s.remindMin === undefined) ? null
                     : (Number.isFinite(+s.remindMin) && +s.remindMin >= 0 ? Math.floor(+s.remindMin) : null),
+                // ⚠️ 10.24: مهر «جلسه‌ی مصرف‌شده» (تیک دوره) باید از sanitize رد شود،
+                // وگرنه بعد از هر بارگذاری جلسه دوباره «آینده» می‌شود و due-line برمی‌گردد.
+                doneAt: (typeof s.doneAt === 'string' && !isNaN(new Date(s.doneAt))) ? s.doneAt : null,
                 regAt: regOf(s)
             }))
         : [];
@@ -1328,84 +1331,13 @@ export function validateSeriesStart(at, nowMs) {
     return { ok: true, at: new Date(v).toISOString() };
 }
 
-function daysInMonth(gy, gm) {
-    return new Date(gy, gm + 1, 0).getDate();
-}
-
-function addInterval(date, recur, n, m) {
-    const d = new Date(date.getTime());
-    if (recur === 'daily') d.setDate(d.getDate() + 1);
-    else if (recur === 'weekly') d.setDate(d.getDate() + 7);
-    else if (recur === 'monthly') {
-        const day = d.getDate();
-        d.setDate(1);
-        d.setMonth(d.getMonth() + 1);
-        d.setDate(Math.min(day, daysInMonth(d.getFullYear(), d.getMonth())));
-    }
-    else if (recur === 'custom' && n >= 1) d.setDate(d.getDate() + n);
-    else if (recur === 'hourly' && (n >= 1 || (m || 0) >= 1)) d.setTime(d.getTime() + (n * 3600 + (m || 0) * 60) * 1000);
-    return d;
-}
-
-function nextWeekday(base, days) {
-    const set = (days || []).filter(d => d >= 0 && d <= 6);
-    if (!set.length) return null;
-    for (let i = 1; i <= 7; i++) {
-        const d = new Date(base.getTime());
-        d.setDate(d.getDate() + i);
-        if (set.includes(d.getDay())) {
-            d.setHours(base.getHours(), base.getMinutes(), 0, 0);
-            return d;
-        }
-    }
-    return null;
-}
-
-function nextMonthday(base, days) {
-    const set = [...new Set((days || []).filter(d => d >= 1 && d <= 31))].sort((a, b) => a - b);
-    if (!set.length) return null;
-    for (let m = 0; m < 13; m++) {
-        const y = base.getFullYear();
-        const mo = base.getMonth() + m;
-        for (const dd of set) {
-            if (dd > daysInMonth(y, mo)) continue;
-            const c = new Date(y, mo, dd, base.getHours(), base.getMinutes(), 0, 0);
-            if (c.getTime() > base.getTime()) return c;
-        }
-    }
-    return null;
-}
-
-export function advanceRecur(task) {
-    const r = task.recur;
-    const n = r === 'custom'
-        ? ((task.recurN >= 1 && task.recurN <= 365) ? task.recurN : 0)
-        : r === 'hourly'
-            ? ((task.recurN >= 0 && task.recurN <= 168) ? task.recurN : 0)
-            : 0;
-    const m = r === 'hourly'
-        ? ((task.recurMin >= 0 && task.recurMin <= 59) ? task.recurMin : 0)
-        : 0;
-    if ((r === 'custom' || r === 'hourly') && !n && !m) return false;
-    const list = task.sessions || [];
-    // ⚠️ 10.13: پایه همیشه آخرین سررسید ثبت‌شده است — حتی گذشته.
-    // (پیش‌تر با Math.max(..., Date.now()) محاسبه می‌شد و در تمدید
-    //  دیرهنگام، سررسید بعدی از «لحظه تمدید» حساب می‌شد.)
-    let base = null;
-    for (const s of list) {
-        const v = new Date(s.at).getTime();
-        if (!isNaN(v) && (base === null || v > base)) base = v;
-    }
-    if (base === null) base = Date.now();
-    const b = new Date(base);
-    let next = null;
-    if (r === 'weeklyDays') next = nextWeekday(b, task.recurDays);
-    else if (r === 'monthlyDays') next = nextMonthday(b, task.recurDays);
-    else next = addInterval(b, r, n, m);
-    if (!next || next.getTime() <= base) return false;
-    task.sessions.push({ id: uid(), at: next.toISOString(), reminded: false, remindMin: null, location: null, regAt: new Date().toISOString() });
-    return true;
-}
+/**
+ * ⚠️ 10.24: منطق «قانون دوره» (`advanceRecur` و کمک‌تابع‌هایش) به
+ * `sessions.js` منتقل شد تا مسیر مشترک (DM/گروه در `tasks/source.js`) هم
+ * بدون چرخه‌ی import از آن استفاده کند. این re-export سازگاری importهای
+ * موجود (notify.js، تست‌ها) را حفظ می‌کند.
+ */
+export { advanceRecur };
 
 /**
  * سقف قدم برای جلو بردن خودکار (غیبت طولانی + پریود کوتاه نباید هزاران جلسه بسازد).
@@ -1750,8 +1682,12 @@ export function toggleTask(id) {
     if (!found) return;
     found.task.completed = !found.task.completed;
     found.task.completedAt = found.task.completed ? new Date().toISOString() : null;
-    if (found.task.completed && found.task.recur && found.task.recur !== 'none' && advanceRecur(found.task)) {
+    // ⚠️ 10.24: تیک دوره = مصرف جلسه‌ی جاری + ساخت جلسه‌ی بعدی. `advanceRecurOnTick`
+    // جلسه‌ی جاری را `doneAt` می‌زند تا due-line بی‌درنگ به جلسه‌ی بعد برود
+    // (قبلاً جلسه در «آینده» می‌ماند و تا رفرش/گذشتن زمان تکان نمی‌خورد).
+    if (found.task.completed && advanceRecurOnTick(found.task)) {
         found.task.completed = false;
+        found.task.completedAt = null;
     }
     saveTask(found.task, found.parent);
     call('render');

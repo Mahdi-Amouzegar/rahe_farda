@@ -710,16 +710,21 @@ export function renderDetailSessions() {
     const now = getNow().getTime();
     el.innerHTML = list.map((s, i) => {
         const past = new Date(s.at).getTime() < now;
+        // ⚠️ 10.24: جلسه‌ی مصرف‌شده (تیک دوره) در آینده است ولی «پیش‌رو» نیست —
+        // باید صریح علامت بخورد، وگرنه با due-line (که به جلسه‌ی بعد رفته) نمی‌خواند.
+        const done = !past && Boolean(s.doneAt);
         const sessionLoc = s.location || task.location;
         const weatherLabel = i18nT('taskItem.weather.buttonAria');
-        const weatherBtn = !past && sessionLoc
+        const weatherBtn = !past && !done && sessionLoc
             ? `<button type="button" class="weather-icon-btn" data-weather-task="${escapeHtml(String(task.id))}" data-weather-session="${escapeHtml(String(s.id))}" aria-label="${weatherLabel}" title="${weatherLabel}">🌡️</button>`
             : '';
-        const pastLabel = past ? ` ${i18nT('detail.session.past')}` : '';
+        const pastLabel = past
+            ? ` ${i18nT('detail.session.past')}`
+            : (done ? ` ${i18nT('detail.session.done')}` : '');
         const remindAria = i18nT('detail.session.remindAria');
         const locAria = i18nT('detail.session.locationAria');
         const delAria = i18nT('detail.session.removeAria', { n: formatNumber(i + 1) });
-        return `<div class="session-item ${past ? 'past' : ''}">
+        return `<div class="session-item ${past ? 'past' : ''}${done ? ' done' : ''}">
             <span class="session-num">${formatNumber(i + 1)}</span>
             <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
             <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}">

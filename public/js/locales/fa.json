@@ -718,7 +718,8 @@
       "remind1440": "۱ روز",
       "remindOff": "خاموش",
       "locationAria": "ثبت محل جلسه",
-      "past": "(گذشته)"
+      "past": "(گذشته)",
+      "done": "✓ انجام شد"
     },
     "photo": {
       "uploadPending": "در انتظار آپلود",

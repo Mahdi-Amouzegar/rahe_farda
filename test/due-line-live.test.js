@@ -46,9 +46,13 @@ describe('dueLinePhase — فاز due-line (10.21/BUG-20)', () => {
     });
 
     it('جلسه‌ی آینده → u<at>#<روز>', () => {
-        const now = Date.now();
-        const at = new Date(now + 2 * H).toISOString();
-        const fp = dueLinePhase({ sessions: [{ id: 's1', at }] }, now);
+        // ⚠️ ساعت مرجع باید وسط روز باشد، وگرنه `now + 2h` بعد از نیمه‌شب
+        // می‌افتد و فاصله‌ی روزها ۱ می‌شود (تست وابسته به ساعت اجرا).
+        const now = new Date();
+        now.setHours(10, 0, 0, 0);
+        const nowMs = now.getTime();
+        const at = new Date(nowMs + 2 * H).toISOString();
+        const fp = dueLinePhase({ sessions: [{ id: 's1', at }] }, nowMs);
         expect(fp).toBe('u' + new Date(at).getTime() + '#0');
     });
 

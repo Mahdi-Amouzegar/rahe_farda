@@ -1,7 +1,7 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // sessions.js -- session (due-date) domain logic (ESM)
 
-import { state, toFa, escapeHtml } from './core.js';
+import { state, toFa, escapeHtml, uid } from './core.js';
 import { getNow } from './time.js';
 import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
 
@@ -66,10 +66,25 @@ export function updateDueChips() {
 // Nearest / summary
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * آیا این جلسه «مصرف‌شده» است؟ (10.24)
+ *
+ * ⚠️ با تیک زدن یک دوره، جلسه‌ی جاری (نزدیک‌ترین آینده) با `doneAt` علامت
+ * می‌خورد و از فهرست «آینده» بیرون می‌رود — ولی به‌عنوان تاریخچه در
+ * `sessions` می‌ماند (نقطه‌ی تقویم، شمارش). بدون این، due-line بعد از تیک
+ * همان جلسه‌ی قبلی را نشان می‌داد و تا رفرش/گذشتن زمان تکان نمی‌خورد.
+ *
+ * @param {object} s
+ * @returns {boolean}
+ */
+export function isSessionDone(s) {
+    return !!(s && s.doneAt);
+}
+
 export function nearestUpcoming(task) {
     const now = getNow().getTime();
     return (task.sessions || [])
-        .filter(s => new Date(s.at).getTime() >= now)
+        .filter(s => !isSessionDone(s) && new Date(s.at).getTime() >= now)
         .sort((a, b) => new Date(a.at) - new Date(b.at))[0] || null;
 }
 
@@ -86,6 +101,10 @@ export function nearestUpcoming(task) {
  *   'c<n>'        → تکمیل‌شده (فقط شمارش)
  *   'u<at>#<d>'   → نزدیک‌ترین جلسه‌ی آینده + فاصله‌ی روز (امروز/فردا/n روز)
  *   'o<at>'       → همه گذشته (سررسید گذشته، آخرین جلسه)
+ *   'd<n>'        → همه‌ی جلسه‌ها مصرف‌شده‌اند ولی تسک باز است (10.24)
+ *
+ * ⚠️ 10.24: جلسه‌های مصرف‌شده (`doneAt`) مثل «گذشته» رفتار می‌کنند —
+ * وگرنه بعد از تیک یک دوره، فاز عوض نمی‌شد و due-line کهنه می‌ماند.
  *
  * @param {object} task
  * @param {number} [nowMs] — برای تست؛ پیش‌فرض ساعت تصحیح‌شده‌ی getNow()
@@ -99,9 +118,12 @@ export function dueLinePhase(task, nowMs) {
     const nowVal = now.getTime();
     let nearest = null;
     let latest = null;
+    let pending = 0;
     for (const s of sessions) {
-        const v = new Date(s && s.at).getTime();
+        if (!s || isSessionDone(s)) continue;
+        const v = new Date(s.at).getTime();
         if (!Number.isFinite(v)) continue;
+        pending++;
         if (v >= nowVal) {
             if (nearest === null || v < nearest) nearest = v;
         }
@@ -112,6 +134,7 @@ export function dueLinePhase(task, nowMs) {
         const diffDays = Math.round((startOf(new Date(nearest)) - startOf(now)) / 86400000);
         return 'u' + nearest + '#' + diffDays;
     }
+    if (pending === 0) return 'd' + sessions.length;
     return 'o' + latest;
 }
 
@@ -136,6 +159,129 @@ export function isDueFireable(nowMs, atMs, remindedDue) {
     if (remindedDue) return false;
     if (!Number.isFinite(atMs)) return false;
     return nowMs >= atMs - NEAR_DUE_MIN * 60 * 1000 && nowMs - atMs <= DUE_CATCH_UP_MS;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Recurrence (قانون دوره → جلسه‌ی بعدی)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ 10.24: این بلوک از `store.js` به `sessions.js` منتقل شد تا مسیر مشترک
+// (DM/گروه در `tasks/source.js`) هم بتواند بدون چرخه‌ی import از آن استفاده
+// کند. `store.js` همچنان `advanceRecur` را re-export می‌کند (سازگاری).
+
+function daysInMonth(gy, gm) {
+    return new Date(gy, gm + 1, 0).getDate();
+}
+
+function addInterval(date, recur, n, m) {
+    const d = new Date(date.getTime());
+    if (recur === 'daily') d.setDate(d.getDate() + 1);
+    else if (recur === 'weekly') d.setDate(d.getDate() + 7);
+    else if (recur === 'monthly') {
+        const day = d.getDate();
+        d.setDate(1);
+        d.setMonth(d.getMonth() + 1);
+        d.setDate(Math.min(day, daysInMonth(d.getFullYear(), d.getMonth())));
+    }
+    else if (recur === 'custom' && n >= 1) d.setDate(d.getDate() + n);
+    else if (recur === 'hourly' && (n >= 1 || (m || 0) >= 1)) d.setTime(d.getTime() + (n * 3600 + (m || 0) * 60) * 1000);
+    return d;
+}
+
+function nextWeekday(base, days) {
+    const set = (days || []).filter(d => d >= 0 && d <= 6);
+    if (!set.length) return null;
+    for (let i = 1; i <= 7; i++) {
+        const d = new Date(base.getTime());
+        d.setDate(d.getDate() + i);
+        if (set.includes(d.getDay())) {
+            d.setHours(base.getHours(), base.getMinutes(), 0, 0);
+            return d;
+        }
+    }
+    return null;
+}
+
+function nextMonthday(base, days) {
+    const set = [...new Set((days || []).filter(d => d >= 1 && d <= 31))].sort((a, b) => a - b);
+    if (!set.length) return null;
+    for (let m = 0; m < 13; m++) {
+        const y = base.getFullYear();
+        const mo = base.getMonth() + m;
+        for (const dd of set) {
+            if (dd > daysInMonth(y, mo)) continue;
+            const c = new Date(y, mo, dd, base.getHours(), base.getMinutes(), 0, 0);
+            if (c.getTime() > base.getTime()) return c;
+        }
+    }
+    return null;
+}
+
+/**
+ * ساخت جلسه‌ی بعدی از قانون دوره (مثلاً روزانه → فردا همان ساعت).
+ *
+ * ⚠️ 10.13: پایه همیشه آخرین سررسید ثبت‌شده است — حتی گذشته.
+ * (پیش‌تر با Math.max(..., Date.now()) محاسبه می‌شد و در تمدید
+ *  دیرهنگام، سررسید بعدی از «لحظه تمدید» حساب می‌شد.)
+ *
+ * @param {object} task — باید recur/recurN/recurMin/recurDays/sessions داشته باشد
+ * @returns {boolean} آیا جلسه‌ی تازه اضافه شد؟
+ */
+export function advanceRecur(task) {
+    const r = task.recur;
+    const n = r === 'custom'
+        ? ((task.recurN >= 1 && task.recurN <= 365) ? task.recurN : 0)
+        : r === 'hourly'
+            ? ((task.recurN >= 0 && task.recurN <= 168) ? task.recurN : 0)
+            : 0;
+    const m = r === 'hourly'
+        ? ((task.recurMin >= 0 && task.recurMin <= 59) ? task.recurMin : 0)
+        : 0;
+    if ((r === 'custom' || r === 'hourly') && !n && !m) return false;
+    const list = task.sessions || [];
+    let base = null;
+    for (const s of list) {
+        const v = new Date(s.at).getTime();
+        if (!isNaN(v) && (base === null || v > base)) base = v;
+    }
+    if (base === null) base = Date.now();
+    const b = new Date(base);
+    let next = null;
+    if (r === 'weeklyDays') next = nextWeekday(b, task.recurDays);
+    else if (r === 'monthlyDays') next = nextMonthday(b, task.recurDays);
+    else next = addInterval(b, r, n, m);
+    if (!next || next.getTime() <= base) return false;
+    task.sessions.push({ id: uid(), at: next.toISOString(), reminded: false, remindMin: null, location: null, regAt: new Date().toISOString() });
+    return true;
+}
+
+/**
+ * «تیک یک دوره» = مصرف جلسه‌ی جاری + ساخت جلسه‌ی بعدی (10.24).
+ *
+ * ⚠️ مسئله‌ی گزارش‌شده (T-09): قبلاً `toggleTask` فقط `advanceRecur` را صدا
+ * می‌زد و جلسه‌ی جاری در آرایه می‌ماند. چون جلسه در آینده بود،
+ * `nearestUpcoming` همچنان همان را برمی‌گرداند و due-line تا لحظه‌ی گذشتن
+ * زمان (یا رفرش با rollforward) تکان نمی‌خورد — حتی بعد از رفرش، چون جلسه
+ * هنوز «آینده» بود.
+ *
+ * حالا جلسه‌ی جاری با `doneAt` مهر می‌خورد (تاریخچه حفظ می‌شود: نقطه‌ی
+ * تقویم و شمارش) و از «آینده» بیرون می‌رود؛ پس due-line بلافاصله به جلسه‌ی
+ * بعدی می‌رود. برای تسک بدون جلسه‌ی آینده (همه گذشته)، چیزی مهر نمی‌خورد و
+ * همان rollforward معمول کافی است.
+ *
+ * @param {object} task
+ * @param {string} [nowIso] — برای تست
+ * @returns {boolean} آیا جلسه‌ی بعدی ساخته شد؟
+ */
+export function advanceRecurOnTick(task, nowIso) {
+    if (!task || !task.recur || task.recur === 'none') return false;
+    const consumed = nearestUpcoming(task);
+    if (!advanceRecur(task)) return false;
+    if (consumed) {
+        const s = (task.sessions || []).find(x => x && String(x.id) === String(consumed.id));
+        if (s) s.doneAt = nowIso || new Date().toISOString();
+    }
+    return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -207,7 +353,13 @@ export function sessionSummaryHtml(task) {
         const wBtn = weatherButtonHtml(task);
         return `<span class="due-line">${i18nT('sessions.summary.nextSession', { date: faShort(n.at) })}${extra}${n.location ? ' 📍' : ''}${wBtn}</span>${count}`;
     }
-    const past = [...sessions].sort((a, b) => new Date(b.at) - new Date(a.at))[0];
+    const past = [...sessions.filter(s => !isSessionDone(s))].sort((a, b) => new Date(b.at) - new Date(a.at))[0];
+    // ⚠️ 10.24: ممکن است همه‌ی جلسه‌ها مصرف شده باشند ولی تسک باز مانده باشد
+    // (مثلاً قانون نامعتبر → جلسه‌ی بعدی ساخته نشد). نمایش «سررسید گذشته» با
+    // تاریخ جلسه‌ی مصرف‌شده گمراه‌کننده است؛ فقط شمارش نشان داده می‌شود.
+    if (!past) {
+        return `<span class="due-line past-all">📅 ${i18nT('sessions.summary.count', { n: formatNumber(sessions.length) })}</span>`;
+    }
     return `<span class="due-line overdue">${i18nT('sessions.summary.overdue', { date: faShort(past.at) })}</span>`;
 }
 
@@ -390,6 +542,9 @@ export function allSessions(onlyOpen) {
         if (t.archived) return;
         (t.sessions || []).forEach(s => {
             if (onlyOpen && t.completed) return;
+            // ⚠️ 10.24: جلسه‌ی مصرف‌شده (تیک‌خورده) دیگر «آینده» نیست —
+            // نه یادآور می‌گیرد، نه در انتخابگر جلسه پیشنهاد می‌شود.
+            if (onlyOpen && isSessionDone(s)) return;
             out.push({
                 at: s.at,
                 id: s.id,
@@ -400,6 +555,7 @@ export function allSessions(onlyOpen) {
                 remindedDue: Boolean(s.remindedDue),
                 remindedDueSoon: Boolean(s.remindedDueSoon),
                 remindMin: s.remindMin != null ? s.remindMin : null,
+                doneAt: s.doneAt || null,
                 regAt: s.regAt != null ? s.regAt : t.createdAt
             });
         });

@@ -56,7 +56,7 @@ import {
 import { scheduleMarkerRefresh } from './map.js';
 import { getWeatherIcon } from './weather.js';
 import {
-    buildRenderSignature,
+    listSignature,
     diffTasks,
     isSafeForDiff
 } from './render-diff.js';
@@ -1078,22 +1078,10 @@ export function render() {
 
     // ─── تصمیم renderFull vs renderDiff ───
     const visibleIds = filtered.map(t => String(t.id));
-    // ⚠️ 10.11/BUG-04: امضا فقط idها را می‌دید — افزودن/تغییر جلسه (مثلاً جلو رفتن خودکار
-    // دوره) امضا را عوض نمی‌کرد و due-line کهنه می‌ماند (رفرش دستی با reset امضا درستش می‌کرد).
-    // اثر جلسات هم لحاظ می‌شود؛ snapshotهای diff آرایه sessions را by-ref شر می‌کنند پس به diff اتکا نیست.
-    const sessFp = filtered.map(t =>
-        ((t.sessions || []).map(s => s.at).join(',')) + '#' +
-        (((t.children || []).map(c => (c.sessions || []).map(s => s.at).join(',')).join(';')))
-    ).join('|');
-    // ⚠️ 10.21/BUG-20: due-line به زمان وابسته است (نزدیک‌ترین جلسه / سررسید گذشته /
-    // «امروز-فردا-n روز دیگر»). بدون فاز، گذشتن زمان هیچ رندری تحریک نمی‌کرد و
-    // متن تا رفرش دستی کهنه می‌ماند — خصوصاً در پیام خصوصی/گروه که داده از سرور می‌آید.
-    const dueFp = filtered.map(t =>
-        dueLinePhase(t) + (t.children ? '/' + t.children.map(c => dueLinePhase(c)).join(',') : '')
-    ).join('|');
-    const signature = buildRenderSignature(state, visibleIds) + '::' + sessFp + '::' + dueFp;
+    // ⚠️ همه‌ی اثرها (جلسات، due-line، زیرکارها) در `listSignature` جمع شده‌اند.
+    const signature = listSignature(filtered, visibleIds, state);
 
-        if (signature !== _lastRenderSignature) {
+    if (signature !== _lastRenderSignature) {
         renderFull(filtered, total, done);
         _lastRenderSignature = signature;
         _lastVisibleTasks = filtered.map(t => ({

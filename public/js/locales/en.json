@@ -718,7 +718,8 @@
       "remind1440": "1 day",
       "remindOff": "Off",
       "locationAria": "Set session location",
-      "past": "(past)"
+      "past": "(past)",
+      "done": "✓ Done"
     },
     "photo": {
       "uploadPending": "Pending upload",

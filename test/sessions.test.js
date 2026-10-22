@@ -12,7 +12,9 @@ import {
     normalizeForSearch,
     parseFaDateTime,
     nearestUpcoming,
-    validatePlanRange
+    validatePlanRange,
+    advanceRecurOnTick,
+    dueLinePhase
 } from '../js/sessions.js';
 import { state } from '../js/core.js';
 
@@ -321,6 +323,63 @@ describe('sessions — nearestUpcoming', () => {
     it('برای task بدون sessions null برمی‌گرداند', () => {
         expect(nearestUpcoming({})).toBe(null);
         expect(nearestUpcoming({ sessions: [] })).toBe(null);
+    });
+
+    it('جلسه‌ی مصرف‌شده (doneAt) را نادیده می‌گیرد (10.24)', () => {
+        const now = Date.now();
+        const s1 = { id: 'a', at: new Date(now + 60 * 60 * 1000).toISOString() };
+        const s2 = { id: 'b', at: new Date(now + 2 * 60 * 60 * 1000).toISOString() };
+        const task = { sessions: [{ ...s1, doneAt: new Date().toISOString() }, s2] };
+        expect(nearestUpcoming(task).id).toBe('b');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// advanceRecurOnTick — تیک دوره = مصرف جلسه‌ی جاری (10.24 / T-09)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('sessions — advanceRecurOnTick', () => {
+    const mk = (recur, atMs) => ({
+        recur,
+        recurN: null,
+        recurMin: 0,
+        recurDays: [],
+        sessions: [{ id: 's1', at: new Date(atMs).toISOString(), reminded: false }],
+    });
+
+    it('جلسه‌ی جاری را doneAt می‌زند و جلسه‌ی بعدی می‌سازد', () => {
+        const tomorrow = Date.now() + 24 * 3600 * 1000;
+        const t = mk('daily', tomorrow);
+        expect(advanceRecurOnTick(t, '2026-10-21T12:00:00.000Z')).toBe(true);
+        expect(t.sessions.length).toBe(2);
+        expect(t.sessions[0].doneAt).toBe('2026-10-21T12:00:00.000Z');
+        expect(t.sessions[1].doneAt).toBeUndefined();
+        expect(nearestUpcoming(t).id).toBe(t.sessions[1].id);
+    });
+
+    it('due-line بلافاصله به جلسه‌ی بعدی می‌رود (بدون تغییر ساعت سیستم)', () => {
+        const tomorrow = Date.now() + 24 * 3600 * 1000;
+        const t = mk('daily', tomorrow);
+        const before = dueLinePhase(t);
+        advanceRecurOnTick(t);
+        const after = dueLinePhase(t);
+        expect(before).not.toBe(after);
+        expect(after.startsWith('u')).toBe(true);
+    });
+
+    it('تسک بدون قانون دست‌نخورده می‌ماند', () => {
+        const t = mk('none', Date.now() + 3600 * 1000);
+        expect(advanceRecurOnTick(t)).toBe(false);
+        expect(t.sessions.length).toBe(1);
+        expect(t.sessions[0].doneAt).toBeUndefined();
+    });
+
+    it('وقتی جلسه‌ها گذشته‌اند، جلسه‌ی آینده ساخته می‌شود و چیزی مهر نمی‌خورد', () => {
+        const past = Date.now() - 3600 * 1000; // ۱ ساعت پیش → جلسه‌ی بعدی فردا همان ساعت
+        const t = mk('daily', past);
+        expect(advanceRecurOnTick(t)).toBe(true);
+        expect(t.sessions[0].doneAt).toBeUndefined();
+        expect(nearestUpcoming(t)).not.toBe(null);
     });
 });
 

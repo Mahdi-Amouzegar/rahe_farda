@@ -15,6 +15,8 @@ import { dataUrlToBlob } from '../media.js';
 import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
 import { getDestination } from './destination.js';
+// ⚠️ 10.24: منطق دوره در sessions.js است (بدون چرخه‌ی import با store.js).
+import { advanceRecurOnTick } from '../sessions.js';
 
 function parsePayload(raw) {
     if (!raw) return null;
@@ -541,16 +543,22 @@ export function persistAdvancedShared(task) {
 
 /**
  * تاگل تسک خودی در نمای مشترک.
+ *
+ * ⚠️ 10.24: تیک یک **دوره** در DM/گروه هم مثل نسخه‌ی شخصی رفتار می‌کند —
+ * جلسه‌ی جاری مصرف (`doneAt`) و جلسه‌ی بعدی ساخته می‌شود، تسک باز می‌ماند و
+ * payload کامل (شامل sessions) روی مقصد نوشته می‌شود. قبلاً فقط
+ * `completed` عوض می‌شد؛ سری روی سرور همان جلسه‌ی اول می‌ماند و
+ * `advanceSharedOne` هم چون تسک completed بود از آن رد می‌شد → دوره برای همیشه
+ * «تکمیل» می‌شد و due-line هرگز جلو نمی‌رفت.
  */
 export async function toggleSharedTask(remoteId) {
     const item = getSharedItem(remoteId);
     if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const completed = !item.completed;
-    const next = {
-        ...stripShared(item),
-        completed,
-        completedAt: completed ? new Date().toISOString() : null,
-    };
+    const next = { ...stripShared(item) };
+    let completed = !item.completed;
+    if (completed && advanceRecurOnTick(next)) completed = false;
+    next.completed = completed;
+    next.completedAt = completed ? new Date().toISOString() : null;
     return writeSharedTask(item._shared.dest, remoteId, next);
 }
 

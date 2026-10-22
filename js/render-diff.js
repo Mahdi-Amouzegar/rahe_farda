@@ -10,6 +10,8 @@
 //   - اگر باگی داشت، در یک نقطه‌ی متمرکز رفع می‌شود
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { dueLinePhase } from './sessions.js';
+
 /**
  * ساخت یک امضای یکتا از state فعلی UI.
  *
@@ -78,6 +80,42 @@ export function diffTasks(oldTasks, newTasks) {
     }
 
     return ops;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// امضای کامل لیست (شامل جلسات، due-line و زیرکارها) — 10.24
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * امضای کامل لیست — تصمیم بین renderFull و renderDiff (خالص، تست‌پذیر).
+ *
+ * ⚠️ فقط id/فیلتر/مرتب‌سازی کافی نیست:
+ *  - 10.11/BUG-04: تغییر جلسات (جلو رفتن خودکار دوره) امضا را عوض نمی‌کرد.
+ *  - 10.21/BUG-20: due-line به زمان وابسته است (امروز/فردا/سررسید گذشته).
+ *  - 10.24/T-12: متن و وضعیت زیرکارها هم دیده نمی‌شد؛ `diffTaskFields` متن
+ *    فرزند را مقایسه نمی‌کند، پس ویرایش عنوان زیرکار در جزئیات هیچ patchی
+ *    تولید نمی‌کرد و لیست تا رفرش دستی کهنه می‌ماند.
+ *  - 10.24/T-09: مهر `doneAt` (جلسه‌ی مصرف‌شده) هم بخشی از امضاست.
+ *
+ * @param {object[]} filtered — تسک‌های قابل‌نمایش (سطح‌بالا)
+ * @param {string[]} visibleIds — idهای قابل‌نمایش
+ * @param {object} uiState — state سراسری UI
+ * @returns {string}
+ */
+export function listSignature(filtered, visibleIds, uiState) {
+    const sessFp = filtered.map(t =>
+        ((t.sessions || []).map(s => s.at + (s.doneAt ? '*' : '')).join(',')) + '#' +
+        (((t.children || []).map(c => (c.sessions || []).map(s => s.at + (s.doneAt ? '*' : '')).join(',')).join(';')))
+    ).join('|');
+    const childFp = filtered.map(t =>
+        (t.children || []).map(c => [
+            c.id, c.text, c.completed ? 1 : 0, c.priority, (c.sessions || []).length
+        ].join('~')).join(';')
+    ).join('|');
+    const dueFp = filtered.map(t =>
+        dueLinePhase(t) + (t.children ? '/' + t.children.map(c => dueLinePhase(c)).join(',') : '')
+    ).join('|');
+    return buildRenderSignature(uiState, visibleIds) + '::' + sessFp + '::' + dueFp + '::' + childFp;
 }
 
 /**

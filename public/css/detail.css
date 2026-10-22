@@ -216,6 +216,12 @@
         border-color: var(--accent-pink-border);
     }
 
+    /* ⚠️ 10.24: جلسه‌ی مصرف‌شده با تیک دوره — تاریخچه می‌ماند، ولی «آینده» نیست */
+    .session-item.done {
+        opacity: 0.6;
+        border-color: var(--accent-green-border, var(--accent-pink-border));
+    }
+
     .session-num {
         width: 26px;
         height: 26px;

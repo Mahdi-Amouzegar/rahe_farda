@@ -617,12 +617,14 @@ export function collectSharedDue(items, nowMs, flags) {
     const rmDefault = (() => { try { return state.prefs.remindMin; } catch { return null; } })();
     const units = sharedDueUnits(items);
     // ⚠️ 10.18: هشدار ۵ دقیقه‌ای فقط برای جلسه‌ی فعلی هر تسک
+    // ⚠️ 10.24: جلسه‌های مصرف‌شده (`doneAt` — تیک دوره) نه هشدار می‌گیرند نه
+    // در محاسبه‌ی «جلسه‌ی فعلی» شرکت می‌کنند.
     const nextAt = nextSessionAtMap(
-        units.flatMap(u => u.sessions.map(s => ({ taskId: u.id, at: s.at }))),
+        units.flatMap(u => u.sessions.filter(s => s && !s.doneAt).map(s => ({ taskId: u.id, at: s.at }))),
         nowMs);
     for (const t of units) {
         for (const s of t.sessions) {
-            if (!s) continue;
+            if (!s || s.doneAt) continue;
             const v = new Date(s.at).getTime();
             if (!Number.isFinite(v)) continue;
             const key = `shr:${t.id}:${s.id}`;
