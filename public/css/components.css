@@ -788,15 +788,22 @@
 
     /* ⚠️ 10.26: نمای مشترک (پیام خصوصی/گروه) — تشخیص کارت خودی از مخاطب.
        نوار رنگی اولویت برای همه سمت چپ بود؛ حالا کارت خودی نوار را سمت راست
-       می‌گیرد (inline-start در RTL) و کارت مخاطب/عضو همان سمت چپ می‌ماند. */
+       می‌گیرد (inline-start در RTL) و کارت مخاطب/عضو همان سمت چپ می‌ماند.
+       ⚠️ 10.27: همین نوار سمت راست برای «وظایف من» (`side-own`) هم اعمال شد —
+       وظایف شخصی را خودمان ساخته‌ایم، پس نوار سمت چپ (سمت پیام دریافتی)
+       گمراه‌کننده بود. حاشیه‌ی ۶ پیکسلی فقط مخصوص نمای مشترک است. */
+    .task-item.side-own,
     .task-item.shared-mine {
         border-inline-end-width: 1.5px;
         border-inline-end-color: var(--border-subtle);
         border-inline-start-width: 5px;
     }
 
+    .task-item.side-own.prio-high,
     .task-item.shared-mine.prio-high { border-inline-start-color: var(--accent-pink); }
+    .task-item.side-own.prio-medium,
     .task-item.shared-mine.prio-medium { border-inline-start-color: var(--accent-yellow); }
+    .task-item.side-own.prio-low,
     .task-item.shared-mine.prio-low { border-inline-start-color: var(--accent-cyan); }
 
     /* کارت خودی کمی از لبه فاصله می‌گیرد تا سمت پیام‌ها در یک نگاه معلوم شود */

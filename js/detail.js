@@ -14,7 +14,7 @@
 import { state, uid, escapeHtml, debounce, showConfirmModal, trapFocus, MAX_LENGTH } from './core.js';
 import { getNow } from './time.js';
 import { findTask, saveTasks, enqueueDirtyTasks, moveToTrashById, sanitizeUrl } from './store.js';
-import { faShort, hasSessionAt, parseDateText, validatePlanRange, activeSessionId, isSessionInactive, promoteFutureSession } from './sessions.js';
+import { faShort, hasSessionAt, parseDateText, validatePlanRange, activeSessionId, isSessionInactive, promoteFutureSession, anchorSessionId, isAnchorSession } from './sessions.js';
 import {
     processImageFile,
     validateImageFile,
@@ -819,10 +819,14 @@ export function renderDetailSessions() {
     // (برای تسک غیرتکراری رفتار قبلی حفظ می‌شود تا حذف تاریخ اشتباه ممکن بماند.)
     const isRecur = !!(task.recur && task.recur !== 'none');
     const activeId = activeSessionId(task);
+    // ⚠️ 10.27: سررسید لنگر (شروع دوره) هرگز ✕ نمی‌گیرد — حتی وقتی با حذف
+    // سررسیدهای بعدی «فعال» شده باشد. حذفش دوره را بی‌ریشه می‌کند.
+    const anchorId = isRecur ? anchorSessionId(task) : null;
     el.innerHTML = list.map((s, i) => {
         const inactive = isSessionInactive(s, now);
         const active = !inactive && (!isRecur || String(s.id) === String(activeId));
         const canEdit = !_readOnly && (!isRecur || active);
+        const canDelete = canEdit && String(s.id) !== String(anchorId);
         const sessionLoc = s.location || task.location;
         const weatherLabel = i18nT('taskItem.weather.buttonAria');
         const weatherBtn = active && sessionLoc
@@ -849,7 +853,7 @@ export function renderDetailSessions() {
         const locBtn = canEdit
             ? `<button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>`
             : '';
-        const delBtn = canEdit
+        const delBtn = canDelete
             ? `<button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>`
             : '';
         const cls = ['session-item'];
@@ -1415,6 +1419,9 @@ export function bindDetailInputs() {
         if (!btn) return;
         const task = getDetailTask();
         if (!task) return;
+        // ⚠️ 10.27: نگهبان دوم — سررسید لنگر دوره حتی با DOM کهنه/کیبورد حذف نمی‌شود.
+        const target = (task.sessions || []).find(s => String(s.id) === btn.dataset.sess);
+        if (target && isAnchorSession(task, target)) return;
         task.sessions = task.sessions.filter(s => String(s.id) !== btn.dataset.sess);
         // ⚠️ 10.26: اگر جلسه‌ی فعال حذف شد و جلسه‌ی قبلی‌اش هنوز تاریخش بعد از
         // «حالا» است، همان فعال می‌شود (مهر doneAt برداشته می‌شود) تا due-line

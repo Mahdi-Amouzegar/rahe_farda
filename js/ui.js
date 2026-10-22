@@ -62,6 +62,7 @@ import {
 } from './render-diff.js';
 import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18nT } from './i18n.js';
 import { isLocalView } from './tasks/destination.js';
+import { sideClassFor } from './tasks/side.js';
 import { getSharedItems, getSharedItem } from './tasks/source.js';
 
 /**
@@ -80,15 +81,22 @@ function sharedFromBadge(task) {
 }
 
 /**
- * کلاس «سمت» کارت در نمای مشترک (10.26).
+ * کلاس «سمت» کارت — وظایف شخصی + نمای مشترک (10.26 / 10.27).
  *
- * ⚠️ در پیام خصوصی/گروه، نوار رنگی اولویت (`border-inline-end`) برای همه سمت
- * چپ بود و کارت‌های خودِ کاربر با کارت‌های مخاطب/اعضا قابل تشخیص نبود.
- * حالا کارت خودی `shared-mine` (نوار در سمت راست) و بقیه `shared-other` می‌گیرند.
+ * ⚠️ 10.26: در پیام خصوصی/گروه، نوار رنگی اولویت (`border-inline-end`) برای همه
+ * سمت چپ بود و کارت‌های خودِ کاربر با کارت‌های مخاطب/اعضا قابل تشخیص نبود.
+ * کارت خودی `shared-mine` (نوار در سمت راست) و بقیه `shared-other` می‌گیرند.
+ *
+ * ⚠️ 10.27: در «وظایف من» هم نوار سمت چپ بود و ظاهرش شبیه پیام دریافتی می‌شد؛
+ * این‌ها را خودمان ساخته‌ایم، پس `side-own` (نوار سمت راست) می‌گیرند — بدون
+ * حاشیه‌ی ۶ پیکسلی نمای مشترک، چون آنجا فقط برای تفکیک دو طرف است.
+ * تصمیم خالص در `tasks/side.js` است (تست‌پذیر).
  */
-function sharedSideClass(task) {
-    if (isLocalView()) return '';
-    return task && task._shared && task._shared.mine ? ' shared-mine' : ' shared-other';
+function sideClass(task) {
+    return sideClassFor({
+        local: isLocalView(),
+        mine: !!(task && task._shared && task._shared.mine)
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -724,7 +732,7 @@ function planHtml(task) {
             { action: 'delete', label: i18nT('taskItem.operations.deletePlan'), icon: '✕', className: 'danger' }
         ];
 
-    return `<div class="task-item plan-item prio-${task.priority}${sharedSideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
+    return `<div class="task-item plan-item prio-${task.priority}${sideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="plan-head">
             <button class="plan-caret" data-action="expand" aria-label="${i18nT('taskItem.plan.expand')}">${open ? '▾' : '◂'}</button>
             <div class="plan-head-main">
@@ -801,7 +809,7 @@ function taskItemHtml(task) {
         ];
 
     return `
-    <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}${sharedSideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
+    <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}${sideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="task-main-row">
             <button class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"
                 aria-label="${toggleAria}"

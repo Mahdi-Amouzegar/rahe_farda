@@ -149,6 +149,49 @@ export function promoteFutureSession(task, nowMs) {
 }
 
 /**
+ * شناسه‌ی جلسه‌ی «لنگر» یک دوره (10.27).
+ *
+ * ⚠️ لنگر = همان سررسیدی که برای «شروع دوره» انتخاب کرده‌ایم؛ یعنی قدیمی‌ترین
+ * جلسه‌ی آرایه. این جلسه نقطه‌ی شروع دوره است و حذفش کل دوره را بی‌ریشه
+ * می‌کند (نه تاریخچه می‌ماند، نه مبنایی برای `advanceRecur`)، پس دکمه‌ی ✕
+ * هرگز نباید به آن داده شود — حتی وقتی با حذف سررسیدهای بعدی «فعال» شده باشد.
+ *
+ * ⚠️ فیلد صریحی برای شروع دوره ذخیره نمی‌شود؛ قدیمی‌ترین `at` نزدیک‌ترین
+ * معادل است (جلسه‌های دوره همیشه بعد از لنگر ساخته می‌شوند).
+ *
+ * @param {object} task
+ * @returns {string|null}
+ */
+export function anchorSessionId(task) {
+    const list = (task && task.sessions) || [];
+    let anchor = null;
+    let best = Infinity;
+    for (const s of list) {
+        if (!s) continue;
+        const v = new Date(s.at).getTime();
+        if (!Number.isFinite(v)) continue;
+        if (v < best) { best = v; anchor = s; }
+    }
+    return anchor ? String(anchor.id) : null;
+}
+
+/**
+ * آیا این جلسه لنگر دوره است؟ (حذف‌ناشدنی)
+ *
+ * برای تسک غیرتکراری همیشه false است — آنجا کاربر باید بتواند تاریخ اشتباه
+ * را پاک کند (رفتار قبلی حفظ می‌شود).
+ *
+ * @param {object} task
+ * @param {object} session
+ * @returns {boolean}
+ */
+export function isAnchorSession(task, session) {
+    if (!task || !session) return false;
+    if (!task.recur || task.recur === 'none') return false;
+    return anchorSessionId(task) === String(session.id);
+}
+
+/**
  * اثر انگشت «فاز» due-line یک آیتم (10.21/BUG-20) — محض و ارزان.
  *
  * ⚠️ چرا لازم است: `sessionSummaryHtml` به زمان وابسته است (نزدیک‌ترین جلسه‌ی
