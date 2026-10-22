@@ -29,7 +29,7 @@ import {
 } from './media-upload.js';
 import { putCachedPhoto } from './media-cache.js';
 import { dataUrlToBlob } from './media.js';
-import { getDetailBridgeTask, saveSharedTask as persistSharedTask } from './tasks/source.js';
+import { getDetailBridgeTask, getDetailBridgeRoot, saveSharedTask as persistSharedTask } from './tasks/source.js';
 
 async function saveSharedTask(task) {
     const res = await persistSharedTask(task);
@@ -969,9 +969,11 @@ export function saveTasks() {
     });
     // پل جزئیات مشترک: ذخیره‌سازهای bulk جزئیات (عنوان/توضیح/تلفن/...) باید به API مقصد بروند.
     // بدون این، ویرایش فقط روی آبجکت زنده دیده می‌شود و با رفرش برمی‌گردد.
+    // ⚠️ 10.25: ریشه‌ی پل (والد) نوشته می‌شود — حتی وقتی جزئیات روی زیرکار باز است —
+    // و آیتم غیرخودی (جزئیات فقط‌خواندنی) هرگز نوشته نمی‌شود (وگرنه toast خطای الکی).
     try {
-        const bridge = state.currentDetailId ? getDetailBridgeTask(state.currentDetailId) : null;
-        if (bridge) {
+        const bridge = state.currentDetailId ? getDetailBridgeRoot() : null;
+        if (bridge && bridge._shared && bridge._shared.mine) {
             persistSharedTask(bridge).then(async (res) => {
                 if (res && !res.ok) {
                     const [{ showToast }, { t }] = await Promise.all([

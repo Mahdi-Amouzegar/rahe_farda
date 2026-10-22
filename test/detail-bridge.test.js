@@ -36,6 +36,7 @@ import { findTask, saveTask, saveTasks } from '../js/store.js';
 import {
     setDetailBridge,
     clearDetailBridge,
+    isDetailBridgeReadOnly,
     getSharedItem,
     __resetSharedForTest,
 } from '../js/tasks/source.js';
@@ -88,12 +89,57 @@ describe('detail bridge — findTask', () => {
         state.currentDetailId = null;
     });
 
-    it('پل برای آیتم دیگران ست نمی‌شود', async () => {
+    it('پل برای آیتم دیگران فقط با readOnly ست می‌شود (10.25)', async () => {
         seedBridge(other);
         state.currentDetailId = 'd1';
+        // بدون readOnly → رد
         expect(setDetailBridge(other)).toBe(false);
         expect(findTask('d1')).toBeNull();
+        // با readOnly → پل فعال، ولی قفل‌شده
+        expect(setDetailBridge(other, { readOnly: true })).toBe(true);
+        expect(isDetailBridgeReadOnly()).toBe(true);
+        const found = findTask('d1');
+        expect(found).not.toBeNull();
+        expect(found.task).toBe(other);
+        clearDetailBridge();
         state.currentDetailId = null;
+    });
+});
+
+describe('detail bridge — زیرکار برنامه (10.25)', () => {
+    const plan = {
+        id: 'g5',
+        text: 'سفر',
+        kind: 'plan',
+        _shared: { mine: false, dest: { type: 'group', groupId: 'gr1' }, remoteId: 'g5', senderName: 'رضا' },
+        children: [
+            { id: 'c1', text: 'رزرو هتل', kind: 'task', sessions: [] },
+            { id: 'c2', text: 'خرید بلیت', kind: 'task', sessions: [] },
+        ],
+    };
+
+    it('جزئیات زیرکارِ برنامه‌ی دیگران باز می‌شود (readOnly) و همان زیرکار برمی‌گردد', async () => {
+        seedBridge(plan);
+        const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
+        __setSharedItemsForTest([plan]);
+        state.currentDetailId = null;
+        expect(await openSharedDetail('c1')).toBe(true);
+        expect(detailCalls).toEqual(['c1']);
+        state.currentDetailId = 'c1';
+        const found = findTask('c1');
+        expect(found).not.toBeNull();
+        expect(found.task).toBe(plan.children[0]);
+        expect(isDetailBridgeReadOnly()).toBe(true);
+        clearDetailBridge();
+        state.currentDetailId = null;
+    });
+
+    it('getSharedRole برای زیرکار هم نقش می‌دهد (دابل‌کلیک)', async () => {
+        seedBridge(plan);
+        const { __setSharedItemsForTest, getSharedRole } = await import('../js/tasks/source.js');
+        __setSharedItemsForTest([plan]);
+        expect(getSharedRole('c2')).toEqual({ mine: false });
+        expect(getSharedRole('nope')).toBeNull();
     });
 });
 
@@ -114,6 +160,22 @@ describe('detail bridge — save routing', () => {
         expect(state.tasks).toEqual([]);
         state.currentDetailId = null;
     });
+
+    it('پل فقط‌خواندنی هیچ PATCHی نمی‌فرستد (10.25)', async () => {
+        seedBridge(other);
+        const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
+        __setSharedItemsForTest([other]);
+        state.currentDetailId = 'd1';
+        setDetailBridge(other, { readOnly: true });
+        await saveTasks();
+        await new Promise((r) => setTimeout(r, 20));
+        const patches = apiCalls.filter(
+            (c) => c.opts && c.opts.method === 'PATCH'
+        );
+        expect(patches.length).toBe(0);
+        clearDetailBridge();
+        state.currentDetailId = null;
+    });
 });
 
 describe('detail bridge — openSharedDetail', () => {    it('خودی: پل ست + openDetail صدا زده می‌شود', async () => {
@@ -126,12 +188,23 @@ describe('detail bridge — openSharedDetail', () => {    it('خودی: پل س�
         state.currentDetailId = null;
     });
 
-    it('دیگران: باز نمی‌شود', async () => {
+    it('دیگران: باز می‌شود ولی فقط‌خواندنی (10.25)', async () => {
         seedBridge(other);
         const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
         __setSharedItemsForTest([other]);
         state.currentDetailId = null;
-        expect(await openSharedDetail('d1')).toBe(false);
+        expect(await openSharedDetail('d1')).toBe(true);
+        expect(detailCalls).toEqual(['d1']);
+        expect(isDetailBridgeReadOnly()).toBe(true);
+        clearDetailBridge();
+        state.currentDetailId = null;
+    });
+
+    it('آیتم ناموجود → false', async () => {
+        seedBridge(other);
+        const { __setSharedItemsForTest } = await import('../js/tasks/source.js');
+        __setSharedItemsForTest([other]);
+        expect(await openSharedDetail('nope')).toBe(false);
         expect(detailCalls).toEqual([]);
     });
 });

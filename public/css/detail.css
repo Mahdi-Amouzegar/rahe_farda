@@ -56,6 +56,65 @@
         box-shadow: var(--shadow-lg);
     }
 
+    /* ═══ 10.25 — فقط خواندنی (وظیفه‌ی دیگران در DM/گروه) ═══ */
+
+    .detail-readonly-badge {
+        flex: none;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        color: var(--accent-cyan);
+        border: 1px solid var(--accent-cyan-border, var(--border-subtle));
+        background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
+        white-space: nowrap;
+    }
+
+    .detail-readonly-banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        border-radius: var(--radius-md, 12px);
+        border: 1px dashed var(--accent-cyan-border, var(--border-subtle));
+        background: color-mix(in srgb, var(--accent-cyan) 8%, transparent);
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        line-height: 1.7;
+    }
+
+    /* قفل بصری: فیلدها شبیه متن خوانده‌شده، بدون افکت فوکوس */
+    .detail-page.readonly .field input[readonly],
+    .detail-page.readonly .field textarea[readonly] {
+        background: transparent;
+        border-color: transparent;
+        padding-inline: 2px;
+        cursor: default;
+        color: var(--text-primary);
+    }
+
+    .detail-page.readonly .field input[readonly]:focus,
+    .detail-page.readonly .field textarea[readonly]:focus {
+        outline: none;
+        border-color: transparent;
+        box-shadow: none;
+    }
+
+    .detail-page.readonly .field select:disabled,
+    .detail-page.readonly .field input:disabled {
+        opacity: 0.75;
+        cursor: default;
+    }
+
+    .detail-page.readonly .pin-row {
+        display: none;
+    }
+
+    .detail-page.readonly .photo-actions {
+        display: none !important;
+    }
+
     /* ═══ Field ═══ */
     .field {
         display: flex;

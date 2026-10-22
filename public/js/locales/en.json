@@ -604,6 +604,11 @@
   "detail": {
     "title": "Task details",
     "back": "Back to list",
+    "readOnly": {
+      "badge": "👁 Read-only",
+      "hint": "Someone else sent this task — you can view it and download its images only.",
+      "from": "{name} sent this task — you can view it and download its images only."
+    },
     "delete": "Delete this task",
     "deleteConfirmTitle": "Delete task",
     "deleteConfirmMessage": "\"{text}\" will be moved to trash?",

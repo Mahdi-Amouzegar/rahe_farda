@@ -128,6 +128,29 @@ export function getSharedItem(id) {
     return _items.find((t) => String(t.id) === String(id)) || null;
 }
 
+/**
+ * یافتن تسک مشترک در هر عمقی (سطح‌بالا یا زیرکار برنامه).
+ *
+ * ⚠️ 10.25: دکمه‌ی «جزئیات» روی ردیف زیرکار هم هست، ولی `getSharedItem`
+ * فقط سطح‌بالا را می‌دید؛ نتیجه: جزئیات زیرکار برنامه‌ی مشترک اصلاً باز
+ * نمی‌شد (نه برای خودی، نه برای مخاطب).
+ *
+ * @param {string} id
+ * @returns {{ item: object, childId: string|null }|null}
+ */
+export function getSharedTaskDeep(id) {
+    const key = String(id);
+    for (const t of _items) {
+        if (!t) continue;
+        if (String(t.id) === key) return { item: t, childId: null };
+        if (t.kind === 'plan' && Array.isArray(t.children)) {
+            const c = t.children.find(x => x && String(x.id) === key);
+            if (c) return { item: t, childId: key };
+        }
+    }
+    return null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // کش مقصدها برای یادآور پس‌زمینه (REQ-02)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -305,9 +328,9 @@ export function getCachedSharedAll() {
 }
 
 export function getSharedRole(id) {
-    const item = getSharedItem(id);
-    if (!item || !item._shared) return null;
-    return { mine: !!item._shared.mine };
+    const hit = getSharedTaskDeep(id);
+    if (!hit || !hit.item._shared) return null;
+    return { mine: !!hit.item._shared.mine };
 }
 
 function myId() {
@@ -362,6 +385,8 @@ export function __resetSharedForTest() {
     _loading = false;
     _error = null;
     _detailBridge = null;
+    _detailBridgeChildId = null;
+    _detailBridgeReadOnly = false;
     try { localStorage.removeItem(SEEN_STORAGE_KEY); } catch { /* silent */ }
 }
 
@@ -588,18 +613,55 @@ export async function deleteSharedTask(remoteId) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 let _detailBridge = null;
+let _detailBridgeChildId = null;
+let _detailBridgeReadOnly = false;
 
 /**
- * ثبت پل برای باز کردن جزئیات (فقط خودی).
+ * ثبت پل برای باز کردن جزئیات.
+ *
+ * ⚠️ 10.25: حالا آیتم **دیگران** هم پل می‌گیرد، ولی با `readOnly: true`.
+ * دلیل: مخاطب/عضو گروه باید بتواند جزئیات وظیفه‌ی فرستاده‌شده را ببیند
+ * (متن، تاریخ‌ها، مکان، عکس‌ها) بدون اینکه چیزی را عوض کند. پیش از این
+ * `openSharedDetail` برای آیتم غیرخودی `false` برمی‌گرداند و کلیک «جزئیات»
+ * هیچ کاری نمی‌کرد.
+ *
+ * @param {object} item — آیتم سطح‌بالای مشترک (صاحب `_shared`)
+ * @param {{readOnly?: boolean, childId?: string}} [opts]
+ * @returns {boolean}
  */
-export function setDetailBridge(item) {
-    if (!item || !item._shared || !item._shared.mine) return false;
+export function setDetailBridge(item, opts) {
+    if (!item || !item._shared) return false;
+    const o = opts || {};
+    const mine = Boolean(item._shared.mine);
+    const readOnly = Boolean(o.readOnly);
+    if (!mine && !readOnly) return false;
     _detailBridge = item;
+    _detailBridgeChildId = o.childId ? String(o.childId) : null;
+    _detailBridgeReadOnly = readOnly || !mine;
     return true;
 }
 
 export function clearDetailBridge() {
     _detailBridge = null;
+    _detailBridgeChildId = null;
+    _detailBridgeReadOnly = false;
+}
+
+/**
+ * آیا جزئیات باز، «فقط خواندنی» است؟ (آیتم دیگران)
+ * @returns {boolean}
+ */
+export function isDetailBridgeReadOnly() {
+    return _detailBridgeReadOnly;
+}
+
+/**
+ * آیتم سطح‌بالای پل (صاحب `_shared`) — برای ذخیره‌ی bulk؛ حتی وقتی جزئیات
+ * روی یک زیرکار باز است، نوشتن باید روی والد انجام شود.
+ * @returns {object|null}
+ */
+export function getDetailBridgeRoot() {
+    return _detailBridge;
 }
 
 let _reconcileSubscribed = false;
@@ -613,7 +675,11 @@ function ensureReconcileSubscribed() {
         if (!_detailBridge) return;
         const hadBridge = _detailBridge;
         _detailBridge = null;
+        _detailBridgeChildId = null;
+        _detailBridgeReadOnly = false;
         if (!hadBridge || !hadBridge._shared) return;
+        // ⚠️ 10.25: جزئیات فقط‌خواندنی چیزی ننوشته که نیاز به تطبیق داشته باشد.
+        if (!hadBridge._shared.mine) return;
         try {
             const dest = getDestination();
             const sameDest = dest.type !== 'local' &&
@@ -631,12 +697,18 @@ ensureReconcileSubscribed();
 
 /**
  * آبجکت پل اگر id همان جزئیات باز باشد، وگرنه null.
+ * اگر جزئیات روی زیرکارِ یک برنامه‌ی مشترک باز شده باشد، همان زیرکار برمی‌گردد.
  */
 export function getDetailBridgeTask(id) {
     try {
         if (!_detailBridge) return null;
         if (!state.currentDetailId) return null;
         if (String(state.currentDetailId) !== String(id)) return null;
+        if (_detailBridgeChildId) {
+            if (String(_detailBridgeChildId) !== String(id)) return null;
+            const c = (_detailBridge.children || []).find(x => x && String(x.id) === String(id));
+            return c || null;
+        }
         if (String(_detailBridge.id) !== String(id)) return null;
         return _detailBridge;
     } catch {

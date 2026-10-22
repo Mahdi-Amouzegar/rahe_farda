@@ -2520,6 +2520,12 @@ taskList.addEventListener('click', e => {
                 flyToShared(id);
                 return;
             }
+            // ⚠️ 10.25: «جزئیات» برای آیتم دیگران هم باز می‌شود، ولی صفحه در
+            // حالت فقط‌خواندنی می‌آید (بدون ویرایش/حذف؛ عکس‌ها قابل دیدن و دانلود).
+            if (action === 'detail') {
+                openSharedDetail(id);
+                return;
+            }
             return;
         }
         if (action === 'toggle') {

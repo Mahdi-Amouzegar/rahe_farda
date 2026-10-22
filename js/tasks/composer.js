@@ -18,6 +18,7 @@ import {
     deleteSharedTask,
     setDetailBridge,
     getSharedItem,
+    getSharedTaskDeep,
 } from './source.js';
 import { createDmTask } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
@@ -75,13 +76,21 @@ export async function submitTask(kind) {
 }
 
 /**
- * باز کردن جزئیات تسک خودیِ مشترک (پل زنده زیر دست detail).
- * دیگران: false (read-only می‌ماند).
+ * باز کردن جزئیات تسک مشترک (پل زنده زیر دست detail).
+ *
+ * ⚠️ 10.25: برای آیتم **دیگران** هم باز می‌شود، ولی در حالت «فقط خواندنی»
+ * (`readOnly`) — صفحه پر می‌شود، همه‌ی ورودی‌ها قفل و دکمه‌های ویرایش/حذف
+ * پنهان می‌شوند؛ پیش‌نمایش و دانلود عکس باقی می‌ماند.
+ * زیرکار برنامه هم پشتیبانی می‌شود (`childId`).
+ *
+ * @param {string} remoteId
+ * @returns {Promise<boolean>}
  */
 export async function openSharedDetail(remoteId) {
-    const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return false;
-    if (!setDetailBridge(item)) return false;
+    const hit = getSharedTaskDeep(remoteId);
+    if (!hit || !hit.item._shared) return false;
+    const mine = Boolean(hit.item._shared.mine);
+    if (!setDetailBridge(hit.item, { readOnly: !mine, childId: hit.childId })) return false;
     const { openDetail } = await import('../detail.js');
     openDetail(remoteId);
     return true;

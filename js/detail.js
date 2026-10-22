@@ -48,7 +48,103 @@ import {
 } from './map.js';
 import { openPicker } from './picker.js';
 import { events, EV, CALLBACK_TO_EVENT } from './events.js';
+import { isDetailBridgeReadOnly, getDetailBridgeRoot } from './tasks/source.js';
 import { formatDate, formatNumber, getLang, t as i18nT } from './i18n.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// حالت «فقط خواندنی» (10.25)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// وقتی مخاطب/عضو گروه روی «جزئیات» وظیفه‌ای می‌زند که خودش نفرستاده، صفحه
+// باید **دیده** شود ولی هیچ‌چیز ویرایش نشود: متن‌ها readOnly، selectها
+// disabled، دکمه‌های افزودن/حذف/جابه‌جایی پنهان. پیش‌نمایش و دانلود عکس
+// دست‌نخورده می‌ماند (فقط حذف/افزودن عکس پنهان است).
+//
+// ⚠️ فلگ در لحظه‌ی openDetail از پل مشترک خوانده می‌شود (نه از خود تسک)، چون
+// زیرکارِ برنامه `_shared` ندارد و وضعیت فقط روی والد است.
+let _readOnly = false;
+
+/**
+ * آیا صفحه‌ی جزئیاتِ باز، فقط‌خواندنی است؟ (برای تست/دیگر ماژول‌ها)
+ * @returns {boolean}
+ */
+export function isDetailReadOnly() {
+    return _readOnly;
+}
+
+/**
+ * اعمال/برداشتن قفل ویرایش روی DOM جزئیات.
+ * (export فقط برای تست — فراخوان اصلی openDetail است)
+ * @param {boolean} ro
+ */
+export function applyDetailReadOnly(ro) {
+    const pageEl = document.getElementById('detailPage');
+    if (!pageEl) return;
+    pageEl.classList.toggle('readonly', ro);
+
+    // متن‌ها: readOnly (قابل انتخاب و کپی، غیرقابل تغییر)
+    ['fTitle', 'fDesc', 'fPhone', 'fAddr', 'fUrl'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if ('readOnly' in el) el.readOnly = ro;
+        el.setAttribute('aria-readonly', ro ? 'true' : 'false');
+    });
+    // انتخاب‌گرها/چک‌باکس: disabled (readOnly ندارند)
+    ['fPriority', 'fRecur', 'fRecurN', 'fPin'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = ro;
+    });
+
+    // دکمه‌های تغییردهنده — در حالت خواندنی پنهان
+    ['addSessionBtn', 'detailPlanStartBtn', 'detailPlanEndBtn',
+        'detailLocChange', 'detailLocRemove', 'detailDelete', 'timerToggle'
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = ro;
+    });
+    // پاک‌کردن تاریخ‌های برنامه حالت خودش را دارد؛ در خواندنی همیشه پنهان
+    const planClear = document.getElementById('detailPlanDatesClear');
+    if (planClear) {
+        if (ro) planClear.hidden = true;
+        else planClear.hidden = !(getDetailTask() && (getDetailTask().startAt || getDetailTask().endAt));
+    }
+    // نوار «افزودن عکس» (پیش‌نمایش/دانلود عکس‌ها می‌ماند)
+    const photoActions = document.querySelector('#detailPage .photo-actions');
+    if (photoActions) photoActions.hidden = ro;
+
+    const banner = document.getElementById('detailReadonlyBanner');
+    if (banner) banner.hidden = !ro;
+    const badge = document.getElementById('detailReadonlyBadge');
+    if (badge) badge.hidden = !ro;
+    // متن بنر: نام فرستنده اگر معلوم باشد (DM/گروه)
+    const bannerText = document.getElementById('detailReadonlyText');
+    if (bannerText && ro) {
+        let sender = null;
+        try {
+            const root = getDetailBridgeRoot();
+            sender = root && root._shared ? root._shared.senderName : null;
+        } catch { /* silent */ }
+        bannerText.textContent = sender
+            ? i18nT('detail.readOnly.from', { name: sender })
+            : i18nT('detail.readOnly.hint');
+    }
+
+    // چیپ پیشنهاد تاریخ روی عنوان/توضیح در خواندنی معنا ندارد
+    if (ro) hideDetailSmart();
+
+    // برچسب «ویرایش‌پذیر» در بخش اصلی برای آیتم دیگران گمراه‌کننده است.
+    // در حالت خواندنی `data-i18n` برداشته می‌شود تا سوییچ زبان متن را برنگرداند.
+    const basicStatus = pageEl.querySelector('[data-detail-section="basic"] .detail-section-status');
+    if (basicStatus) {
+        if (ro) {
+            basicStatus.removeAttribute('data-i18n');
+            basicStatus.textContent = i18nT('detail.readOnly.badge');
+        } else {
+            basicStatus.setAttribute('data-i18n', 'detail.sections.basic.status');
+            basicStatus.textContent = i18nT('detail.sections.basic.status');
+        }
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ⚠️ فاز ۴D.4b-fix-2: Photo Snackbar
@@ -578,6 +674,9 @@ export function openDetail(id) {
     const task = getDetailTask();
     if (!task) return;
 
+    // ⚠️ 10.25: آیتم دیگران → صفحه باز می‌شود ولی فقط‌خواندنی.
+    _readOnly = isDetailBridgeReadOnly();
+
     resetDetailSmart();
 
     document.getElementById('detailTitle').textContent = (task.kind === 'plan' ? '📁 ' : '') + task.text;
@@ -604,6 +703,10 @@ export function openDetail(id) {
     renderTimer();
     clearInterval(timerTick);
     timerTick = setInterval(() => { if (getDetailTask()) renderTimer(); }, 60000);
+    // ⚠️ 10.25: قفل/بازکردن ویرایش باید بعد از پر شدن همه‌ی فیلدها باشد،
+    // وگرنه مقداردهی‌ها روی کنترل‌های disabled می‌نشینند (مقدار می‌گیرند، ولی
+    // منطق renderPlanDates/renderTimer هم باید اول اجرا شده باشد).
+    applyDetailReadOnly(_readOnly);
     pageEl.hidden = false;
     if (window.matchMedia('(max-width: 900px)').matches) {
         document.body.style.overflow = 'hidden';
@@ -626,6 +729,9 @@ export function closeDetail() {
 
     const closedId = state.currentDetailId;
     state.currentDetailId = null;
+    _readOnly = false;
+    const pageEl = document.getElementById('detailPage');
+    if (pageEl) pageEl.classList.remove('readonly');
     clearInterval(timerTick);
     document.getElementById('detailPage').hidden = true;
     document.body.style.overflow = '';
@@ -724,10 +830,9 @@ export function renderDetailSessions() {
         const remindAria = i18nT('detail.session.remindAria');
         const locAria = i18nT('detail.session.locationAria');
         const delAria = i18nT('detail.session.removeAria', { n: formatNumber(i + 1) });
-        return `<div class="session-item ${past ? 'past' : ''}${done ? ' done' : ''}">
-            <span class="session-num">${formatNumber(i + 1)}</span>
-            <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
-            <select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}">
+        // ⚠️ 10.25: در حالت فقط‌خواندنی، انتخاب یادآور قفل و دکمه‌های
+        // مکان/حذف پنهان‌اند (کاربر فقط تاریخ‌ها را می‌بیند).
+        const remindSelect = `<select class="sess-remind" data-sess-rem="${escapeHtml(String(s.id))}" aria-label="${remindAria}"${_readOnly ? ' disabled' : ''}>
                 <option value=""${s.remindMin == null ? ' selected' : ''}>${i18nT('detail.session.remindDefault')}</option>
                 <option value="5"${s.remindMin === 5 ? ' selected' : ''}>${i18nT('detail.session.remind5')}</option>
                 <option value="15"${s.remindMin === 15 ? ' selected' : ''}>${i18nT('detail.session.remind15')}</option>
@@ -736,9 +841,17 @@ export function renderDetailSessions() {
                 <option value="180"${s.remindMin === 180 ? ' selected' : ''}>${i18nT('detail.session.remind180')}</option>
                 <option value="1440"${s.remindMin === 1440 ? ' selected' : ''}>${i18nT('detail.session.remind1440')}</option>
                 <option value="0"${s.remindMin === 0 ? ' selected' : ''}>${i18nT('detail.session.remindOff')}</option>
-            </select>
-            <button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>
-            <button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>
+            </select>`;
+        const locBtn = _readOnly ? '' :
+            `<button class="btn-icon btn-detail ${s.location ? 'has-loc' : ''}" data-sess-loc="${escapeHtml(String(s.id))}" aria-label="${locAria}">📍</button>`;
+        const delBtn = _readOnly ? '' :
+            `<button class="btn-icon btn-delete" data-sess="${escapeHtml(String(s.id))}" aria-label="${delAria}">✕</button>`;
+        return `<div class="session-item ${past ? 'past' : ''}${done ? ' done' : ''}">
+            <span class="session-num">${formatNumber(i + 1)}</span>
+            <span class="session-date">📅 ${faShort(s.at)}${pastLabel} ${weatherBtn}</span>
+            ${remindSelect}
+            ${locBtn}
+            ${delBtn}
         </div>`;
     }).join('');
 }
@@ -892,7 +1005,9 @@ async function renderDetailPhotos() {
 
         const uploadState = upload ? upload.status : null;
         const uploadBadge = renderUploadBadge(uploadState, p.id);
-        const delBtn = `<button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>`;
+        // ⚠️ 10.25: در فقط‌خواندنی، دکمه‌ی حذف عکس رندر نمی‌شود (افزودن هم با
+        // پنهان‌شدن نوار .photo-actions). پیش‌نمایش/دانلود دست‌نخورده است.
+        const delBtn = _readOnly ? '' : `<button data-photo-del="${escapeHtml(String(p.id))}" aria-label="${delAria}">✕</button>`;
         if (!src) {
             return `
         <div class="photo-thumb photo-thumb--loading">
@@ -1044,6 +1159,7 @@ function renderTimer() {
 }
 
 function toggleTimer() {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     if (task.timerStartedAt) {
@@ -1151,6 +1267,7 @@ function toggleRecurDay(v) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const debouncedSaveTitle = debounce(() => {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     task.text = document.getElementById('fTitle').value.trim().replace(/\s+/g, ' ').slice(0, MAX_LENGTH);
@@ -1161,6 +1278,7 @@ const debouncedSaveTitle = debounce(() => {
 }, 300);
 
 const debouncedSaveDesc = debounce(() => {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     task.description = document.getElementById('fDesc').value.slice(0, 1000);
@@ -1169,6 +1287,7 @@ const debouncedSaveDesc = debounce(() => {
 }, 500);
 
 const debouncedSavePhone = debounce(() => {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     task.phone = document.getElementById('fPhone').value.trim().slice(0, 20);
@@ -1177,6 +1296,7 @@ const debouncedSavePhone = debounce(() => {
 }, 300);
 
 const debouncedSaveAddr = debounce(() => {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     task.address = document.getElementById('fAddr').value.slice(0, 500);
@@ -1185,6 +1305,7 @@ const debouncedSaveAddr = debounce(() => {
 }, 500);
 
 const debouncedSaveUrl = debounce(() => {
+    if (_readOnly) return;
     const task = getDetailTask();
     if (!task) return;
     task.url = sanitizeUrl(document.getElementById('fUrl').value);
@@ -1246,6 +1367,7 @@ export function bindDetailInputs() {
     attachDetailSmartSuggest(document.getElementById('fDesc'), 'fDesc');
 
     document.getElementById('addSessionBtn').addEventListener('click', () => {
+        if (_readOnly) return;
         openPicker('session', iso => {
             const task = getDetailTask();
             if (!task) return;
@@ -1261,6 +1383,7 @@ export function bindDetailInputs() {
         });
     });
     document.getElementById('sessList').addEventListener('click', e => {
+        if (_readOnly) return;
         const locBtn = e.target.closest('[data-sess-loc]');
         if (locBtn) {
             state.relocateSess = { taskId: state.currentDetailId, sessId: locBtn.dataset.sessLoc };
@@ -1288,6 +1411,7 @@ export function bindDetailInputs() {
         flashSaved(i18nT('detail.session.removed'));
     });
     document.getElementById('sessList').addEventListener('change', e => {
+        if (_readOnly) return;
         const sel = e.target.closest('[data-sess-rem]');
         if (!sel) return;
         const task = getDetailTask();
@@ -1307,11 +1431,13 @@ export function bindDetailInputs() {
         enterLocationPickMode(t.id, 'show');
     });
     document.getElementById('detailLocChange').addEventListener('click', () => {
+        if (_readOnly) return;
         const t = getDetailTask();
         if (!t) return;
         enterLocationPickMode(t.id, 'change');
     });
     document.getElementById('detailLocRemove').addEventListener('click', () => {
+        if (_readOnly) return;
         const t = getDetailTask();
         if (!t) return;
         t.location = null;
@@ -1322,6 +1448,7 @@ export function bindDetailInputs() {
         flashSaved(i18nT('detail.location.removed'));
     });
     document.getElementById('fPriority').addEventListener('change', e => {
+        if (_readOnly) return;
         const task = getDetailTask();
         if (!task) return;
         task.priority = ['high', 'medium', 'low'].includes(e.target.value) ? e.target.value : 'medium';
@@ -1357,6 +1484,7 @@ export function bindDetailInputs() {
         flashSaved(ok ? i18nT('detail.url.copied') : i18nT('detail.url.copyFailed'));
     });
     document.getElementById('fPin').addEventListener('change', e => {
+        if (_readOnly) return;
         const task = getDetailTask();
         if (!task) return;
         task.pinned = e.target.checked;
@@ -1365,14 +1493,17 @@ export function bindDetailInputs() {
         flashSaved();
     });
     document.getElementById('fRecurWeekChips').addEventListener('click', e => {
+        if (_readOnly) return;
         const b = e.target.closest('[data-wday]');
         if (b) toggleRecurDay(parseInt(b.dataset.wday, 10));
     });
     document.getElementById('fRecurMonthChips').addEventListener('click', e => {
+        if (_readOnly) return;
         const b = e.target.closest('[data-mday]');
         if (b) toggleRecurDay(parseInt(b.dataset.mday, 10));
     });
     document.getElementById('fRecur').addEventListener('change', e => {
+        if (_readOnly) return;
         const task = getDetailTask();
         if (!task) return;
         const v = e.target.value;
@@ -1403,6 +1534,7 @@ export function bindDetailInputs() {
         flashSaved(warn || undefined);
     });
     document.getElementById('fRecurN').addEventListener('change', e => {
+        if (_readOnly) return;
         const task = getDetailTask();
         if (!task) return;
         const maxN = task.recur === 'hourly' ? 168 : 365;
@@ -1477,6 +1609,7 @@ export function bindDetailInputs() {
 
     const photoInput = document.getElementById('photoInput');
     photoInput.addEventListener('change', async () => {
+        if (_readOnly) { photoInput.value = ''; return; }
         const task = getDetailTask();
         if (!task) { photoInput.value = ''; return; }
 
@@ -1604,6 +1737,12 @@ export function bindDetailInputs() {
     });
     
     document.getElementById('photoGrid').addEventListener('click', async e => {
+        if (_readOnly) {
+            // ⚠️ 10.25: فقط پیش‌نمایش؛ حذف/تلاش مجدد آپلود در خواندنی معنا ندارد.
+            const img = e.target.closest('[data-photo-view]');
+            if (img) openLightbox(img.src, { photoId: img.getAttribute('data-photo-view'), alt: img.alt });
+            return;
+        }
         const retry = e.target.closest('[data-photo-retry]');
         if (retry) {
             const task = getDetailTask();
@@ -1649,6 +1788,7 @@ export function bindDetailInputs() {
     document.getElementById('timerToggle').addEventListener('click', toggleTimer);
     document.getElementById('detailBack').addEventListener('click', closeDetail);
     document.getElementById('detailDelete').addEventListener('click', async () => {
+        if (_readOnly) return;
         const task = getDetailTask();
         if (!task) return;
         const ok = await showConfirmModal({
