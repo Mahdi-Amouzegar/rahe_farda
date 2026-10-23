@@ -99,6 +99,22 @@ function sideClass(task) {
     });
 }
 
+/**
+ * دکمه‌ی «انجام شدن همه زیرکارها» چه زمانی نمایش داده شود؟
+ *
+ * ⚠️ 10.29 (BUG-34): در نمای مشترک، دکمه روی برنامه‌ی **دیگران** هم رندر می‌شد
+ * ولی dispatcher برای آیتم غیرخودی هر اکشنی جز expand/locate/detail را رد
+ * می‌کند → دکمه‌ی مرده. حالا فقط برای وظایف شخصی یا برنامه‌ی خودی می‌آید.
+ *
+ * @param {object} task
+ * @returns {boolean}
+ */
+function canBulkCheck(task) {
+    if (!task || task.kind !== 'plan') return false;
+    if (isLocalView()) return true;
+    return !!(task._shared && task._shared.mine);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Local state
 // ═══════════════════════════════════════════════════════════════════════════
@@ -749,7 +765,7 @@ function planHtml(task) {
             ${(task.photos || []).length ? `<span title="${formatNumber(task.photos.length)} ${i18nT('detail.sections.photos.countAria')}">📷</span>` : ''}
             ${hasLoc ? `<button class="mini-link" data-action="locate" aria-label="${i18nT('taskItem.map.showAria')}">${i18nT('taskItem.map.showButton')}</button>` : ''}
             <div class="mini-progress"><div class="mini-progress-fill" data-w="${pct}"></div></div>
-            ${st.total > 0 && st.done < st.total ? `<button class="mini-link" data-action="check-all" aria-label="${i18nT('taskItem.operations.checkAll')}">✓ ${i18nT('taskItem.operations.checkAll')}</button>` : ''}
+            ${st.total > 0 && st.done < st.total && canBulkCheck(task) ? `<button class="mini-link" data-action="check-all" aria-label="${i18nT('taskItem.operations.checkAll')}">✓ ${i18nT('taskItem.operations.checkAll')}</button>` : ''}
         </div>
         ${(task.sessions && task.sessions.length) ? `<div class="plan-session-row">${sessionSummaryHtml(task)}</div>` : ''}
         ${open ? `<div class="plan-body">

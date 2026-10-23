@@ -757,7 +757,11 @@
     }
 
     .task-item:hover {
-        border-color: var(--accent-cyan-border);
+        /* ⚠️ 10.29: رنگ هاور در یک متغیر نگه داشته می‌شود تا نوار اولویت
+           کارت خودی (که با specificity بالاتر رنگ خودش را می‌گذاشت) هم
+           بتواند همان رنگ را بگیرد. */
+        --task-hover-border: var(--accent-cyan-border);
+        border-color: var(--task-hover-border);
         box-shadow:
             0 8px 30px rgba(0, 0, 0, 0.1),
             0 0 20px var(--accent-cyan-soft);
@@ -809,6 +813,18 @@
     /* کارت خودی کمی از لبه فاصله می‌گیرد تا سمت پیام‌ها در یک نگاه معلوم شود */
     .task-item.shared-mine {
         margin-inline-end: 6px;
+    }
+
+    /* ⚠️ 10.29 (BUG-35): در هاور باید **کل** کادر آبی شود، ولی نوار اولویت
+       سمت راست رنگی می‌ماند. دلیل: قاعده‌ی `.side-own.prio-*` سه کلاس دارد
+       (0,3,0) و از `.task-item:hover` (0,2,0) قوی‌تر است، پس
+       `border-inline-start-color` را نادیده می‌گیرد. اینجا با همان وزن
+       (سه کلاس + هاور) رنگ نوار را به رنگ هاورِ بقیه‌ی کادر برمی‌گردانیم.
+       کارت مخاطب (نوار سمت چپ) از این مشکل رنج نمی‌برد چون قاعده‌ی
+       `.task-item.prio-*` فقط دو کلاس دارد. */
+    .task-item.side-own:hover,
+    .task-item.shared-mine:hover {
+        border-inline-start-color: var(--task-hover-border, var(--accent-primary));
     }
 
     .task-item.shared-other {
@@ -1318,7 +1334,8 @@
 
     .task-item:hover,
     .plan-item:hover {
-        border-color: var(--accent-primary);
+        --task-hover-border: var(--accent-primary);
+        border-color: var(--task-hover-border);
         box-shadow: var(--shadow-sm);
     }
 

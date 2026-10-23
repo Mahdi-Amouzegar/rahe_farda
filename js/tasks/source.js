@@ -548,12 +548,28 @@ export function waitSharedSaves() {
 
 /**
  * ویرایش عنوان تسک خودی در نمای مشترک.
+ *
+ * ⚠️ 10.29 (هم‌خانواده‌ی BUG-33): ویرایش درون‌خطی عنوان **زیرکار** هم id زیرکار
+ * می‌فرستد؛ نسخه‌ی قبلی با `getSharedItem` (فقط سطح‌بالا) آن را پیدا نمی‌کرد و
+ * «ذخیره ناموفق بود» می‌داد. حالا زیرکار در والدش به‌روز می‌شود.
  */
 export async function updateSharedTaskText(remoteId, title) {
-    const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const next = { ...stripShared(item), text: String(title).slice(0, 200) };
-    return writeSharedTask(item._shared.dest, remoteId, next);
+    const hit = getSharedTaskDeep(remoteId);
+    if (!hit || !hit.item._shared || !hit.item._shared.mine) return { ok: false };
+    const root = hit.item;
+    const clean = String(title).slice(0, 200);
+    const next = { ...stripShared(root) };
+    if (hit.childId) {
+        const kids = Array.isArray(next.children) ? next.children : [];
+        const idx = kids.findIndex((c) => c && String(c.id) === String(hit.childId));
+        if (idx < 0) return { ok: false };
+        const children = kids.slice();
+        children[idx] = { ...kids[idx], text: clean };
+        next.children = children;
+    } else {
+        next.text = clean;
+    }
+    return writeSharedTask(root._shared.dest, root.id, next);
 }
 
 /**
@@ -578,14 +594,65 @@ export function persistAdvancedShared(task) {
  * «تکمیل» می‌شد و due-line هرگز جلو نمی‌رفت.
  */
 export async function toggleSharedTask(remoteId) {
-    const item = getSharedItem(remoteId);
-    if (!item || !item._shared || !item._shared.mine) return { ok: false };
-    const next = { ...stripShared(item) };
-    let completed = !item.completed;
+    // ⚠️ 10.29 (BUG-33): قبلاً `getSharedItem(remoteId)` صدا زده می‌شد که فقط
+    // سطح‌بالا را می‌دید؛ تیک یک **زیرکار** برنامه در DM/گروه، id زیرکار را
+    // می‌فرستاد → آیتم پیدا نمی‌شد → `{ok:false}` و پیام «ذخیره ناموفق بود»
+    // بدون اینکه هیچ تیکی بخورد. حالا مسیر عمیق استفاده می‌شود و نوشتن همیشه
+    // روی **والد** انجام می‌شود (payload کامل با children).
+    const hit = getSharedTaskDeep(remoteId);
+    if (!hit || !hit.item._shared || !hit.item._shared.mine) return { ok: false };
+    const root = hit.item;
+    const next = { ...stripShared(root) };
+
+    if (hit.childId) {
+        const kids = Array.isArray(next.children) ? next.children : [];
+        const idx = kids.findIndex((c) => c && String(c.id) === String(hit.childId));
+        if (idx < 0) return { ok: false };
+        const child = { ...kids[idx] };
+        child.completed = !child.completed;
+        child.completedAt = child.completed ? new Date().toISOString() : null;
+        // مثل نسخه‌ی شخصی: تیک دوره = مصرف جلسه‌ی جاری + ساخت جلسه‌ی بعدی
+        if (child.completed && advanceRecurOnTick(child)) {
+            child.completed = false;
+            child.completedAt = null;
+        }
+        const children = kids.slice();
+        children[idx] = child;
+        next.children = children;
+        return writeSharedTask(root._shared.dest, root.id, next);
+    }
+
+    let completed = !root.completed;
     if (completed && advanceRecurOnTick(next)) completed = false;
     next.completed = completed;
     next.completedAt = completed ? new Date().toISOString() : null;
-    return writeSharedTask(item._shared.dest, remoteId, next);
+    return writeSharedTask(root._shared.dest, root.id, next);
+}
+
+/**
+ * «انجام شدن همه زیرکارها» برای برنامه‌ی خودی در نمای مشترک (DM/گروه).
+ *
+ * ⚠️ 10.29 (BUG-34): هندلر دکمه در `app.js` فقط `state.tasks` (وظایف شخصی)
+ * را می‌دید و از طرفی پشت گیت نمای مشترک `return` می‌شد → دکمه در DM/گروه
+ * کاملاً بی‌اثر بود. حالا payload والد با همه‌ی زیرکارهای تیک‌خورده نوشته
+ * می‌شود؛ مهر `completedAt` زیرکارهای قبلاً تمام‌شده دست‌نخورده می‌ماند.
+ *
+ * @param {string} remoteId — id برنامه‌ی خودی (سطح‌بالا)
+ * @returns {Promise<{ok:boolean}>}
+ */
+export async function completeSharedChildren(remoteId) {
+    const hit = getSharedTaskDeep(remoteId);
+    if (!hit || !hit.item._shared || !hit.item._shared.mine) return { ok: false };
+    const root = hit.item;
+    if (root.kind !== 'plan') return { ok: false };
+    const next = { ...stripShared(root) };
+    const stamp = new Date().toISOString();
+    next.children = (Array.isArray(next.children) ? next.children : []).map((c) => {
+        if (!c) return c;
+        if (c.completed) return { ...c };
+        return { ...c, completed: true, completedAt: stamp };
+    });
+    return writeSharedTask(root._shared.dest, root.id, next);
 }
 
 /**

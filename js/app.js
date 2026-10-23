@@ -198,7 +198,7 @@ import {
     resetToLocal,
     openSharedDetail,
 } from './tasks/composer.js';
-import { getSharedRole, getSharedItem, refreshSharedList } from './tasks/source.js';
+import { getSharedRole, getSharedItem, refreshSharedList, completeSharedChildren } from './tasks/source.js';
 import { getDestination } from './tasks/destination.js';
 
 /**
@@ -2537,6 +2537,17 @@ taskList.addEventListener('click', e => {
         }
         if (action === 'delete') {
             deleteSharedTask(id).then((res) => {
+                if (res && !res.ok) showToast(t('errors.saveFailed'));
+                refreshSharedList().then(() => render());
+            });
+            return;
+        }
+        // ⚠️ 10.29 (BUG-34): «انجام شدن همه زیرکارها» در نمای مشترک.
+        // قبل از این، این action به گیت همین بلوک می‌رسید و `return` می‌شد
+        // (هندلر پایین‌تر فقط state.tasks شخصی را می‌دید) → دکمه در DM/گروه
+        // هیچ کاری نمی‌کرد.
+        if (action === 'check-all') {
+            completeSharedChildren(id).then((res) => {
                 if (res && !res.ok) showToast(t('errors.saveFailed'));
                 refreshSharedList().then(() => render());
             });
