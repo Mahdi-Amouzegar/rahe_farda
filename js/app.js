@@ -198,7 +198,14 @@ import {
     resetToLocal,
     openSharedDetail,
 } from './tasks/composer.js';
-import { getSharedRole, getSharedItem, refreshSharedList, completeSharedChildren } from './tasks/source.js';
+import {
+    getSharedRole,
+    getSharedItem,
+    getSharedTaskDeep,
+    refreshSharedList,
+    completeSharedChildren,
+    removeSharedChild
+} from './tasks/source.js';
 import { getDestination } from './tasks/destination.js';
 
 /**
@@ -841,6 +848,17 @@ function wireEvents() {
     events.on(EV.ROUTE_CLEAR, clearMapRoute);
     events.on('route:has-active', hasActiveRoute);
     events.on('route:get-destination', getActiveRouteDestination);
+
+    // ⚠️ 10.30 (BUG-37): آپلود عکس وقتی سرور در حالت mock است (MEDIA_STORAGE
+    // ست نشده یا secretهای ParsPack ناقص‌اند) با آدرس `mock-storage.local`
+    // شکست می‌خورد و قبلاً هیچ پیامی به کاربر نمی‌رسید. حالا یک‌بار در هر
+    // نشست، پیام روشن نشان می‌دهیم.
+    let _storageWarnShown = false;
+    events.on('media:storage-unconfigured', () => {
+        if (_storageWarnShown) return;
+        _storageWarnShown = true;
+        showToast(t('media.errors.storageUnconfigured'));
+    });
 
     events.on(EV.MODAL_CONFIRM, showConfirmModal);
 
@@ -2536,6 +2554,27 @@ taskList.addEventListener('click', e => {
             return;
         }
         if (action === 'delete') {
+            // ⚠️ 10.29 (BUG-36): حذف زیرکار در نمای مشترک مسیر نداشت. چون
+            // سطل زباله/Undo در نمای مشترک نیست، حذف دائمی است → اول تأیید.
+            const deep = getSharedTaskDeep(id);
+            if (deep && deep.childId) {
+                const child = (deep.item.children || [])
+                    .find((c) => c && String(c.id) === String(deep.childId));
+                showConfirmModal({
+                    title: t('tasks.sharedDeleteChildTitle'),
+                    message: t('tasks.sharedDeleteChildMessage', { text: (child && child.text) || '' }),
+                    confirmText: t('tasks.sharedDeleteChildOk'),
+                    cancelText: t('common.cancel'),
+                    danger: true
+                }).then((ok) => {
+                    if (!ok) return;
+                    removeSharedChild(id).then((res) => {
+                        if (res && !res.ok) showToast(t('errors.saveFailed'));
+                        refreshSharedList().then(() => render());
+                    });
+                });
+                return;
+            }
             deleteSharedTask(id).then((res) => {
                 if (res && !res.ok) showToast(t('errors.saveFailed'));
                 refreshSharedList().then(() => render());

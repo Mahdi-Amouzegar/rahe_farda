@@ -416,6 +416,9 @@
     "add": "افزودن",
     "sharedFrom": "از {name}",
     "unknownMember": "یکی از اعضای گروه",
+    "sharedDeleteChildTitle": "حذف زیرکار",
+    "sharedDeleteChildMessage": "«{text}» برای همه‌ی اعضا حذف می‌شود و قابل بازگشت نیست. مطمئنی؟",
+    "sharedDeleteChildOk": "بله، حذف کن",
     "new": "کار جدید",
     "newPlaceholder": "کار جدید را بنویسید...",
     "planPlaceholder": "نام برنامه (مثلاً سفر به تهران)...",
@@ -1401,7 +1404,8 @@
       "tooLarge": "حجم فایل بیش از حد مجاز است (حداکثر {max})",
       "unsupportedFormat": "فرمت فایل پشتیبانی نمی‌شود",
       "unsupportedFormatWithMime": "فرمت فایل پشتیبانی نمی‌شود ({mime})",
-      "unsupportedExtension": "پسوند فایل پشتیبانی نمی‌شود ({ext})"
+      "unsupportedExtension": "پسوند فایل پشتیبانی نمی‌شود ({ext})",
+      "storageUnconfigured": "فضای ذخیره‌سازی سرور هنوز تنظیم نشده؛ عکس فعلاً فقط روی همین دستگاه ذخیره می‌شود."
     }
   },
   "accountDelete": {

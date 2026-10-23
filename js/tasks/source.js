@@ -656,6 +656,29 @@ export async function completeSharedChildren(remoteId) {
 }
 
 /**
+ * حذف یک **زیرکار** از برنامه‌ی خودی در نمای مشترک (DM/گروه).
+ *
+ * ⚠️ 10.29 (BUG-36): حذف زیرکار در نمای مشترک هیچ مسیری نداشت — id زیرکار به
+ * `deleteSharedTask` می‌رسید که فقط سطح‌بالا را می‌دید → `{ok:false}` و پیام
+ * «ذخیره ناموفق بود». نمای مشترک سطل زباله/Undo ندارد، پس حذف اینجا **دائمی**
+ * است؛ به همین دلیل UI قبل از صدا زدن این تابع پنجره‌ی تأیید نشان می‌دهد.
+ *
+ * @param {string} remoteId — id زیرکار
+ * @returns {Promise<{ok:boolean}>}
+ */
+export async function removeSharedChild(remoteId) {
+    const hit = getSharedTaskDeep(remoteId);
+    if (!hit || !hit.childId) return { ok: false };
+    if (!hit.item._shared || !hit.item._shared.mine) return { ok: false };
+    const root = hit.item;
+    const next = { ...stripShared(root) };
+    const kids = Array.isArray(next.children) ? next.children : [];
+    if (!kids.some((c) => c && String(c.id) === String(hit.childId))) return { ok: false };
+    next.children = kids.filter((c) => !(c && String(c.id) === String(hit.childId)));
+    return writeSharedTask(root._shared.dest, root.id, next);
+}
+
+/**
  * حذف تسک خودی در نمای مشترک.
  */
 export async function deleteSharedTask(remoteId) {

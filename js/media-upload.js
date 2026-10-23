@@ -54,6 +54,43 @@ const IDB_VERSION = 4;
 /** حداکثر تلاش مجدد برای هر آپلود */
 const MAX_UPLOAD_RETRIES = 5;
 
+/**
+ * ⚠️ 10.30 (BUG-37): سرور می‌تواند در حالت «mock» بالا بیاید — یعنی
+ * `MEDIA_STORAGE` ست نشده یا secretهای ParsPack ناقص‌اند. در این حالت
+ * presign آدرس `https://mock-storage.local/...` می‌دهد که وجود خارجی ندارد:
+ * مرورگر آن را با خطای CSP رد می‌کند، صف تا بی‌نهایت retry می‌کند و هیچ
+ * پیام قابل‌فهمی به کاربر نمی‌رسد.
+ *
+ * حالا یک‌بار تشخیص می‌دهیم، صف را متوقف می‌کنیم و به UI خبر می‌دهیم.
+ * تا رفرش صفحه (یا رفع تنظیمات سرور) دوباره تلاش نمی‌کنیم.
+ */
+let _storageUnconfigured = false;
+
+/**
+ * آیا فضای ذخیره‌سازی سرور تنظیم نشده است؟ (adapter = mock)
+ * @returns {boolean}
+ */
+export function isMediaStorageUnconfigured() {
+    return _storageUnconfigured;
+}
+
+/**
+ * تشخیص آدرس «ساختگی» سرور (mock adapter).
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function isMockStorageUrl(url) {
+    try {
+        const u = new URL(String(url || ''));
+        return u.hostname === 'mock-storage.local' || u.hostname.endsWith('.mock-storage.local');
+    } catch {
+        return false;
+    }
+}
+
+/** خطای غیرقابل‌تلاش‌مجدد: سرور storage ندارد. */
+const ERR_STORAGE_UNCONFIGURED = 'MEDIA_STORAGE_UNCONFIGURED';
+
 /** تأخیر پایه برای exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 3000;
 
@@ -254,6 +291,11 @@ export async function getPendingUploadCount() {
  * @returns {Promise<object>} — upload record
  */
 export async function enqueueUpload(params) {
+    // ⚠️ 10.30 (BUG-37): وقتی سرور storage ندارد، صف کردن هیچ فایده‌ای ندارد —
+    // هر enqueue دوباره presign می‌زند و همان خطا را می‌گیرد (حلقه‌ی بی‌پایان
+    // از طریق healMissingPhotoUploads در هر رندر).
+    if (_storageUnconfigured) return null;
+
     const mediaId = params.mediaId || uid();
 
     const upload = {
@@ -352,7 +394,8 @@ export async function processQueue() {
                 processed++;
             } catch (err) {
                 failed++;
-                upload.retries = (upload.retries || 0) + 1;
+                const fatal = err && err.code === ERR_STORAGE_UNCONFIGURED;
+                upload.retries = fatal ? MAX_UPLOAD_RETRIES : (upload.retries || 0) + 1;
                 upload.lastError = err instanceof Error ? err.message : 'unknown';
                 upload.status = 'failed';
                 await putUpload(upload);
@@ -363,6 +406,13 @@ export async function processQueue() {
                     error: upload.lastError,
                     retries: upload.retries,
                 });
+
+                // ⚠️ 10.30 (BUG-37): یک‌بار به UI بگو که مشکل تنظیمات سرور است،
+                // نه شبکه — و بقیه‌ی صف را رها کن (هر تلاشی همین خطا را می‌دهد).
+                if (fatal) {
+                    events.emit('media:storage-unconfigured', {});
+                    break;
+                }
             }
         }
     } finally {
@@ -451,6 +501,15 @@ async function stepPresign(upload) {
     upload.uploadUrl = data.data.uploadUrl;
     const ttlSeconds = data.data.expiresIn || 900;
     upload.uploadUrlExpiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+
+    // ⚠️ 10.30 (BUG-37): اگر سرور در حالت mock باشد، آدرس وجود خارجی ندارد
+    // و مرورگر با CSP ردش می‌کند. همان‌جاfail می‌کنیم — بدون retry بی‌پایان.
+    if (isMockStorageUrl(upload.uploadUrl)) {
+        _storageUnconfigured = true;
+        const err = new Error(ERR_STORAGE_UNCONFIGURED);
+        err.code = ERR_STORAGE_UNCONFIGURED;
+        throw err;
+    }
 
     await putUpload(upload);
 }

@@ -416,6 +416,9 @@
     "add": "Add",
     "sharedFrom": "From {name}",
     "unknownMember": "A group member",
+    "sharedDeleteChildTitle": "Delete subtask",
+    "sharedDeleteChildMessage": "“{text}” will be removed for everyone and cannot be undone. Are you sure?",
+    "sharedDeleteChildOk": "Yes, delete",
     "new": "New task",
     "newPlaceholder": "Write your new task…",
     "planPlaceholder": "Plan name (e.g. Trip to Tehran)…",
@@ -1401,7 +1404,8 @@
       "tooLarge": "File exceeds the allowed size (max {max})",
       "unsupportedFormat": "File format not supported",
       "unsupportedFormatWithMime": "File format not supported ({mime})",
-      "unsupportedExtension": "File extension not supported ({ext})"
+      "unsupportedExtension": "File extension not supported ({ext})",
+      "storageUnconfigured": "Server storage is not configured yet; the photo is kept on this device only."
     }
   },
   "accountDelete": {

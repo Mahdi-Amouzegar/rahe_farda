@@ -31,6 +31,7 @@ import {
     toggleSharedTask,
     updateSharedTaskText,
     completeSharedChildren,
+    removeSharedChild,
 } from '../js/tasks/source.js';
 
 const PEER_DEST = { type: 'peer', peerId: 'u2' };
@@ -150,6 +151,33 @@ describe('ویرایش عنوان زیرکار برنامه‌ی مشترک (BUG
         const res = await updateSharedTaskText('p1', 'برنامه‌ی نو');
         expect(res.ok).toBe(true);
         expect(lastPayload().text).toBe('برنامه‌ی نو');
+    });
+});
+
+describe('حذف زیرکار برنامه‌ی مشترک (BUG-36)', () => {
+    it('زیرکار از والد حذف می‌شود و بقیه دست‌نخورده می‌مانند', async () => {
+        __setSharedItemsForTest([planItem()]);
+        const res = await removeSharedChild('c1');
+
+        expect(res.ok).toBe(true);
+        expect(apiCalls[0].path).toBe('/api/dm/tasks/p1');
+        const payload = lastPayload();
+        expect(payload.children.map((c) => c.id)).toEqual(['c2']);
+        expect(payload._shared).toBeUndefined();
+    });
+
+    it('زیرکار برنامه‌ی دیگران → ok:false و بدون درخواست', async () => {
+        __setSharedItemsForTest([planItem({ mine: false })]);
+        const res = await removeSharedChild('c1');
+        expect(res.ok).toBe(false);
+        expect(apiCalls).toHaveLength(0);
+    });
+
+    it('id سطح‌بالا (نه زیرکار) → ok:false (حذف کل برنامه از مسیر دیگری می‌رود)', async () => {
+        __setSharedItemsForTest([planItem()]);
+        const res = await removeSharedChild('p1');
+        expect(res.ok).toBe(false);
+        expect(apiCalls).toHaveLength(0);
     });
 });
 
