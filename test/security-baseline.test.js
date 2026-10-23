@@ -10,6 +10,10 @@
 //
 // ⚠️ نکته: اثر انگشت «فایل + خط نرمال‌شده» است (بدون شماره خط تا جابه‌جایی
 //    خطوط تست را نشکند). ویرایش همان خط هم نیاز به بازبینی و به‌روزرسانی دارد.
+//
+// ⚠️ 10.33: خطوط **کامنت‌محض** (شروع با `//`، `*` یا `/*`) شمرده نمی‌شوند.
+//    کامنت اجرا نمی‌شود، پس ریسک امنیتی ندارد؛ قبلاً همین باعث می‌شد نوشتن
+//    جمله‌ی «بدون innerHTML» در توضیحات، تست را بشکند.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,8 +50,6 @@ const BASELINE = new Set([
   'detail.js:mc.innerHTML = mhtml;',
   'detail.js:wc.innerHTML = weekOrder.map(([key, v]) =>',
   'header-status.js:_el.innerHTML = `<span class="status-icon" aria-hidden="true">${status.icon}</span>${badgeHtml}`;',
-  'i18n.js:*   - data-i18n-html         → innerHTML (⚠️ فقط برای رشته‌های امن)',
-  'i18n.js:// ─── data-i18n-html (innerHTML — فقط برای رشته‌های امن) ───',
   'i18n.js:el.innerHTML = value;',
   'location-ui.js:body.innerHTML = `<div class="saved-locations-body">${sorted.map(x => `',
   'location-ui.js:body.innerHTML = `<div class="session-empty">${i18nT(\'location.emptyList\')}</div>`;',
@@ -61,19 +63,11 @@ const BASELINE = new Set([
   'map-search.js:resultsEl.innerHTML = `<div class="map-search-empty">${escapeHtml(msg)}</div>`;',
   'map-search.js:resultsEl.innerHTML = results.map((r, i) => {',
   'map.js:if (el) el.innerHTML = \'<div class="map-fallback">برای نمایش نقشه به اینترنت نیاز است.<br>برنامه بدون نقشه هم کامل کار می‌کند.</div>\';',
-  'communication/conversations.js:// ⚠️ بدون innerHTML — فقط DOM API و textContent.',
-  'communication/groups.js://    گروه local-first نیست. همه‌ی requestها فقط از js/api.js. بدون innerHTML.',
-  'communication/search.js:// ⚠️ فقط واردشده‌ها (فضا گیت ورود دارد). بدون innerHTML.',
-  'communication/shares.js:// ⚠️ همه‌ی requestها فقط از js/api.js. بدون innerHTML.',
-  'navigation/sidebar.js://   - هیچ innerHTML — فقط DOM API و textContent',
-  'navigation/workspace.js:// ⚠️ بدون innerHTML — این ماژول فقط hidden را جابه‌جا می‌کند.',
   'picker.js:container.innerHTML = keys.map(k =>',
   'picker.js:document.getElementById(\'pickerDays\').innerHTML = html;',
   'route-ui.js:el.innerHTML = `<div class="route-summary-title"><button type="button" class="route-summary-close" data-route-close aria-label="بستن" title="بستن">×</button><span class="route-summary-title-text">${title}</span></div><div class="route-options">${rows}</div>`;',
   'sessions.js:wrap.innerHTML = \'\';',
   'sessions.js:wrap.innerHTML = sorted.map(s =>',
-  'ui.js:* رندر کامل — innerHTML-based.',
-  'ui.js://   - برای تغییرات ساختاری (filter/sort/search/editing)، همچنان innerHTML می‌سازد',
   'ui.js:box.innerHTML = `<div class="stats-title">${titleText}</div><div class="bars">` +',
   'ui.js:chip.innerHTML = `📅 ${formatDate(new Date(gy, gm - 1, gd), { day: \'numeric\', month: \'long\' })} <b>✕</b>`;',
   'ui.js:container.innerHTML = keys.map(k =>',
@@ -85,14 +79,26 @@ const BASELINE = new Set([
   'ui.js:taskList.innerHTML = `',
   'ui.js:taskList.innerHTML = filtered.map(task => {',
   'ui.js:textEl.innerHTML = iconHtml + escapeHtml(op.patches.text);',
-  'ui/badge.js://    بدون innerHTML — فقط textContent و hidden.',
-  'ui/menu.js://   - هیچ innerHTML — فقط DOM API و textContent (محتوای کاربر هرگز HTML نمی‌شود)',
-  'ui/sheet.js://    بدون innerHTML — فقط DOM API و textContent.',
   'weather-modal.js:if (content) content.innerHTML = html;',
-  'ui/avatar-settings.js://    انتظار confirm → PATCH با `media:<id>`). هیچ innerHTML.',
-  'ui/avatar.js:// ⚠️ بدون innerHTML.',
-  'welcome-wizard.js:// ⚠️ بدون innerHTML — فقط DOM API و textContent (به‌جز رشته‌های استاتیک لوکال',
 ]);
+
+/**
+ * آیا این خط فقط کامنت است؟
+ *
+ * ⚠️ 10.33: گارد قبلی هر خطی را که رشته‌ی `innerHTML` داشت می‌گرفت — حتی
+ * کامنت‌ها. کامنت اجرا نمی‌شود، پس ریسک امنیتی ندارد؛ ولی نتیجه این بود که
+ * نوشتن جمله‌ی «بدون innerHTML» در توضیحات، تست را می‌شکست (دو بار وقت گرفت).
+ * حالا خطوط کامنت‌محض نادیده گرفته می‌شوند؛ هر خط **کد** که این رشته را داشته
+ * باشد مثل قبل گرفته می‌شود — از جمله کد + کامنت انتهای همان خط.
+ *
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isCommentLine(line) {
+  const t = String(line == null ? '' : line).trim();
+  if (!t) return false;
+  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*');
+}
 
 function collectInnerHtml() {
   const found = new Set();
@@ -110,6 +116,8 @@ function collectInnerHtml() {
         if (!raw.includes('innerHTML')) continue;
         // ⚠️ فایل‌ها CRLF هستند — \r هم باید پاک شود
         const line = raw.replace(/^\s+|\s+$/g, '');
+        // ⚠️ 10.33: کامنت‌ها اجرا نمی‌شوند → مورد امنیتی نیستند
+        if (isCommentLine(line)) continue;
         found.add(`${rel}:${line}`);
       }
     }
@@ -129,5 +137,18 @@ describe('security baseline — innerHTML', () => {
           'یا با textContent جایگزین کن یا با دلیل به BASELINE اضافه کن.'
         : 'new innerHTML found'
     ).toEqual([]);
+  });
+});
+
+describe('security baseline — شمارش خطوط', () => {
+  it('کامنت‌ها نادیده گرفته می‌شوند ولی کد نه', () => {
+    expect(isCommentLine('// بدون innerHTML')).toBe(true);
+    expect(isCommentLine(' * ⚠️ بدون innerHTML.')).toBe(true);
+    expect(isCommentLine('/* innerHTML */')).toBe(true);
+    // کد واقعی — باید شمرده شود (همراه با کامنت انتهای خط)
+    expect(isCommentLine('el.innerHTML = html;')).toBe(false);
+    expect(isCommentLine('const x = 1; // innerHTML')).toBe(false);
+    expect(isCommentLine('')).toBe(false);
+    expect(isCommentLine(null)).toBe(false);
   });
 });
