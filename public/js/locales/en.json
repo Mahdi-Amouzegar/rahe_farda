@@ -753,6 +753,7 @@
       "alt": "Task image",
       "deleteAria": "Delete photo",
       "sizePrefix": "Size",
+      "renderFailed": "Could not display photos. Reopen the page.",
       "badge": {
         "pending": "Pending upload",
         "uploading": "Uploading",

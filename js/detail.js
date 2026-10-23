@@ -34,6 +34,7 @@ import {
     deleteCachedPhoto,
     fetchPhotoBlob,
     classifyPhotoForDisplay,
+    isDeadPhotoRef,
     clampZoom,
     extForContentType,
 } from './media-cache.js';
@@ -699,7 +700,21 @@ export function openDetail(id) {
     updateCallBtn();
     renderDetailSessions();
     call('refreshSavedLocationUI');
-        renderDetailPhotos().catch(err => console.warn('[detail] renderDetailPhotos failed:', err));
+    // ⚠️ 10.31: این catch قبلاً فقط warn می‌کرد و شبکه‌ی عکس خالی می‌ماند؛
+    // یک ReferenceError واقعی همین‌جا بلعیده شده بود. حالا خطا در کنسول
+    // با سطح error می‌رود و جای خالی، پیام قابل‌دیدن می‌گیرد.
+    renderDetailPhotos().catch(err => {
+        console.error('[detail] renderDetailPhotos failed:', err);
+        const grid = document.getElementById('photoGrid');
+        if (grid && String(state.currentDetailId) === String(id)) {
+            // با DOM API و textContent — طبق گارد امنیتی §۱۰
+            grid.textContent = '';
+            const note = document.createElement('div');
+            note.className = 'session-empty';
+            note.textContent = i18nT('detail.photo.renderFailed');
+            grid.appendChild(note);
+        }
+    });
     renderTimer();
     clearInterval(timerTick);
     timerTick = setInterval(() => { if (getDetailTask()) renderTimer(); }, 60000);
@@ -926,7 +941,15 @@ async function fetchMissingPhotos(photos) {
     }
 }
 
-async function renderDetailPhotos() {
+/**
+ * رندر شبکه‌ی عکس‌های جزئیات.
+ *
+ * ⚠️ 10.31: export شد تا تست بتواند مسیر واقعی رندر را اجرا کند. قبلاً فقط
+ * از داخل `openDetail` صدا زده می‌شد و هیچ تستی آن را اجرا نمی‌کرد؛ به همین
+ * دلیل یک ارجاع به شناسه‌ی import‌نشده (`isDeadPhotoRef`) فقط در کنسول
+ * کاربر دیده شد و شبکه‌ی عکس‌ها خالی ماند.
+ */
+export async function renderDetailPhotos() {
     const task = getDetailTask();
     if (!task) return;
     const list = task.photos || [];
