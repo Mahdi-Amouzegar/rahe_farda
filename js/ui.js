@@ -63,6 +63,8 @@ import {
 import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18nT } from './i18n.js';
 import { isLocalView } from './tasks/destination.js';
 import { sideClassFor } from './tasks/side.js';
+import { shouldShowSenderAvatar, senderInitial } from './tasks/group-sender.js';
+import { hydrateAvatars } from './ui/avatar.js';
 import { getSharedItems, getSharedItem } from './tasks/source.js';
 
 /**
@@ -113,6 +115,28 @@ function canBulkCheck(task) {
     if (!task || task.kind !== 'plan') return false;
     if (isLocalView()) return true;
     return !!(task._shared && task._shared.mine);
+}
+
+/**
+ * ستون آواتار فرستنده برای کارت‌های مخاطبان در گروه (10.32).
+ *
+ * ⚠️ فقط گروه + فقط پیام دیگران (تصمیم در `tasks/group-sender.js`).
+ * آواتار با `data-avatar` رندر می‌شود و `hydrateAvatars` بعد از ساخت مارک‌آپ
+ * تصویر واقعی را می‌گذارد؛ اگر عکس نبود، حرف اول نام می‌ماند.
+ */
+function withSenderAvatar(task, cardHtml) {
+    const s = (task && task._shared) || null;
+    const show = shouldShowSenderAvatar({
+        local: isLocalView(),
+        mine: !!(s && s.mine),
+        destType: (s && s.dest && s.dest.type) || null,
+    });
+    if (!show) return cardHtml;
+    const name = s.senderName || i18nT('tasks.unknownMember');
+    const ref = s.senderAvatar || '';
+    const title = escapeHtml(i18nT('tasks.sharedFrom', { name }));
+    const avatar = `<div class="task-row-sender"><span class="conv-avatar conv-avatar--sm" title="${title}" data-avatar="${escapeHtml(ref)}" data-avatar-name="${escapeHtml(name)}" aria-hidden="true">${escapeHtml(senderInitial(name))}</span></div>`;
+    return `<div class="task-row task-row--sender">${avatar}<div class="task-row-body">${cardHtml}</div></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -956,9 +980,12 @@ function renderFull(filtered, total, done) {
     }
 
     taskList.innerHTML = filtered.map(task => {
-        if (task.kind === 'plan') return planHtml(task);
-        return taskItemHtml(task);
+        const card = task.kind === 'plan' ? planHtml(task) : taskItemHtml(task);
+        return withSenderAvatar(task, card);
     }).join('');
+
+    // آواتار فرستنده‌ها (async) — تصویر اگر بود، وگرنه حرف اول می‌ماند
+    try { hydrateAvatars(taskList); } catch { /* best-effort */ }
 
     // ⚠️ T1b: عرض progress-barها با CSSOM ست می‌شود (style attribute زیر CSP ممنوع است)
     taskList.querySelectorAll('.mini-progress-fill[data-w]').forEach(el => {

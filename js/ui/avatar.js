@@ -99,6 +99,13 @@ export function hydrateAvatars(root) {
                 const img = document.createElement('img');
                 img.className = 'conv-avatar-img';
                 img.alt = '';
+                // ⚠️ 10.32: اگر تصویر نشکست، حرف اول برگردد — وگرنه کادر خالی
+                // می‌ماند (مثلاً media:id که resolve شد ولی فایل ۴۰۴ است).
+                img.addEventListener('error', () => {
+                    if (img.parentNode === node) {
+                        node.textContent = initialOf(name);
+                    }
+                });
                 img.src = url;
                 node.appendChild(img);
             }

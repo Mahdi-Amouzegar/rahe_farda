@@ -696,6 +696,30 @@
         }
     }
 
+    /* ═══ Task Row — ستون آواتار فرستنده در گروه (10.32) ═══
+       در گروه، کارت هر مخاطب یک ستون آواتار می‌گیرد تا وقتی چند نفر پیام
+       می‌فرستند، فرستنده در یک نگاه معلوم باشد. ستون آواتار sticky است تا
+       در کارت‌های بلند (برنامه با چند زیرکار) هنگام اسکرول هم دیده شود.
+       ⚠️ ستون اول = inline-start (راست در RTL) و ستون دوم = کارت. */
+    .task-row--sender {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+    }
+
+    .task-row-sender {
+        position: sticky;
+        top: 4px;
+        align-self: start;
+        z-index: 3;
+        padding-top: 10px;
+    }
+
+    .task-row-body {
+        min-width: 0;
+    }
+
     /* ═══ Task Item ═══ */
     .task-item {
         display: flex;

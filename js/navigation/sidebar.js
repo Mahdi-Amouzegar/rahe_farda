@@ -15,6 +15,7 @@ import { t as i18nT } from '../i18n.js';
 import { isLoggedIn } from '../auth.js';
 import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
+import { splitLeadingEmoji } from './nav-icon.js';
 import { getActiveWorkspace, switchWorkspace } from './workspace.js';
 
 let _opts = null;
@@ -56,6 +57,24 @@ function el(tag, className, text) {
     return node;
 }
 
+/**
+ * برچسب یک آیتم منو: اول کادر آیکون (مثل `conv-avatar`)، بعد متن.
+ *
+ * ⚠️ 10.32: ایموجیِ ابتدای ترجمه داخل متن می‌چسبید و ردیف‌های منو با
+ * ردیف‌های مخاطب/گروه (که آواتار دارند) هم‌تراز نبود. حالا ایموجی از متن جدا
+ * و در یک کادر هم‌اندازه‌ی آواتار رندر می‌شود؛ متن خالی از ایموجی می‌ماند.
+ *
+ * @param {string} label
+ * @returns {HTMLElement[]}
+ */
+function labelNodes(label) {
+    const { icon, text } = splitLeadingEmoji(label);
+    const out = [];
+    if (icon) out.push(el('span', 'conv-avatar drawer-item-icon', icon));
+    out.push(el('span', 'drawer-item-label', text));
+    return out;
+}
+
 function navButton({ labelKey, fallback, badgeKey, workspace }) {
     const btn = el('button', 'drawer-item');
     btn.type = 'button';
@@ -64,7 +83,9 @@ function navButton({ labelKey, fallback, badgeKey, workspace }) {
         btn.classList.add('active');
         btn.setAttribute('aria-current', 'page');
     }
-    btn.appendChild(el('span', 'drawer-item-label', i18nT(labelKey) !== labelKey ? i18nT(labelKey) : fallback));
+    for (const node of labelNodes(i18nT(labelKey) !== labelKey ? i18nT(labelKey) : fallback)) {
+        btn.appendChild(node);
+    }
     const badge = el('span', 'drawer-badge');
     badge.hidden = true;
     btn.appendChild(badge);
@@ -109,14 +130,18 @@ function renderDrawer() {
     const duo = el('div', 'drawer-duo');
     const settingsTop = el('button', 'drawer-item drawer-duo-btn');
     settingsTop.type = 'button';
-    settingsTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.settings') !== 'nav.settings' ? i18nT('nav.settings') : '⚙ تنظیمات'));
+    for (const node of labelNodes(i18nT('nav.settings') !== 'nav.settings' ? i18nT('nav.settings') : '⚙ تنظیمات')) {
+        settingsTop.appendChild(node);
+    }
     settingsTop.addEventListener('click', () => {
         closeDrawer();
         if (_opts && typeof _opts.onOpenSettings === 'function') _opts.onOpenSettings();
     });
     const accountTop = el('button', 'drawer-item drawer-duo-btn');
     accountTop.type = 'button';
-    accountTop.appendChild(el('span', 'drawer-item-label', i18nT('nav.account') !== 'nav.account' ? i18nT('nav.account') : '👤 حساب من'));
+    for (const node of labelNodes(i18nT('nav.account') !== 'nav.account' ? i18nT('nav.account') : '👤 حساب من')) {
+        accountTop.appendChild(node);
+    }
     accountTop.addEventListener('click', () => {
         closeDrawer();
         if (_opts && typeof _opts.onOpenAccount === 'function') _opts.onOpenAccount();
@@ -133,7 +158,9 @@ function renderDrawer() {
         aside.appendChild(sep);
         const login = el('button', 'drawer-item drawer-login');
         login.type = 'button';
-        login.appendChild(el('span', 'drawer-item-label', i18nT('nav.login') !== 'nav.login' ? i18nT('nav.login') : '🔐 ورود / ساخت حساب'));
+        for (const node of labelNodes(i18nT('nav.login') !== 'nav.login' ? i18nT('nav.login') : '🔐 ورود / ساخت حساب')) {
+            login.appendChild(node);
+        }
         login.addEventListener('click', () => {
             closeDrawer();
             if (_opts && typeof _opts.onLogin === 'function') _opts.onLogin();
@@ -171,6 +198,18 @@ function renderDrawer() {
         else if (_drawerTab === 'groups') renderGroupsTab(aside);
         else renderSearchTab(aside);
     }
+
+    // ⚠️ 10.32: این دنباله باید **داخل** renderDrawer بماند (بعد از محتوای تب،
+    // چون applyBadges به ردیف‌های رندرشده نیاز دارد). قبلاً این شش خط بعد از
+    // `renderSearchResults` افتاده بود و همان `}` کار renderDrawer را تمام
+    // می‌کرد؛ نتیجه: پنج تابع بعدی تودرتوی renderDrawer می‌شدند و هر تابع
+    // تازه‌ای که بین آن‌ها اضافه می‌شد بی‌صدا از دست می‌رفت.
+    const sep2 = el('div', 'drawer-sep');
+    sep2.setAttribute('aria-hidden', 'true');
+    aside.appendChild(sep2);
+
+    applyBadges(aside);
+}
 
 /**
  * تب مخاطبان: اول دکمه گفتگوی تازه، بعد درخواست‌ها، بعد لیست کامل.
@@ -436,13 +475,6 @@ function renderSearchResults(box) {
         });
         box.appendChild(row);
     }
-}
-
-    const sep2 = el('div', 'drawer-sep');
-    sep2.setAttribute('aria-hidden', 'true');
-    aside.appendChild(sep2);
-
-    applyBadges(aside);
 }
 
 /**

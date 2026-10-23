@@ -617,6 +617,28 @@ html[dir="ltr"] .drawer {
     border-radius: 50%;
 }
 
+/* ⚠️ 10.32: کادر آیکون گزینه‌های دراور — هم‌اندازه/هم‌شکل آواتار مخاطب تا
+   متن منو و نام مخاطب/گروه هم‌تراز شوند. (ایموجی از متن جدا شده است.) */
+.drawer-item-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+/* در دکمه‌های دوقلوی بالا (تنظیمات/حساب) محتوا وسط‌چین می‌ماند:
+   برچسب نباید کل عرض باقی‌مانده را بگیرد. */
+.drawer-duo .drawer-item-icon + .drawer-item-label {
+    flex: 0 1 auto;
+}
+
+/* ⚠️ 10.32: آواتار کوچک — ستون فرستنده در لیست وظایف گروه.
+   ⚠️ این قاعده باید در همین فایل (بدون @layer) بماند: components.css داخل
+   @layer است و `.conv-avatar` بدون لایه بر آن اولویت دارد. */
+.conv-avatar.conv-avatar--sm {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+}
+
 .msg-body {
     background: var(--bg-4);
     border-radius: 12px;
@@ -1008,4 +1030,22 @@ html[dir="ltr"] .drawer {
 
 .welcome-opt.selected {
     border-color: var(--accent-cyan);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   آواتار گروه در مودال تنظیمات (10.32)
+   ⚠️ پیش‌نمایش بزرگ‌تر از آواتار لیست است تا تغییر عکس دیده شود.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.group-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 4px 0 8px;
+}
+
+.conv-avatar.group-avatar-preview {
+    width: 56px;
+    height: 56px;
+    font-size: 1.3rem;
 }

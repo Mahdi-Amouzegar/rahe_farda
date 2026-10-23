@@ -16,7 +16,8 @@ import { isLoggedIn } from '../auth.js';
 import { t as i18nT } from '../i18n.js';
 import { isOnline } from '../net.js';
 import { openMenu } from '../ui/menu.js';
-import { avatarNode } from '../ui/avatar.js';
+import { avatarNode, clearAvatarCache } from '../ui/avatar.js';
+import { changeGroupAvatar, removeGroupAvatar } from '../ui/avatar-settings.js';
 import {
     updateDrawerBadges,
     setRecentGroups,
@@ -266,6 +267,18 @@ export async function openGroupMembersModal(groupId) {
 }
 
 /**
+ * بعد از تغییر/حذف آواتار گروه: داده و دراور تازه شوند و مودال باز بماند.
+ */
+async function afterGroupAvatarChange(groupId) {
+    try { clearAvatarCache(); } catch { /* silent */ }
+    try { await loadGroupData(groupId); } catch { /* silent */ }
+    try { await refreshGroupsHome(); } catch { /* silent */ }
+    try { rerenderDrawer(); } catch { /* best-effort */ }
+    closeModalShell();
+    openGroupSettingsModal(groupId);
+}
+
+/**
  * مودال تنظیمات گروه (فقط مالک): نام + اعضا/اخراج.
  * هندل نام کاربری (username) در قدم بعدی همین‌جا اضافه می‌شود.
  */
@@ -281,6 +294,56 @@ export async function openGroupSettingsModal(groupId) {
     }
     if (_myRole !== 'owner') return;
     const body = openModalShell(tr('grp.settings', 'تنظیمات گروه'));
+
+    // ─── آواتار گروه (10.32) — انتخاب / تغییر / حذف، فقط مالک ───
+    // ⚠️ پیش‌نمایش از همان `avatarNode` استفاده می‌کند که دراور و لیست اعضا؛
+    // اگر گروه عکس نداشته باشد، حرف اول نام گروه می‌ماند.
+    const avRow = el('div', 'settings-row group-avatar-row');
+    const avRef = (_group && _group.avatarUrl) || null;
+    const avPreview = avatarNode(avRef, (_group && _group.name) || '?');
+    avPreview.classList.add('group-avatar-preview');
+    avRow.appendChild(avPreview);
+    const avPick = el('button', 'conv-mini-btn', tr('grp.changeAvatar', 'انتخاب عکس گروه'));
+    avPick.type = 'button';
+    avPick.addEventListener('click', async () => {
+        avPick.disabled = true;
+        try {
+            const changed = await changeGroupAvatar(groupId);
+            if (changed) await afterGroupAvatarChange(groupId);
+        } catch (err) {
+            console.error('[groups] avatar change failed:', err);
+            showInfoModal({
+                title: tr('grp.avatar', 'عکس گروه'),
+                paragraphs: [tr('avatar.uploadFailed', 'آپلود ناموفق بود.')],
+            });
+        } finally {
+            avPick.disabled = false;
+        }
+    });
+    avRow.appendChild(avPick);
+    if (avRef) {
+        const avDel = el('button', 'conv-mini-btn', tr('grp.removeAvatar', 'حذف عکس'));
+        avDel.type = 'button';
+        avDel.addEventListener('click', async () => {
+            const ok = await showConfirmModal({
+                title: tr('grp.removeAvatar', 'حذف عکس'),
+                message: tr('grp.removeAvatarConfirm', 'عکس گروه حذف شود؟'),
+                danger: true,
+            });
+            if (!ok) return;
+            avDel.disabled = true;
+            try {
+                const removed = await removeGroupAvatar(groupId);
+                if (removed) await afterGroupAvatarChange(groupId);
+            } finally {
+                avDel.disabled = false;
+            }
+        });
+        avRow.appendChild(avDel);
+    }
+    body.appendChild(avRow);
+    body.appendChild(el('p', 'wizard-hint', tr('grp.avatarHint', 'عکس مربعی انتخاب کنید تا کراپ یا کشیده نشود.')));
+
     // ─── نام گروه ───
     const nameRow = el('div', 'conv-new');
     const nameInput = el('input', 'conv-input');
