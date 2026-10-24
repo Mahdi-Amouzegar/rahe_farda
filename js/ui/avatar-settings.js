@@ -1,7 +1,7 @@
 // © Mahdi Amouzegar — All rights reserved | مهدی آموزگار — همه حقوق محفوظ است
 // js/ui/avatar-settings.js -- بخش آواتار در تنظیمات + آواتار گروه (تصمیم F)
 //
-// ⚠️ آپلود از همان pipeline مدیا می‌گذرد (processImageFile → enqueueUpload →
+// ⚠️ آپلود از همان pipeline مدیا می‌گذرد (processAvatarFile → enqueueUpload →
 //    انتظار confirm → PATCH با `media:<id>`). هیچ innerHTML.
 // ═══════════════════════════════════════════════════════════════════════════
 
