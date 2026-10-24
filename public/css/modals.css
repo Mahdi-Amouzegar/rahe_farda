@@ -52,6 +52,46 @@
         color: var(--text-primary);
     }
 
+    /* ═══ مودال گروه: کمی پهن‌تر از picker پیش‌فرض (10.34) ═══ */
+    .picker.group-modal-box {
+        max-width: 420px;
+    }
+
+    /* ═══ سرصفحه‌ی مودال: عنوان و دکمه‌ی بستن در یک سطر (10.34) ═══
+       ⚠️ قبلاً این ردیف هیچ قاعده‌ای نداشت؛ عنوان و ✕ به‌صورت بلوکی
+       زیر هم می‌افتادند و ارتفاع اضافه و ظاهر نامرتب می‌ساختند. */
+    .picker-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .picker-title-row .picker-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-bottom: 0;
+        text-align: start;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .picker-title-row .btn-clear {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        margin: 0;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 0.9rem;
+        line-height: 1;
+    }
+
     .picker-nav {
         display: flex;
         align-items: center;

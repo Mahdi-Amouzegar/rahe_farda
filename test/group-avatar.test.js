@@ -32,8 +32,19 @@ vi.mock('../js/media-upload.js', async () => ({
     getUploadStatus: vi.fn(async () => ({ status: 'uploaded', serverMediaId: 'srv-9' })),
 }));
 
+// ⚠️ 10.34: آواتار از `processAvatarFile` می‌گذرد (برش مربع + ۲۵۶×۲۵۶)
 vi.mock('../js/media.js', async () => ({
-    processImageFile: vi.fn(async () => ({ blob: { size: 1234, type: 'image/jpeg' }, contentType: 'image/jpeg' })),
+    processAvatarFile: vi.fn(async () => ({
+        blob: { size: 1234, type: 'image/webp' },
+        contentType: 'image/webp',
+        width: 256,
+        height: 256,
+        sizeBytes: 1234,
+        originalWidth: 800,
+        originalHeight: 400,
+        extension: 'webp',
+        crop: { side: 400, sx: 200, sy: 0 },
+    })),
 }));
 
 vi.mock('../js/auth.js', async () => ({
@@ -72,6 +83,15 @@ describe('changeGroupAvatar', () => {
         expect(patch).toBeTruthy();
         expect(patch.path).toBe('/api/groups/g1');
         expect(patch.opts.body).toEqual({ avatarUrl: 'media:srv-9' });
+    });
+
+    it('آواتار با خروجی ۲۵۶×۲۵۶ و فرمت مجازِ سرور آپلود می‌شود', async () => {
+        const p = changeGroupAvatar('g1');
+        pickFileAndDispatch();
+        expect(await p).toBe(true);
+        // ⚠️ BUG-39: هرگز نباید png/jpg خام به presign برود
+        expect(enqueueCalls[0].contentType).toBe('image/webp');
+        expect(enqueueCalls[0].sizeBytes).toBe(1234);
     });
 
     it('اگر کاربر فایلی انتخاب نکند، هیچ درخواستی نمی‌زند', async () => {

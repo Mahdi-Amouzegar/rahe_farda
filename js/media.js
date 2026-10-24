@@ -51,6 +51,24 @@ export const JPEG_QUALITY = 0.9;
 export const MAX_PHOTOS_PER_TASK = 8;
 
 /**
+ * ابعاد آواتار (مربع، پیکسل).
+ *
+ * ⚠️ 10.34: آواتار همیشه ۲۵۶×۲۵۶ و از مرکز تصویر بریده می‌شود؛ پس هر
+ * ورودی (کشیده، عمودی، پانوراما) خروجی مربع و بدون دیستورت می‌دهد.
+ */
+export const AVATAR_SIZE = 256;
+
+/**
+ * MIMEهایی که **سرور** مدیا می‌پذیرد.
+ *
+ * ⚠️ 10.34 (BUG-39): این لیست باید دقیقاً با
+ * `MEDIA_LIMITS.ALLOWED_CONTENT_TYPES` در `rahe-farda-worker/src/media/types.ts`
+ * یکی بماند. اگر فایل اصلی با MIME دیگری نگه داشته شود، `POST /api/media/upload`
+ * با ۴۰۰ رد می‌شود — دقیقاً همان چیزی که برای PNG رخ می‌داد.
+ */
+export const SERVER_ALLOWED_CONTENT_TYPES = ['image/avif', 'image/webp', 'image/jpeg'];
+
+/**
  * MIME typeهای مجاز.
  *
  * ⚠️ فاز ۴D.4b-fix-2: JFIF و PJPG اضافه شدند.
@@ -284,12 +302,30 @@ export function isDirectDisplayable(mime) {
 }
 
 /**
+ * آیا سرور این MIME را می‌پذیرد؟
+ *
+ * ⚠️ 10.34 (BUG-39): مقایسه دقیق است، نه startsWith — سرور هم همین کار را
+ * می‌کند (`ALLOWED_CONTENT_TYPES.includes`). پس `image/jpg` یا `image/pjpeg`
+ * هم رد می‌شوند و باید re-encode شوند.
+ */
+export function isServerAllowedContentType(mime) {
+    return SERVER_ALLOWED_CONTENT_TYPES.includes(String(mime || '').toLowerCase());
+}
+
+/**
  * آیا فایل اصلی نگه داشته شود؟ وقتی خروجی re-encode از ورودی بزرگ‌تر شد
  * (روی JPEG از قبل فشرده با کیفیت ۰.۹ رایج است) و ورودی قابل‌نمایش است.
+ *
+ * ⚠️ 10.34 (BUG-39): شرط سوم اضافه شد — MIME ورودی باید از نوع‌هایی باشد که
+ * سرور قبول می‌کند. قبلاً PNG (و GIF/BMP) نگه داشته می‌شد و چون سرور فقط
+ * avif/webp/jpeg را می‌شناسد، presign با ۴۰۰ شکست می‌خورد و کاربر پیام
+ * «آپلود ناموفق بود» می‌دید. حالا PNG همیشه به WebP/AVIF/JPEG تبدیل می‌شود.
  */
 export function shouldKeepOriginalFile(fileType, fileSize, outSize) {
     if (!Number.isFinite(+fileSize) || !Number.isFinite(+outSize)) return false;
-    return outSize >= fileSize && isDirectDisplayable(fileType);
+    if (!isDirectDisplayable(fileType)) return false;
+    if (!isServerAllowedContentType(fileType)) return false;
+    return outSize >= fileSize;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -387,6 +423,46 @@ function canvasToBlob(canvas, mimeType, quality) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Encode chain — AVIF ← WebP ← JPEG (یک منبع حقیقت برای همه‌ی مسیرها)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * تبدیل canvas به Blob با زنجیره‌ی فرمت پروژه: AVIF → WebP → JPEG.
+ *
+ * ⚠️ 10.34: از `processImageFile` بیرون کشیده شد تا `processAvatarFile`
+ * دقیقاً همان فشرده‌سازی را بدهد (خواسته‌ی کاربر: آواتار مثل عکس‌های
+ * بخش جزئیات فشرده شود).
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @returns {Promise<{blob: Blob, contentType: string, extension: string}>}
+ */
+async function encodeCanvas(canvas) {
+    if (isAvifSupported()) {
+        try {
+            return {
+                blob: await canvasToBlob(canvas, 'image/avif', AVIF_QUALITY),
+                contentType: 'image/avif',
+                extension: 'avif',
+            };
+        } catch { /* ادامه به WebP */ }
+    }
+    if (isWebPSupported()) {
+        try {
+            return {
+                blob: await canvasToBlob(canvas, 'image/webp', WEBP_QUALITY),
+                contentType: 'image/webp',
+                extension: 'webp',
+            };
+        } catch { /* ادامه به JPEG */ }
+    }
+    return {
+        blob: await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY),
+        contentType: 'image/jpeg',
+        extension: 'jpeg',
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // processImageFile — تابع اصلی
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -454,36 +530,10 @@ export async function processImageFile(file) {
     ctx.drawImage(img, 0, 0, target.width, target.height);
 
     // ─── ۵. تبدیل به Blob: AVIF ← WebP ← JPEG ───
-    let blob;
-    let contentType;
-    let extension;
-
-    if (isAvifSupported()) {
-        try {
-            blob = await canvasToBlob(canvas, 'image/avif', AVIF_QUALITY);
-            contentType = 'image/avif';
-            extension = 'avif';
-        } catch {
-            // ادامه به WebP
-            blob = null;
-        }
-    }
-    if (!blob && isWebPSupported()) {
-        try {
-            blob = await canvasToBlob(canvas, 'image/webp', WEBP_QUALITY);
-            contentType = 'image/webp';
-            extension = 'webp';
-        } catch {
-            // fallback به JPEG
-            blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);
-            contentType = 'image/jpeg';
-            extension = 'jpeg';
-        }
-    } else if (!blob) {
-        blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);
-        contentType = 'image/jpeg';
-        extension = 'jpeg';
-    }
+    const encoded = await encodeCanvas(canvas);
+    let blob = encoded.blob;
+    let contentType = encoded.contentType;
+    let extension = encoded.extension;
 
     // ─── ۶. اگر خروجی از ورودی بزرگ‌تر شد و ورودی قابل‌نمایش است، همان ورودی ───
     // (re-encode با کیفیت بالا روی JPEG از قبل فشرده گاهی بزرگ‌تر می‌شود؛
@@ -516,6 +566,138 @@ export async function processImageFile(file) {
         originalWidth,
         originalHeight,
         extension,
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// آواتار — برش مربع از مرکز + ۲۵۶×۲۵۶
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * بزرگ‌ترین مربعِ وسط تصویر.
+ *
+ * مثال کاربر: تصویر ۱۶×۳۲ → مربع ۱۶×۱۶ که از هر طرف ۸ بریده می‌شود.
+ * مثال دیگر: ۳۲×۱۶ → مربع ۱۶×۱۶ (چون ارتفاع کوچک‌تر است).
+ *
+ * @param {number} width
+ * @param {number} height
+ * @returns {{side: number, sx: number, sy: number}} ضلع مربع و مبدأ برش
+ */
+export function computeCenterSquare(width, height) {
+    const w = Math.max(0, Math.round(Number(width) || 0));
+    const h = Math.max(0, Math.round(Number(height) || 0));
+    const side = Math.min(w, h);
+    // ⚠️ ابعاد صفر/نامعتبر → برش بی‌معناست؛ همه صفر (به‌جای sy نیمه‌محاسبه‌شده)
+    if (!side) return { side: 0, sx: 0, sy: 0 };
+    return {
+        side,
+        sx: Math.round((w - side) / 2),
+        sy: Math.round((h - side) / 2),
+    };
+}
+
+/**
+ * پردازش فایل عکس برای آواتار (کاربر یا گروه):
+ *   ۱. اعتبارسنجی
+ *   ۲. برش بزرگ‌ترین مربع وسط تصویر (بدون دیستورت — کشیدگی حذف می‌شود)
+ *   ۳. تغییر اندازه به ۲۵۶×۲۵۶
+ *   ۴. همان زنجیره‌ی فشرده‌سازی عکس‌های وظایف (AVIF → WebP → JPEG)
+ *
+ * ⚠️ 10.34: برخلاف `processImageFile`، فایل اصلی **هرگز** نگه داشته
+ * نمی‌شود — خروجی باید همیشه مربع ۲۵۶ باشد.
+ *
+ * @param {File} file
+ * @param {{size?: number}} [opts]
+ * @returns {Promise<{
+ *   blob: Blob,
+ *   contentType: string,
+ *   width: number,
+ *   height: number,
+ *   sizeBytes: number,
+ *   originalSizeBytes: number,
+ *   originalWidth: number,
+ *   originalHeight: number,
+ *   extension: string,
+ *   crop: {side: number, sx: number, sy: number},
+ * }>}
+ * @throws {Error} اگر فایل نامعتبر باشد یا پردازش شکست بخورد
+ */
+export async function processAvatarFile(file, opts) {
+    const size = Math.max(1, Math.round((opts && opts.size) || AVATAR_SIZE));
+
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+        throw new Error(validation.reason);
+    }
+
+    const img = await loadImage(file);
+    const originalWidth = img.naturalWidth || img.width;
+    const originalHeight = img.naturalHeight || img.height;
+    if (!originalWidth || !originalHeight) {
+        throw new Error('ابعاد تصویر نامعتبر است');
+    }
+
+    const crop = computeCenterSquare(originalWidth, originalHeight);
+    if (!crop.side) {
+        throw new Error('ابعاد تصویر نامعتبر است');
+    }
+
+    /**
+     * رسم مربع برش‌خورده روی canvas خروجی.
+     * @param {boolean} opaque — پس‌زمینه‌ی سفید لازم است؟ (JPEG آلفا ندارد)
+     */
+    const drawSquare = (opaque) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('canvas context در دسترس نیست');
+        }
+        if (opaque) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(
+            img,
+            crop.sx,
+            crop.sy,
+            crop.side,
+            crop.side,
+            0,
+            0,
+            size,
+            size
+        );
+        return canvas;
+    };
+
+    // AVIF/WebP شفافیت را حفظ می‌کنند → همان canvas بدون پس‌زمینه
+    let encoded = await encodeCanvas(drawSquare(false));
+
+    // اگر به JPEG رسیدیم، همان صحنه را با پس‌زمینه‌ی سفید دوباره encode کن
+    // (وگرنه نواحی شفافِ PNG سیاه می‌شوند).
+    if (encoded.contentType === 'image/jpeg') {
+        encoded = {
+            blob: await canvasToBlob(drawSquare(true), 'image/jpeg', JPEG_QUALITY),
+            contentType: 'image/jpeg',
+            extension: 'jpeg',
+        };
+    }
+
+    return {
+        blob: encoded.blob,
+        contentType: encoded.contentType,
+        width: size,
+        height: size,
+        sizeBytes: encoded.blob.size,
+        originalSizeBytes: file.size,
+        originalWidth,
+        originalHeight,
+        extension: encoded.extension,
+        crop,
     };
 }
 

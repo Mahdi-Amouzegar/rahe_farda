@@ -12,7 +12,7 @@
 
 import { trapFocus } from '../core.js';
 import { t as i18nT } from '../i18n.js';
-import { isLoggedIn } from '../auth.js';
+import { isLoggedIn, getCurrentUser } from '../auth.js';
 import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
 import { splitLeadingEmoji } from './nav-icon.js';
@@ -29,6 +29,8 @@ let _recentConversations = [];
 let _incomingRequests = [];
 let _groupInvitations = [];
 let _showNewConv = false;
+/** ⚠️ 10.34: بعد از باز شدن باکس «گفتگوی تازه» یک‌بار فوکوس بده */
+let _focusNewConv = false;
 let _showCreateGroup = false;
 let _drawerTab = 'contacts';
 let _searchQuery = '';
@@ -64,26 +66,85 @@ function el(tag, className, text) {
  * ردیف‌های مخاطب/گروه (که آواتار دارند) هم‌تراز نبود. حالا ایموجی از متن جدا
  * و در یک کادر هم‌اندازه‌ی آواتار رندر می‌شود؛ متن خالی از ایموجی می‌ماند.
  *
+ * ⚠️ 10.34: اگر `avatar` (ref عکس کاربر) بدهیم، به‌جای ایموجی همان آواتار
+ * واقعی در کادر می‌نشیند — برای آیتم فعال دراور (مثلاً «وظایف من») که
+ * کاربر انتظار دارد عکس خودش را ببیند.
+ *
  * @param {string} label
+ * @param {{ref: string, name: string}|null} [avatar]
  * @returns {HTMLElement[]}
  */
-function labelNodes(label) {
+function labelNodes(label, avatar) {
     const { icon, text } = splitLeadingEmoji(label);
     const out = [];
-    if (icon) out.push(el('span', 'conv-avatar drawer-item-icon', icon));
+    if (avatar && avatar.ref) {
+        const node = avatarNode(avatar.ref, avatar.name || text || '?');
+        node.classList.add('drawer-item-icon');
+        out.push(node);
+    } else if (icon) {
+        out.push(el('span', 'conv-avatar drawer-item-icon', icon));
+    }
     out.push(el('span', 'drawer-item-label', text));
     return out;
 }
 
-function navButton({ labelKey, fallback, badgeKey, workspace }) {
+/**
+ * آواتار کاربر جاری برای کادر آیتم فعال دراور.
+ *
+ * ⚠️ همان منطق `myAvatarRef` در `ui/avatar-settings.js`: `avatarUrl` ممکن است
+ * مستقیم روی کاربر باشد یا داخل `profile` (JSON) ذخیره شده باشد.
+ *
+ * @returns {{ref: string|null, name: string}}
+ */
+function myAvatarInfo() {
+    try {
+        const u = getCurrentUser();
+        if (!u) return { ref: null, name: '' };
+        let ref = typeof u.avatarUrl === 'string' && u.avatarUrl ? u.avatarUrl : null;
+        if (!ref && u.profile) {
+            const p = typeof u.profile === 'string' ? JSON.parse(u.profile) : u.profile;
+            if (p && typeof p.avatarUrl === 'string' && p.avatarUrl) ref = p.avatarUrl;
+        }
+        return { ref: ref || null, name: String(u.displayName || u.username || '') };
+    } catch {
+        return { ref: null, name: '' };
+    }
+}
+
+/**
+ * برچسب ردیف کاربر در نتایج جستجو: نام بالا، نام کاربری (@handle) زیرش.
+ *
+ * ⚠️ 10.34: قبلاً فقط نام نمایش داده می‌شد و دو کاربر هم‌نام از هم قابل
+ * تشخیص نبودند. اگر نام کاربری نداشته باشیم یا با نام یکی باشد، همان
+ * تک‌خطی قبلی می‌ماند (بدون تکرار).
+ *
+ * @param {string} displayName
+ * @param {string} username
+ * @returns {HTMLElement}
+ */
+function userRowLabel(displayName, username) {
+    const name = String(displayName || username || '');
+    const handle = String(username || '').trim();
+    if (!handle || handle === name) return el('span', 'conv-name', name);
+    const box = el('span', 'conv-name conv-name-stack');
+    box.appendChild(el('span', 'conv-name-main', name));
+    box.appendChild(el('span', 'conv-name-sub', '@' + handle));
+    return box;
+}
+
+function navButton({ labelKey, fallback, badgeKey, workspace, useMyAvatar }) {
     const btn = el('button', 'drawer-item');
     btn.type = 'button';
     btn.dataset.workspace = workspace;
-    if (workspace === getActiveWorkspace()) {
+    const active = workspace === getActiveWorkspace();
+    if (active) {
         btn.classList.add('active');
         btn.setAttribute('aria-current', 'page');
     }
-    for (const node of labelNodes(i18nT(labelKey) !== labelKey ? i18nT(labelKey) : fallback)) {
+    const label = i18nT(labelKey) !== labelKey ? i18nT(labelKey) : fallback;
+    // ⚠️ 10.34: فقط آیتم فعال عکس کاربر را نشان می‌دهد (بقیه ایموجی می‌مانند)
+    const avatar = active && useMyAvatar ? myAvatarInfo() : null;
+    for (const node of labelNodes(label, avatar)) {
         btn.appendChild(node);
     }
     const badge = el('span', 'drawer-badge');
@@ -152,7 +213,7 @@ function renderDrawer() {
 
     if (!loggedIn) {
         // ─── حالت مهمان: tasks + ورود (+ تنظیمات/حساب مشترک بالا) ───
-        aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks' }));
+        aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks', useMyAvatar: true }));
         const sep = el('div', 'drawer-sep');
         sep.setAttribute('aria-hidden', 'true');
         aside.appendChild(sep);
@@ -169,7 +230,7 @@ function renderDrawer() {
         aside.appendChild(el('div', 'drawer-hint', i18nT('nav.loginHint') !== 'nav.loginHint' ? i18nT('nav.loginHint') : ''));
     } else {
 
-        aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks' }));
+        aside.appendChild(navButton({ labelKey: 'nav.tasks', fallback: '📋 وظایف من', workspace: 'tasks', useMyAvatar: true }));
 
         // ─── تب سه‌تایی: مخاطبان / گروه‌ها / جستجو ───
         const tabs = el('div', 'drawer-tabs');
@@ -219,11 +280,14 @@ function renderContactsTab(aside) {
     newConvBtn.type = 'button';
     newConvBtn.addEventListener('click', () => {
         _showNewConv = !_showNewConv;
+        _focusNewConv = _showNewConv;
         rerenderDrawer();
     });
     aside.appendChild(newConvBtn);
     if (_showNewConv) {
-        aside.appendChild(buildUserSearchBox());
+        const searchBox = buildUserSearchBox({ autofocus: _focusNewConv });
+        _focusNewConv = false;
+        aside.appendChild(searchBox);
     }
 
     for (const r of _incomingRequests.slice(0, 20)) {
@@ -283,8 +347,14 @@ function renderContactsTab(aside) {
 
 /**
  * باکس جستجوی کاربر (برای گفتگوی تازه).
+ *
+ * ⚠️ 10.34: با `autofocus` مکان‌نما مستقیم داخل کادر می‌رود — کاربر برای
+ * تایپ لازم نیست یک کلیک اضافه بزند.
+ *
+ * @param {{autofocus?: boolean}} [opts]
  */
-function buildUserSearchBox() {
+function buildUserSearchBox(opts) {
+    const autofocus = !!(opts && opts.autofocus);
     const wrap = el('div', 'conv-search');
     const searchInput = el('input', 'conv-input');
     searchInput.setAttribute('placeholder', i18nT('conn.searchPlaceholder') !== 'conn.searchPlaceholder' ? i18nT('conn.searchPlaceholder') : '…');
@@ -309,7 +379,7 @@ function buildUserSearchBox() {
                         const urow = el('button', 'conv-row');
                         urow.type = 'button';
                         urow.appendChild(avatarNode(u.avatarUrl, (u.displayName || u.username)));
-                        urow.appendChild(el('span', 'conv-name', String((u && (u.displayName || u.username)) || '')));
+                        urow.appendChild(userRowLabel(u && u.displayName, u && u.username));
                         if (!u || u.rel === 'accepted') {
                             urow.appendChild(el('span', 'drawer-hint', i18nT('conn.connected') !== 'conn.connected' ? i18nT('conn.connected') : 'مخاطب'));
                         } else if (u.rel === 'pending-in' || u.rel === 'pending-out') {
@@ -332,6 +402,12 @@ function buildUserSearchBox() {
                     }
         }, 350);
     });
+    // ⚠️ 10.34: فوکوس با تأخیر کوتاه (دراور انیمیشن ورود دارد و نود تازه است)
+    if (autofocus) {
+        setTimeout(() => {
+            try { searchInput.focus(); } catch { /* silent */ }
+        }, 60);
+    }
     return wrap;
 }
 
@@ -457,7 +533,7 @@ function renderSearchResults(box) {
         const row = el('button', 'conv-row');
         row.type = 'button';
         row.appendChild(avatarNode(u.avatarUrl, (u.displayName || u.username)));
-        row.appendChild(el('span', 'conv-name', String(u.displayName || u.username || '')));
+        row.appendChild(userRowLabel(u.displayName, u.username));
         row.addEventListener('click', () => {
             closeDrawer();
             if (_opts && typeof _opts.onOpenSearchUser === 'function') _opts.onOpenSearchUser(u);

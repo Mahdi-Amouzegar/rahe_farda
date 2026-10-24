@@ -170,7 +170,7 @@
     "remove": "Remove",
     "uploadFailed": "Upload failed.",
     "loginRequired": "Sign in for avatar.",
-    "shapeHint": "💡 Choose a square photo so it won't be cropped or stretched."
+    "shapeHint": "💡 The image is cropped from the center and resized to 256×256 — never stretched."
   },
   "search": {
     "placeholder": "Username or group… (min 3 chars)",
@@ -217,7 +217,7 @@
     "changeAvatar": "Choose group photo",
     "removeAvatar": "Remove photo",
     "removeAvatarConfirm": "Remove this group's photo? Everyone will see the first letter of the name instead.",
-    "avatarHint": "💡 Pick a square image so it is not cropped or stretched.",
+    "avatarHint": "💡 The photo is cropped from the center and resized to 256×256 — never stretched.",
     "leave": "Leave group",
     "leaveConfirm": "Leave this group?",
     "inviteLink": "Invite link",

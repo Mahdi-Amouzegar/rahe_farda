@@ -8,7 +8,7 @@
 import { apiFetch, apiErrorMessage } from '../api.js';
 import { t as i18nT } from '../i18n.js';
 import { isLoggedIn, getCurrentUser, setStoredUserAvatar } from '../auth.js';
-import { processImageFile } from '../media.js';
+import { processAvatarFile } from '../media.js';
 import { enqueueUpload, getUploadStatus } from '../media-upload.js';
 import { avatarNode, clearAvatarCache, resolveAvatar } from './avatar.js';
 import { showInfoModal } from '../core.js';
@@ -57,6 +57,10 @@ async function waitForUpload(mediaId, timeoutMs) {
 /**
  * آپلود یک فایل به‌عنوان آواتار و برگرداندن ref (`media:<id>`).
  *
+ * ⚠️ 10.34: ورودی از `processAvatarFile` می‌گذرد — بزرگ‌ترین مربعِ وسط
+ * تصویر بریده و به ۲۵۶×۲۵۶ تبدیل می‌شود (بدون دیستورت) و با همان
+ * زنجیره‌ی فشرده‌سازی عکس‌های وظایف (AVIF → WebP → JPEG) ذخیره می‌شود.
+ *
  * ⚠️ 10.32: برای آواتار گروه باید `groupId` بدهیم، وگرنه مدیا شخصی می‌شود و
  * فقط آپلودکننده اجازه‌ی خواندنش را دارد (`authorizeMediaAccess`: owner یا
  * member گروه). نتیجه‌ی بدون groupId: بقیه‌ی اعضا آواتار را نمی‌بینند و
@@ -68,7 +72,7 @@ async function waitForUpload(mediaId, timeoutMs) {
  */
 export async function uploadAvatarFile(file, opts) {
     const groupId = (opts && opts.groupId) || null;
-    const processed = await processImageFile(file);
+    const processed = await processAvatarFile(file);
     const up = await enqueueUpload({
         contentType: processed.contentType,
         sizeBytes: processed.blob.size,

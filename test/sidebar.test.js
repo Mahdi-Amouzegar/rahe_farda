@@ -8,10 +8,14 @@ vi.mock('../js/i18n.js', async (importOriginal) => {
     return { ...actual, t: (key) => key };
 });
 
-const authState = { loggedIn: true };
+const authState = { loggedIn: true, user: null };
 vi.mock('../js/auth.js', async (importOriginal) => {
     const actual = await importOriginal();
-    return { ...actual, isLoggedIn: () => authState.loggedIn };
+    return {
+        ...actual,
+        isLoggedIn: () => authState.loggedIn,
+        getCurrentUser: () => authState.user || actual.getCurrentUser(),
+    };
 });
 
 import {
@@ -38,6 +42,7 @@ function buildDrawer() {
 beforeEach(() => {
     __resetSidebarForTest();
     authState.loggedIn = true;
+    authState.user = null;
     buildDrawer();
     initSidebar({});
     vi.useFakeTimers();
@@ -344,5 +349,59 @@ describe('sidebar — logged in', () => {
         expect(menus).toEqual(['u2']);
         rows[0].querySelector('.drawer-item-label-btn').click();
         expect(opened).toEqual(['u2']);
+    });
+});
+
+describe('sidebar — 10.34 (آواتار آیتم فعال، نام کاربری در جستجو، فوکوس)', () => {
+    it('آیتم فعال «وظایف من» عکس کاربر را در کادر آیکون نشان می‌دهد', async () => {
+        authState.user = { displayName: 'مهدی', avatarUrl: 'https://cdn.example.com/me.png' };
+        openDrawer();
+        // resolveAvatar برای URL مستقیم فوری resolve می‌شود (چند میکروتسک)
+        for (let i = 0; i < 5; i += 1) await Promise.resolve();
+        const box = document.querySelector('#drawer [data-workspace="tasks"].active .drawer-item-icon');
+        expect(box).not.toBeNull();
+        const img = box.querySelector('img');
+        expect(img).not.toBeNull();
+        expect(img.getAttribute('src')).toBe('https://cdn.example.com/me.png');
+    });
+
+    it('بدون عکس، کادر آیتم فعال همان ایموجی را نگه می‌دارد', () => {
+        authState.user = { displayName: 'مهدی' };
+        openDrawer();
+        const box = document.querySelector('#drawer [data-workspace="tasks"].active .drawer-item-icon');
+        expect(box).not.toBeNull();
+        expect(box.querySelector('img')).toBeNull();
+        expect(box.textContent.trim().length).toBeGreaterThan(0);
+    });
+
+    it('نتایج «گفتگوی تازه» نام کاربری را زیر نام نشان می‌دهند', async () => {
+        initSidebar({
+            onSearchUsers: async () => [
+                { id: 'u2', username: 'faramarz', displayName: 'فرامرز آموزگار', rel: 'accepted' },
+                { id: 'u3', username: 'sara', rel: 'accepted' },
+            ],
+        });
+        openDrawer();
+        document.querySelector('#drawer .drawer-mini-btn').click();
+        const input = document.querySelector('#drawer .conv-search input');
+        input.value = 'far';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(500);
+
+        const rows = [...document.querySelectorAll('#drawer .conv-search-results .conv-row')];
+        expect(rows.length).toBe(2);
+        expect(rows[0].querySelector('.conv-name-main').textContent).toBe('فرامرز آموزگار');
+        expect(rows[0].querySelector('.conv-name-sub').textContent).toBe('@faramarz');
+        // وقتی نام کاربری با نام یکی است، خط دوم تکرار نمی‌شود
+        expect(rows[1].querySelector('.conv-name-sub')).toBeNull();
+    });
+
+    it('باز کردن «گفتگوی تازه» مکان‌نما را داخل کادر جستجو می‌گذارد', async () => {
+        openDrawer();
+        document.querySelector('#drawer .drawer-mini-btn').click();
+        await vi.advanceTimersByTimeAsync(120);
+        const input = document.querySelector('#drawer .conv-search input');
+        expect(input).not.toBeNull();
+        expect(document.activeElement).toBe(input);
     });
 });

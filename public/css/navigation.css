@@ -548,6 +548,38 @@ html[dir="ltr"] .drawer {
     white-space: nowrap;
 }
 
+/* ═══ ردیف کاربر در نتایج جستجو: نام بالا، نام کاربری زیرش (10.34) ═══
+   ⚠️ دلیل: با چند کاربر هم‌نام، فقط نام برای تشخیص کافی نبود. */
+.conv-name-stack {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    white-space: normal;
+}
+
+.conv-name-main {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conv-name-sub {
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    /* نام کاربری لاتین است؛ isolate تا @ و حروف به‌هم نریزند */
+    direction: ltr;
+    unicode-bidi: isolate;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .conv-head {
     display: flex;
     align-items: center;

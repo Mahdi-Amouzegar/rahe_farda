@@ -123,6 +123,11 @@ function canBulkCheck(task) {
  * ⚠️ فقط گروه + فقط پیام دیگران (تصمیم در `tasks/group-sender.js`).
  * آواتار با `data-avatar` رندر می‌شود و `hydrateAvatars` بعد از ساخت مارک‌آپ
  * تصویر واقعی را می‌گذارد؛ اگر عکس نبود، حرف اول نام می‌ماند.
+ *
+ * ⚠️ 10.34: ترتیب ستون‌ها عوض شد — اول کارت وظیفه، بعد آواتار. در RTL
+ * ستون اول سمت راست است، پس کارت راست و آواتار چپ قرار می‌گیرد. دلیل:
+ * متن/تیتر وظیفه باید هم‌تراز بقیه‌ی کارت‌ها بماند و آواتار فقط یک ستون
+ * کمکی در لبه باشد. آواتار همچنان sticky است.
  */
 function withSenderAvatar(task, cardHtml) {
     const s = (task && task._shared) || null;
@@ -136,7 +141,7 @@ function withSenderAvatar(task, cardHtml) {
     const ref = s.senderAvatar || '';
     const title = escapeHtml(i18nT('tasks.sharedFrom', { name }));
     const avatar = `<div class="task-row-sender"><span class="conv-avatar conv-avatar--sm" title="${title}" data-avatar="${escapeHtml(ref)}" data-avatar-name="${escapeHtml(name)}" aria-hidden="true">${escapeHtml(senderInitial(name))}</span></div>`;
-    return `<div class="task-row task-row--sender">${avatar}<div class="task-row-body">${cardHtml}</div></div>`;
+    return `<div class="task-row task-row--sender"><div class="task-row-body">${cardHtml}</div>${avatar}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
