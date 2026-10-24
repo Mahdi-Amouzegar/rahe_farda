@@ -30,7 +30,9 @@ export const BACKUP_FILENAME_PREFIX = 'rahe-farda-backup';
 export const state = {
     tasks: [],
     currentFilter: 'all',
-    currentSort: 'newest',
+    // ⚠️ 10.35: پیش‌فرض «هوشمند» است (ترتیب پنج‌سطحی وظایف شخصی). گزینه‌های
+    // دیگر (جدیدترین/سررسید/الفبا/دستی) دست‌نخورده‌اند و کاربر می‌تواند انتخاب کند.
+    currentSort: 'smart',
     searchQuery: '',
     justAddedId: null,
     editingId: null,

@@ -2321,12 +2321,12 @@ function applyProMode() {
 
     state.selectedDay = null;
     state.currentFilter = 'all';
-    state.currentSort = 'newest';
+    state.currentSort = 'smart';
     document.querySelectorAll('.filter-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.filter === 'all');
     });
     const sortSel = document.getElementById('sortSelect');
-    if (sortSel) sortSel.value = 'newest';
+    if (sortSel) sortSel.value = 'smart';
     render();
 }
 

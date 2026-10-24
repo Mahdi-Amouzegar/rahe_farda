@@ -460,6 +460,7 @@
     },
     "sort": {
       "label": "Sort by:",
+      "smart": "Smart (default)",
       "newest": "Newest",
       "due": "Nearest due",
       "oldest": "Oldest",

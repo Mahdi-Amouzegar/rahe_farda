@@ -64,6 +64,7 @@ import { formatDate, formatNumber, formatPercent, formatYear, getLang, t as i18n
 import { isLocalView } from './tasks/destination.js';
 import { sideClassFor } from './tasks/side.js';
 import { shouldShowSenderAvatar, senderInitial } from './tasks/group-sender.js';
+import { sortPersonalTasks, shouldUsePersonalOrder } from './tasks/personal-order.js';
 import { hydrateAvatars } from './ui/avatar.js';
 import { getSharedItems, getSharedItem } from './tasks/source.js';
 
@@ -298,7 +299,13 @@ export function getFiltered() {
         }
         return hasSessionOn(t, state.selectedDay);
     });
-    if (state.currentSort === 'due') {
+    if (state.currentSort === 'smart') {
+        // ⚠️ 10.35: ترتیب «هوشمند» فقط برای وظایف شخصی است. در DM/گروه همان
+        // ترتیب طبیعی مقصد (جدیدترین اول) می‌ماند — به‌درخواست کاربر.
+        if (shouldUsePersonalOrder({ sort: state.currentSort, local: isLocalView() })) {
+            list = sortPersonalTasks(list, getNow().getTime());
+        }
+    } else if (state.currentSort === 'due') {
         const key = t => {
             if (t.kind === 'plan') return planDueKey(t);
             const u = nearestUpcoming(t);
