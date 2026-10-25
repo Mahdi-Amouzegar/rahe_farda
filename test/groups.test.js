@@ -81,6 +81,22 @@ vi.mock('../js/api.js', async () => ({
                 },
             };
         }
+        // ⚠️ 10.38 (BUG-41): مالک قبلی بعد از انتقال — مالک واقعی u9 است ولی
+        // ردیف نقش کهنه هنوز 'admin' برمی‌گردد (داده‌ی قبل از فیکس ورکر).
+        if (path === '/api/groups/g3') {
+            return { ok: true, data: { group: { id: 'g3', name: 'G3', ownerId: 'u9', closedAt: null }, myRole: 'admin' } };
+        }
+        if (path === '/api/groups/g3/members') {
+            return {
+                ok: true,
+                data: {
+                    members: [
+                        { id: 'm19', groupId: 'g3', userId: 'u9', role: 'owner', status: 'active', username: 'boss' },
+                        { id: 'm18', groupId: 'g3', userId: 'u1', role: 'admin', status: 'active', username: 'ali' },
+                    ],
+                },
+            };
+        }
         if (path.startsWith('/api/search')) {
             return { ok: true, data: { users: [{ id: 'u7', username: 'guest7' }] } };
         }
@@ -277,6 +293,21 @@ describe('groups — drawer menu', () => {
         await openGroupMenuFor('g2', document.getElementById('anchor'));
         await sleep(10);
         const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).toEqual(['open', 'members', 'leave']);
+    });
+
+    // ⚠️ 10.38 (BUG-41): بعد از «انتقال مالکیت»، مالک قبلی نباید هیچ گزینه‌ی
+    // مدیریتی (به‌خصوص «دعوت عضو») ببیند — حتی اگر ردیف نقشش کهنه و 'admin'
+    // مانده باشد. منبع حقیقت فقط group.ownerId است.
+    it('مالک قبلی (نقش کهنه admin): بدون دعوت عضو و تنظیمات', async () => {
+        await openGroupMenuFor('g3', document.getElementById('anchor'));
+        await sleep(10);
+        const ids = [...document.querySelectorAll('[data-menu-id]')].map((b) => b.dataset.menuId);
+        expect(ids).not.toContain('invite');
+        expect(ids).not.toContain('settings');
+        expect(ids).not.toContain('transfer');
+        expect(ids).not.toContain('close');
+        expect(ids).not.toContain('delete');
         expect(ids).toEqual(['open', 'members', 'leave']);
     });
 

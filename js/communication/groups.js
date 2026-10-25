@@ -114,8 +114,12 @@ async function fetchMembers(groupId) {
 function renderMembersView(sec, opts) {
     const o = opts || {};
     const box = el('div', 'conv-box');
-    // ─── فرم دعوت (فقط owner/admin) ───
-    if (isManager() && _group && _group.closedAt === null) {
+    // ─── فرم دعوت (فقط مالک) ───
+    // ⚠️ 10.38 (BUG-41): پیش از این شرط `isManager()` بود و «admin» را هم
+    // می‌پذیرفت. انتقال مالکیت در نسخه‌ی قبل، مالک قبلی را به «admin» تنزل
+    // می‌داد؛ نتیجه: مالک قبلی هنوز فرم دعوت را می‌دید. حالا مالکیت فقط از
+    // `group.ownerId` می‌آید (مثل منوی ⋯) و ردیف نقشِ کهنه هیچ مجوزی نمی‌دهد.
+    if (isOwner() && _group && _group.closedAt === null) {
         const invBox = el('div', 'conv-new');
         const searchInput = el('input', 'conv-input');
         searchInput.setAttribute('placeholder', tr('conn.searchPlaceholder', '…'));
@@ -560,14 +564,20 @@ export async function openGroupMenuFor(groupId, anchor) {
     }
     const role = (detail && detail.myRole) || null;
     const group = (detail && detail.group) || { id: groupId };
-    // ⚠️ 10.37: مالکیت از `group.ownerId` محاسبه می‌شود. بعد از «انتقال
-    // مالکیت»، `myRole` ممکن است یک تیک کهنه بماند و منوی مالک قبلی هنوز
-    // «دعوت عضو»/«تنظیمات» را نشان دهد.
+    // ⚠️ 10.37/10.38 (BUG-41): منبع حقیقت مالکیت فقط `group.ownerId` است.
+    // `myRole` از `group_members.role` می‌آید و بعد از «انتقال مالکیت» می‌تواند
+    // یک تیک کهنه بماند — یا (در نسخه‌ی قبلی ورکر) مالک قبلی را 'admin' نگه
+    // دارد. هر دو حالت باعث می‌شد مالک قبلی «دعوت عضو» را ببیند.
     const me = myUserId();
-    const owner = (group && group.ownerId && me)
-        ? String(group.ownerId) === String(me)
+    const hasOwnerId = !!(group && group.ownerId);
+    const owner = hasOwnerId
+        ? (!!me && String(group.ownerId) === String(me))
         : role === 'owner';
-    const manager = owner || role === 'admin';
+    // ⚠️ 10.38: گزینه‌های مدیریتی فقط برای مالک. نقش 'admin' عمداً اینجا
+    // مدیریت حساب نمی‌شود: تنها راه ساخت admin، واگذاری صریح توسط مالک است
+    // (فرم عضویت)، و آن مسیر در مودال اعضا انجام می‌شود نه در این منو. با این
+    // قاعده، یک ردیف نقش کهنه هرگز دکمه‌ی مدیریتی را به مالک قبلی برنمی‌گرداند.
+    const manager = owner;
     const items = [
         { id: 'open', label: tr('grp.open', 'باز کردن') },
         { id: 'members', label: tr('grp.members', 'اعضا') },
@@ -1108,9 +1118,10 @@ function isOwner() {
     return _myRole === 'owner';
 }
 
-function isManager() {
-    return isOwner() || _myRole === 'admin';
-}
+// ⚠️ 10.38 (BUG-41): `isManager()` حذف شد. تنها جایی که استفاده می‌شد فرم
+// دعوتِ مودال اعضا بود و «admin» را مجاز می‌کرد — همان دری که مالک قبلیِ
+// منتقل‌شده از آن رد می‌شد. مدیریت اعضا (دعوت/افزودن/حذف) در محصول فقط با
+// مالک است؛ نقش «admin» فعلاً فقط برچسب نمایشی است.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 8.3-C (تصمیم ۳): بج‌های نخوانده + ثبت خواندن
