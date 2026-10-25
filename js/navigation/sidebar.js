@@ -292,8 +292,22 @@ function renderContactsTab(aside) {
 
     for (const r of _incomingRequests.slice(0, 20)) {
         const row = el('div', 'drawer-item drawer-recent');
-        row.appendChild(avatarNode(r.avatarUrl, r.name));
-        row.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
+        row.dataset.requestId = r.id;
+        // ⚠️ 10.37: نام درخواست‌دهنده حالا کلیک‌پذیر است. پیش از این ردیف فقط
+        // «قبول/رد» داشت و کاربر هدف تا پذیرفتن، هیچ راهی برای دیدن پیام‌های
+        // فرستنده نداشت. حالا می‌تواند گفتگو را باز کند، پیام‌ها را بخواند و
+        // بعد تصمیم بگیرد (نوشتن همچنان تا پذیرش بسته است).
+        const b = el('button', 'drawer-item-label-btn');
+        b.type = 'button';
+        b.appendChild(avatarNode(r.avatarUrl, r.name));
+        b.appendChild(el('span', 'drawer-item-label', String(r.name || '')));
+        b.addEventListener('click', () => {
+            closeDrawer();
+            if (_opts && typeof _opts.onOpenConversation === 'function') {
+                _opts.onOpenConversation(r.userId, r.name);
+            }
+        });
+        row.appendChild(b);
         const okBtn = el('button', 'conv-mini-btn', i18nT('conn.accept') !== 'conn.accept' ? i18nT('conn.accept') : 'قبول');
         okBtn.type = 'button';
         okBtn.addEventListener('click', async () => {
@@ -305,7 +319,9 @@ function renderContactsTab(aside) {
         noBtn.type = 'button';
         noBtn.addEventListener('click', async () => {
             noBtn.disabled = true;
-            if (_opts && typeof _opts.onRejectRequest === 'function') await _opts.onRejectRequest(r.id);
+            // ⚠️ 10.37: userId هم می‌رود تا اگر کاربر گفتگوی همین فرستنده را باز
+            // کرده بود، بعد از «رد» آن گفتگو بسته شود (نه اینکه باز بماند).
+            if (_opts && typeof _opts.onRejectRequest === 'function') await _opts.onRejectRequest(r.id, r.userId);
             rerenderDrawer();
         });
         row.appendChild(okBtn);

@@ -252,9 +252,11 @@ import { initSidebar, openDrawer, rerenderDrawer } from './navigation/sidebar.js
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
+// ⚠️ 10.37: پایش سبک درخواست دوستی/دعوت گروه/انتقال مالکیت → toast پایین صفحه
+import { startInviteWatch } from './communication/invite-watch.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog } from './communication/groups.js';
+import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog, openPublicGroupPreview } from './communication/groups.js';
 import {
     searchUsers,
     acceptConnection,
@@ -875,6 +877,8 @@ function wireEvents() {
     events.on('auth:login', () => {
         updateAccountStatusText();
         preloadDrawerLists();
+        // ⚠️ 10.37: پایش دعوت‌ها بعد از ورود (idempotent — اگر روشن است کاری نمی‌کند)
+        try { startInviteWatch(); } catch { /* silent */ }
         // ⚠️ Phase 13 (E.5.3): فعال‌سازی سینک ابری + آپلود مدیا بعد از ورود
         try {
             enableCloudSyncFromState();
@@ -3097,9 +3101,28 @@ initI18n().then(async () => {
             await refreshConversationBadges().catch(() => {});
             rerenderDrawer();
         },
-        onRejectRequest: async (connectionId) => {
+        onRejectRequest: async (connectionId, userId) => {
             await rejectConnection(connectionId);
             await refreshIncomingRequests().catch(() => {});
+            // ⚠️ 10.37: درخواست کاربر — کاربر هدف می‌تواند قبل از پذیرش/رد،
+            // گفتگوی فرستنده را باز کند و پیام‌ها را بخواند. بعد از «رد»، آن
+            // گفتگو باید بسته شود (وگرنه مقصد روی مخاطبی می‌ماند که رابطه‌اش
+            // قطع شده و ارسال هم مسدود است).
+            try {
+                const peer = String(userId || '');
+                if (peer) {
+                    const { getDestination, setDestination } = await import('./tasks/destination.js');
+                    const dest = getDestination();
+                    if (dest && dest.type === 'peer' && String(dest.peerId) === peer) {
+                        setDestination({ type: 'local' });
+                        const { refreshSharedList } = await import('./tasks/source.js');
+                        const { render } = await import('./ui.js');
+                        await refreshSharedList();
+                        render();
+                        applyDestinationLabel();
+                    }
+                }
+            } catch { /* best-effort */ }
             rerenderDrawer();
         },
         onSearchUsers: async (q) => {
@@ -3174,6 +3197,8 @@ initI18n().then(async () => {
         },
         onOpenSearchGroup: async (g) => {
             if (!g || !g.id) return;
+            // ⚠️ 10.37: عضو هستم → مقصد گروه (مثل قبل). عضو نیستم → پیش‌نمایش
+            // فقط‌خواندنی گروه عمومی + نام/یوزرنیم مدیر (نه پیام «فقط با دعوت»).
             try {
                 const mine = await listGroups().catch(() => null);
                 const found = mine && mine.ok
@@ -3185,10 +3210,13 @@ initI18n().then(async () => {
                     return;
                 }
             } catch { /* silent */ }
-            showInfoModal({
-                title: g.name || '',
-                paragraphs: [t('search.inviteOnly')],
-            });
+            const shown = await openPublicGroupPreview(String(g.id), g.name || '').catch(() => false);
+            if (!shown) {
+                showInfoModal({
+                    title: g.name || '',
+                    paragraphs: [t('search.inviteOnly')],
+                });
+            }
         },
         onCreateGroup: async ({ name, visibility }) => {
             const r = await createGroup({ name, visibility }).catch(() => ({ ok: false }));
@@ -3315,6 +3343,9 @@ initI18n().then(async () => {
     } catch (err) {
         console.warn('[app] refreshConversationBadges failed:', err);
     }
+    // ⚠️ 10.37: پایش دعوت‌ها/درخواست‌ها — مستقل از باز بودن دراور، تا کاربر
+    // هدف بدون باز کردن دراور هم خبردار شود (toast پایین صفحه).
+    try { startInviteWatch(); } catch { /* silent */ }
 }).catch(err => {
     console.error('[app] initI18n failed:', err);
     applyDisplaySettings();

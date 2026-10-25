@@ -1489,5 +1489,27 @@
   "numbers": {
     "hour": "{n}",
     "dayOfMonth": "{n}"
+  },
+  "v10": {
+    "welcomeShort": "A task planner with two ways to work: on this device alone, or with an online account.",
+    "welcomeLocalTitle": "No account — this device only",
+    "welcomeLocal": "Your tasks and settings stay in this browser and are never sent to a server. Clearing browser data or switching devices means starting over.",
+    "welcomeCloudTitle": "With an account — also stored on the server",
+    "welcomeCloud": "Signing in stores your tasks on the server and syncs them across your devices. You can also message other users, send tasks and collaborate in groups.",
+    "welcomeNote": "Signing in is optional: whenever you want, open “My account”, sign in, and the tasks on this device sync with your account.",
+    "detailMore": "Details and more information",
+    "closeGroupHint": "The group is closed and its tasks are removed, but the group and its members remain (read-only).",
+    "deleteGroupHint": "The group is permanently deleted — it disappears from every member’s list.",
+    "closeChatConfirm": "Close this conversation? History is not deleted, but the chat stays hidden from the list until you start it again.",
+    "friendRequestToast": "Friend request from {name}",
+    "groupInviteToast": "Invitation to group “{name}”",
+    "becameOwnerToast": "You are now the owner of “{name}”",
+    "publicGroupTitle": "Public group",
+    "publicGroupOwner": "Group manager",
+    "publicGroupTasks": "Tasks in this group",
+    "publicGroupEmpty": "No tasks in this group yet.",
+    "publicGroupReadOnly": "You are not a member of this group, so you can only view the tasks. Ask the group manager to join.",
+    "publicGroupAskOwner": "Message the manager",
+    "publicGroupClose": "Close"
   }
 }

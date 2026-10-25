@@ -292,7 +292,8 @@ export async function openGroupSettingsModal(groupId) {
         });
         return;
     }
-    if (_myRole !== 'owner') return;
+    // ⚠️ 10.37: گیت مالکیت با ownerId (نه myRole که ممکن است کهنه باشد)
+    if (!isOwner()) return;
     const body = openModalShell(tr('grp.settings', 'تنظیمات گروه'));
 
     // ─── آواتار گروه (10.32) — انتخاب / تغییر / حذف، فقط مالک ───
@@ -530,6 +531,14 @@ async function openTransferPicker(groupId, anchor) {
                 const { showToast } = await import('../ui.js');
                 showToast(tr('grp.transferDone', 'مالکیت منتقل شد — حالا عضو عادی هستی و می‌توانی ترک کنی.'));
             } catch { /* silent */ }
+            // ⚠️ 10.37: نقش/داده‌ی کش‌شده فوراً پاک می‌شود تا منوی ⋯ و مودال
+            // تنظیمات همان لحظه بر اساس مالکیت تازه رندر شوند (وگرنه دکمه‌ی
+            // «دعوت عضو» تا تیک بعدی برای مالک قبلی می‌ماند).
+            _myRole = null;
+            _group = null;
+            _members = [];
+            closeModalShell();
+            try { rerenderDrawer(); } catch { /* best-effort */ }
             await refreshGroupsHome();
         },
     });
@@ -551,7 +560,13 @@ export async function openGroupMenuFor(groupId, anchor) {
     }
     const role = (detail && detail.myRole) || null;
     const group = (detail && detail.group) || { id: groupId };
-    const owner = role === 'owner';
+    // ⚠️ 10.37: مالکیت از `group.ownerId` محاسبه می‌شود. بعد از «انتقال
+    // مالکیت»، `myRole` ممکن است یک تیک کهنه بماند و منوی مالک قبلی هنوز
+    // «دعوت عضو»/«تنظیمات» را نشان دهد.
+    const me = myUserId();
+    const owner = (group && group.ownerId && me)
+        ? String(group.ownerId) === String(me)
+        : role === 'owner';
     const manager = owner || role === 'admin';
     const items = [
         { id: 'open', label: tr('grp.open', 'باز کردن') },
@@ -561,8 +576,20 @@ export async function openGroupMenuFor(groupId, anchor) {
     if (manager) items.push({ id: 'invite', label: tr('grp.invite', 'دعوت عضو') });
     if (owner) {
         items.push({ id: 'transfer', label: tr('grp.transfer', 'انتقال مالکیت') });
-        items.push({ id: 'close', label: tr('grp.close', 'بستن گروه'), danger: true });
-        items.push({ id: 'delete', label: tr('grp.delete', 'حذف گروه'), danger: true });
+        // ⚠️ 10.37: «بستن» و «حذف» دو کار متفاوت‌اند ولی نامشان تفاوت را
+        // نشان نمی‌داد. حالا هر کدام یک خط توضیح دارند.
+        items.push({
+            id: 'close',
+            label: tr('grp.close', 'بستن گروه'),
+            desc: tr('v10.closeGroupHint', 'گروه بسته می‌شود و وظایفش پاک می‌شوند، ولی سابقه‌ی گروه و اعضا می‌ماند (فقط‌خواندنی).'),
+            danger: true,
+        });
+        items.push({
+            id: 'delete',
+            label: tr('grp.delete', 'حذف گروه'),
+            desc: tr('v10.deleteGroupHint', 'گروه برای همیشه و کامل حذف می‌شود — از فهرست همه‌ی اعضا هم برداشته می‌شود.'),
+            danger: true,
+        });
     } else {
         items.push({ id: 'leave', label: tr('grp.leave', 'ترک گروه'), danger: true });
     }
@@ -869,7 +896,133 @@ async function confirmGroupDelete(forId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 8.3-B: تسک‌های گروه (CRUD کامل با Permission Matrix بخش ۱۰)
+// پیش‌نمایش فقط‌خواندنی گروه عمومی (10.37 — درخواست کاربر)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ پیش از این، کلیک روی گروه عمومیِ پیداشده در جستجو فقط پیام
+// «عضویت فقط با دعوت» می‌داد — یعنی عملاً هیچ فرقی با گروه خصوصی نداشت.
+// حالا محتوای وظایف دیده می‌شود (بدون امکان ارسال)، مدیر گروه با نام و
+// نام کاربری معرفی می‌شود و دکمه‌ی «درخواست از مدیر» گفتگو با او را باز می‌کند.
+//
+// ⚠️ سمت سرور: GET /api/groups/:id/public فقط برای گروه public و باز جواب
+// می‌دهد؛ عضویت/عدم‌عضویت در فیلد isMember برمی‌گردد.
+
+/**
+ * متن قابل‌نمایش یک تسک گروهی از payload سرور.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function taskTextOf(raw) {
+    if (!raw) return '';
+    let p = raw;
+    if (typeof raw === 'string') {
+        try { p = JSON.parse(raw); } catch { return String(raw).slice(0, 200); }
+    }
+    if (!p || typeof p !== 'object') return '';
+    const t = (typeof p.text === 'string' && p.text)
+        || (typeof p.title === 'string' && p.title)
+        || '';
+    return String(t).slice(0, 200);
+}
+
+/**
+ * نمایش گروه عمومی به‌صورت فقط‌خواندنی.
+ *
+ * @param {string} groupId
+ * @param {string} [fallbackName]
+ * @returns {Promise<boolean>} آیا پیش‌نمایش باز شد؟
+ */
+export async function openPublicGroupPreview(groupId, fallbackName) {
+    if (!groupId) return false;
+    const res = await apiFetch('/api/groups/' + encodeURIComponent(groupId) + '/public');
+    if (!res.ok) {
+        showInfoModal({
+            title: tr('v10.publicGroupTitle', 'گروه عمومی'),
+            paragraphs: [apiErrorMessage(res.error)],
+        });
+        return false;
+    }
+    const data = res.data || {};
+    const group = data.group || {};
+    const owner = data.owner || null;
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    const isMember = !!data.isMember;
+
+    const body = openModalShell(group.name || fallbackName || tr('v10.publicGroupTitle', 'گروه عمومی'));
+
+    // ─── برچسب نوع گروه ───
+    const tagRow = el('div', 'conv-row');
+    tagRow.appendChild(avatarNode(group.avatarUrl || null, group.name || '?'));
+    const tagMain = el('span', 'conv-name conv-name-stack');
+    tagMain.appendChild(el('span', 'conv-name-main', String(group.name || '')));
+    if (group.username) tagMain.appendChild(el('span', 'conv-name-sub', '@' + group.username));
+    tagRow.appendChild(tagMain);
+    tagRow.appendChild(el('span', 'conv-role', tr('v10.publicGroupTitle', 'گروه عمومی')));
+    body.appendChild(tagRow);
+
+    // ─── مدیر گروه + دکمه‌ی درخواست ───
+    if (owner && owner.id) {
+        const ownerName = owner.displayName || owner.username || tr('grp.roleOwner', 'مالک');
+        const ownerRow = el('div', 'conv-row');
+        ownerRow.appendChild(avatarNode(owner.avatarUrl || null, ownerName));
+        const ownerMain = el('span', 'conv-name conv-name-stack');
+        ownerMain.appendChild(el('span', 'conv-name-main', ownerName));
+        if (owner.username) ownerMain.appendChild(el('span', 'conv-name-sub', '@' + owner.username));
+        ownerRow.appendChild(ownerMain);
+        if (!isMember) {
+            const ask = el('button', 'conv-mini-btn', tr('v10.publicGroupAskOwner', 'درخواست از مدیر'));
+            ask.type = 'button';
+            ask.addEventListener('click', async () => {
+                ask.disabled = true;
+                try {
+                    closeModalShell();
+                    const { selectDestination } = await import('../tasks/composer.js');
+                    await selectDestination({
+                        type: 'peer',
+                        peerId: String(owner.id),
+                        name: ownerName,
+                    });
+                } catch { /* best-effort */ } finally {
+                    ask.disabled = false;
+                }
+            });
+            ownerRow.appendChild(ask);
+        }
+        body.appendChild(ownerRow);
+        body.appendChild(el('p', 'wizard-hint', tr('v10.publicGroupOwner', 'مدیر گروه') + ' — ' + ownerName));
+    }
+
+    // ─── وظایف (فقط خواندن) ───
+    body.appendChild(el('div', 'picker-title', tr('v10.publicGroupTasks', 'وظایف این گروه')));
+    if (tasks.length === 0) {
+        body.appendChild(el('p', 'wizard-hint', tr('v10.publicGroupEmpty', 'هنوز وظیفه‌ای در این گروه نیست.')));
+    } else {
+        for (const t of tasks.slice(0, 100)) {
+            const text = taskTextOf(t.payload);
+            if (!text) continue;
+            const row = el('div', 'conv-row');
+            row.appendChild(el('span', 'conv-name', text));
+            body.appendChild(row);
+        }
+    }
+
+    if (!isMember) {
+        body.appendChild(el('p', 'storage-guidance', tr('v10.publicGroupReadOnly', 'شما عضو این گروه نیستید؛ وظایف را فقط می‌توانید ببینید. برای عضویت، از مدیر گروه درخواست کنید.')));
+    }
+
+    const actions = el('div', 'conv-new');
+    const closeBtn = el('button', 'conv-mini-btn', tr('v10.publicGroupClose', 'بستن'));
+    closeBtn.type = 'button';
+    closeBtn.addEventListener('click', () => closeModalShell());
+    actions.appendChild(closeBtn);
+    body.appendChild(actions);
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 6D: تسک‌های گروه (تایم‌لاین)
+// ═══════════════════════════════════════════════════════════════════════════
+//
 //   - مشاهده/ایجاد: همه‌ی اعضا | ویرایش: فقط creator | حذف: creator یا owner
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -936,12 +1089,27 @@ export async function respondGroupInvitation(inv, accept) {
     return res;
 }
 
-function isManager() {
-    return _myRole === 'owner' || _myRole === 'admin';
+/**
+ * آیا کاربر جاری مالک گروه است؟
+ *
+ * ⚠️ 10.37: منبع حقیقت `groups.owner_id` است، نه `myRole` که از
+ * `group_members.role` می‌آید. بعد از «انتقال مالکیت»، ردیف عضویت مالک قبلی
+ * ممکن است تا تیک بعدی نقش قدیمی را برگرداند؛ نتیجه: مالک قبلی هنوز دکمه‌ی
+ * «دعوت عضو»/«تنظیمات» را می‌دید. حالا اول ownerId مقایسه می‌شود و نقش
+ * فقط fallback است.
+ *
+ * @returns {boolean}
+ */
+function isOwner() {
+    const me = myUserId();
+    if (_group && _group.ownerId && me) {
+        return String(_group.ownerId) === String(me);
+    }
+    return _myRole === 'owner';
 }
 
-function isOwner() {
-    return _myRole === 'owner';
+function isManager() {
+    return isOwner() || _myRole === 'admin';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -989,13 +1157,21 @@ async function _refreshGroupBadgesInner() {
         } catch { /* best-effort per group */ }
     }));
     try {
-        const rows = (_groups || []).map((g) => ({
-            id: String(g.id),
-            name: g.name || '…',
-            avatarUrl: g.avatarUrl || null,
-            unread: unreadByGroup.get(String(g.id)) || 0,
-            lastActivity: g.lastActivity || null,
-        }));
+        // ⚠️ 10.37: درخواست کاربر — گروهی که همین حالا باز است، پیام‌هایش همان
+        // لحظه دیده می‌شوند؛ پس بج «نخوانده»ی ردیفش صفر نمایش داده می‌شود
+        // (هم‌قاعده با گفتگوی خصوصی در `conversations.js`). شمارش سرور دست‌نخورده
+        // است — این فقط لایه‌ی نمایش است.
+        const openId = _openGroupId ? String(_openGroupId) : '';
+        const rows = (_groups || []).map((g) => {
+            const gid = String(g.id);
+            return {
+                id: gid,
+                name: g.name || '…',
+                avatarUrl: g.avatarUrl || null,
+                unread: (openId && gid === openId) ? 0 : (unreadByGroup.get(gid) || 0),
+                lastActivity: g.lastActivity || null,
+            };
+        });
         rows.sort((a, b) => {
             const x = String(a.lastActivity || '');
             const y = String(b.lastActivity || '');

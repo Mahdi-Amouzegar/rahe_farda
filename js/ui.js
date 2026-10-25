@@ -119,6 +119,30 @@ function canBulkCheck(task) {
 }
 
 /**
+ * آیا این کارت، وظیفه‌ی «دیگران» در نمای مشترک است؟
+ *
+ * ⚠️ 10.37: در پیام خصوصی/گروه، منوی ⋯ کارت‌های مخاطب همه‌ی گزینه‌ها را
+ * نشان می‌داد (سنجاق/ویرایش/اشتراک/بایگانی/حذف) در حالی که dispatcher هر
+ * کدام را رد می‌کرد — یعنی دکمه‌های مرده که فقط صفحه را شلوغ می‌کردند.
+ *
+ * @param {object} task
+ * @returns {boolean}
+ */
+function isOtherShared(task) {
+    if (isLocalView()) return false;
+    const s = task && task._shared;
+    return !!s && s.mine === false;
+}
+
+/**
+ * تنها گزینه‌ی مجاز برای وظیفه‌ی دیگران: «جزئیات و اطلاعات بیشتر».
+ * @returns {Array<{action:string,label:string,icon:string}>}
+ */
+function detailOnlyMenu() {
+    return [{ action: 'detail', label: i18nT('v10.detailMore'), icon: '📋' }];
+}
+
+/**
  * ستون آواتار فرستنده برای کارت‌های مخاطبان در گروه (10.32).
  *
  * ⚠️ فقط گروه + فقط پیام دیگران (تصمیم در `tasks/group-sender.js`).
@@ -704,7 +728,7 @@ function childWeatherButton(c) {
     return `<button type="button" class="weather-icon-btn weather-icon-btn-sm" data-weather-task="${escapeHtml(String(c.id))}" aria-label="${label}" title="${label}"><span class="weather-icon-emoji" data-weather-icon-for="${key}" aria-hidden="true">…</span><span aria-hidden="true">🌡️</span></button>`;
 }
 
-function childHtml(c) {
+function childHtml(c, readOnly) {
     if (String(c.id) === String(state.editingId)) {
         return `<div class="child-item" data-id="${escapeHtml(String(c.id))}">
             <div class="edit-wrap">
@@ -728,7 +752,9 @@ function childHtml(c) {
         ? i18nT('taskItem.checkbox.markUndone')
         : i18nT('taskItem.checkbox.markDone');
 
-    const menuItems = state.currentFilter === 'archived'
+    const menuItems = readOnly
+        ? detailOnlyMenu()
+        : (state.currentFilter === 'archived'
         ? [
             { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
             { action: 'delete', label: i18nT('taskItem.operations.deleteChild'), icon: '✕', className: 'danger' }
@@ -739,7 +765,7 @@ function childHtml(c) {
             { action: 'detail', label: i18nT('taskItem.operations.detailChild'), icon: '📋' },
             { action: 'archive', label: i18nT('taskItem.operations.archiveChild'), icon: '📦' },
             { action: 'delete', label: i18nT('taskItem.operations.deleteChild'), icon: '✕', className: 'danger' }
-        ];
+        ]);
 
     return `<div class="child-item ${c.completed ? 'completed' : ''} ${String(c.id) === String(state.justAddedId) ? 'just-added' : ''}" data-id="${escapeHtml(String(c.id))}">
         <div class="child-main-row">
@@ -771,7 +797,9 @@ function planHtml(task) {
     const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
     const hasLoc = hasAnyLocation(task);
 
-    const menuItems = state.currentFilter === 'archived'
+    const menuItems = isOtherShared(task)
+        ? detailOnlyMenu()
+        : (state.currentFilter === 'archived'
         ? [
             { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
             { action: 'delete', label: i18nT('taskItem.operations.deletePlan'), icon: '✕', className: 'danger' }
@@ -782,7 +810,7 @@ function planHtml(task) {
             { action: 'detail', label: i18nT('taskItem.operations.detailPlan'), icon: '📋' },
             { action: 'archive', label: i18nT('taskItem.operations.archivePlan'), icon: '📦' },
             { action: 'delete', label: i18nT('taskItem.operations.deletePlan'), icon: '✕', className: 'danger' }
-        ];
+        ]);
 
     return `<div class="task-item plan-item prio-${task.priority}${sideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">
         <div class="plan-head">
@@ -805,7 +833,7 @@ function planHtml(task) {
         </div>
         ${(task.sessions && task.sessions.length) ? `<div class="plan-session-row">${sessionSummaryHtml(task)}</div>` : ''}
         ${open ? `<div class="plan-body">
-            ${kids.length ? kids.map(c => childHtml(c)).join('') : `<div class="session-empty">${i18nT('taskItem.plan.noChildren')}</div>`}
+            ${kids.length ? kids.map(c => childHtml(c, isOtherShared(task))).join('') : `<div class="session-empty">${i18nT('taskItem.plan.noChildren')}</div>`}
             ${drafts.length ? `<div class="due-chips u-m-0">${drafts.map(s => `<span class="due-chip">📅 ${faShort(s.at)}<button type="button" data-cdchip="${escapeHtml(String(s.id))}" data-gid="${escapeHtml(String(task.id))}" aria-label="${i18nT('common.delete')}">✕</button></span>`).join('')}</div>` : ''}
             <div class="child-add">
                 <input type="text" class="child-input" placeholder="${i18nT('tasks.plan.newChildPlaceholder')}" maxlength="${MAX_LENGTH}" aria-label="${i18nT('tasks.plan.newChildAria')}">
@@ -845,7 +873,9 @@ function taskItemHtml(task) {
         ? i18nT('taskItem.checkbox.markUndone')
         : i18nT('taskItem.checkbox.markDone');
 
-    const menuItems = state.currentFilter === 'archived'
+    const menuItems = isOtherShared(task)
+        ? detailOnlyMenu()
+        : (state.currentFilter === 'archived'
         ? [
             { action: 'unarchive', label: i18nT('taskItem.operations.unarchive'), icon: '↩' },
             { action: 'delete', label: i18nT('taskItem.operations.delete'), icon: '✕', className: 'danger' }
@@ -858,7 +888,7 @@ function taskItemHtml(task) {
             { action: 'edit-btn', label: i18nT('taskItem.operations.edit'), icon: '✎' },
             { action: 'archive', label: i18nT('taskItem.operations.archive'), icon: '📦' },
             { action: 'delete', label: i18nT('taskItem.operations.delete'), icon: '✕', className: 'danger' }
-        ];
+        ]);
 
     return `
     <div class="task-item prio-${task.priority} ${task.completed ? 'completed' : ''} ${task.id === state.justAddedId ? 'just-added' : ''}${sideClass(task)}"${state.currentSort === 'manual' ? ' draggable="true"' : ''} data-id="${escapeHtml(String(task.id))}">

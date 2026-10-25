@@ -14,6 +14,11 @@ const _urlCache = new Map();
 
 /**
  * resolve یک ref آواتار به URL نمایشی (یا null).
+ *
+ * ⚠️ 10.37 (BUG-40): نتیجه‌ی «ناموفق» کش نمی‌شود. پیش از این اگر یک بار
+ * درخواست مدیا شکست می‌خورد (۴۰۳/۴۰۴/شبکه)، `null` برای همیشه در کش
+ * می‌ماند و آواتار آن کاربر تا رفرش کامل صفحه هرگز دیده نمی‌شد. حالا فقط
+ * URL موفق کش می‌شود تا تلاش بعدی دوباره انجام شود.
  */
 export async function resolveAvatar(ref) {
     if (!ref || typeof ref !== 'string') return null;
@@ -35,7 +40,8 @@ export async function resolveAvatar(ref) {
     } else if (value.startsWith('https://')) {
         url = value;
     }
-    _urlCache.set(value, url);
+    if (url) _urlCache.set(value, url);
+    else _urlCache.delete(value);
     return url;
 }
 

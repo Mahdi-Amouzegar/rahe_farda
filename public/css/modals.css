@@ -57,6 +57,152 @@
         max-width: 420px;
     }
 
+    /* ═══ بدنه‌ی مودال گروه (10.37) ═══
+       ⚠️ قبلاً `.group-modal-body` هیچ قاعده‌ای نداشت؛ ردیف‌های نام/هندل/آواتار
+       و لیست اعضا با فاصله‌ی پیش‌فرض مرورگر روی هم می‌افتادند و مودال شبیه یک
+       صفحه‌ی خام دیده می‌شد. حالا همان زبان بصری picker/دراور را می‌گیرد. */
+    .group-modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .group-modal-body > .wizard-hint {
+        margin: -2px 0 6px;
+    }
+
+    .group-modal-body .conv-new {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .group-modal-body .conv-new .conv-input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .group-modal-body .conv-search-results {
+        max-height: 220px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(165, 165, 208, 0.34) transparent;
+    }
+
+    .group-modal-body .conv-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        background: var(--bg-2);
+        min-width: 0;
+    }
+
+    .group-modal-body .conv-row .conv-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ═══ نام + هندل در دو سطر (10.37) ═══
+       ⚠️ در ردیف گروه عمومی و ردیف مدیر، نام در خط اول و «@هندل» در خط دوم
+       می‌آید. بدون این قاعده هر دو span داخل یک `.conv-name` با nowrap به هم
+       می‌چسبند و «نام@هندل» در یک خط دیده می‌شود. */
+    .group-modal-body .conv-name-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+    }
+
+    .group-modal-body .conv-name-main {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .group-modal-body .conv-name-sub {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .group-modal-body .conv-role {
+        flex: 0 0 auto;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--accent-cyan);
+        padding: 2px 8px;
+        border-radius: var(--radius-pill);
+        background: var(--accent-cyan-soft);
+        border: 1px solid var(--accent-cyan-border);
+    }
+
+    /* ═══ ردیف آواتار گروه (10.37) ═══ */
+    .group-avatar-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+    }
+
+    .group-avatar-preview {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 auto;
+        font-size: 1.1rem;
+    }
+
+    /* ═══ کارت‌های حالت کار در ویزارد خوش‌آمد (10.37) ═══ */
+    .wizard-modes {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0 0 12px;
+    }
+
+    .wizard-mode {
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+        text-align: start;
+    }
+
+    .wizard-mode--cloud {
+        border-color: var(--accent-cyan-border);
+        background: linear-gradient(145deg, var(--accent-cyan-soft), transparent 70%);
+    }
+
+    .wizard-mode-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+
+    .wizard-mode-text {
+        margin: 0;
+        font-size: 0.78rem;
+        line-height: 1.9;
+        color: var(--text-muted);
+    }
+
     /* ═══ سرصفحه‌ی مودال: عنوان و دکمه‌ی بستن در یک سطر (10.34) ═══
        ⚠️ قبلاً این ردیف هیچ قاعده‌ای نداشت؛ عنوان و ✕ به‌صورت بلوکی
        زیر هم می‌افتادند و ارتفاع اضافه و ظاهر نامرتب می‌ساختند. */
@@ -632,6 +778,29 @@
         cursor: pointer;
         white-space: nowrap;
     }
+
+    /* ═══ آیتم منوی ⋯ با توضیح (10.37) ═══
+       ⚠️ منوی گروه دو آیتم خطرناک با نام‌های نزدیک دارد («بستن گروه» /
+       «حذف گروه»)؛ توضیح زیر برچسب تفاوتشان را روشن می‌کند. */
+    .menu-item-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        text-align: start;
+    }
+
+    .menu-item-desc {
+        font-size: 0.68rem;
+        font-weight: 400;
+        line-height: 1.7;
+        color: var(--text-faint);
+        white-space: normal;
+    }
+
+    .menu-item--danger .menu-item-desc {
+        color: var(--text-muted);
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -777,6 +946,18 @@
     html.theme-light .welcome-settings {
         background: #f8fafc;
         border-color: #e2e8f0;
+    }
+
+    /* ═══ 10.37: کارت‌های تازه در تم روشن ═══ */
+    html.theme-light .wizard-mode,
+    html.theme-light .group-avatar-row,
+    html.theme-light .group-modal-body .conv-row {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+
+    html.theme-light .wizard-mode--cloud {
+        background: linear-gradient(145deg, var(--accent-cyan-soft), #ffffff 70%);
     }
 
     html.theme-light .welcome-opt {

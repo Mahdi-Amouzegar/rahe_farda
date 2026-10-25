@@ -13,7 +13,7 @@
 
 import { apiFetch } from '../api.js';
 import { state, escapeHtml } from '../core.js';
-import { showInfoModal } from '../core.js';
+import { showInfoModal, showConfirmModal } from '../core.js';
 import { t as i18nT } from '../i18n.js';
 import { openMenu } from '../ui/menu.js';
 import { updateDrawerBadges, setRecentConversations, removeDrawerRow } from '../navigation/sidebar.js';
@@ -102,16 +102,40 @@ export async function listConversations() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * شناسه‌ی مخاطبی که گفتگویش همین حالا باز است (یا رشته‌ی خالی).
+ *
+ * ⚠️ 10.37: درخواست کاربر — وقتی گفتگو باز است و پیام را همان لحظه می‌بینیم،
+ * شمارش «نخوانده» نباید بالا برود. شمارش سرور درست است (cursor هنوز جلو
+ * نرفته)؛ اینجا فقط برای **نمایش** بج، مخاطب باز را کنار می‌گذاریم تا
+ * عددی که کاربر هم‌اکنون روی صفحه می‌بیند دوباره شمرده نشود.
+ *
+ * @returns {string}
+ */
+async function openPeerId() {
+    try {
+        const { getDestination } = await import('../tasks/destination.js');
+        const d = getDestination();
+        return d && d.type === 'peer' && d.peerId ? String(d.peerId) : '';
+    } catch {
+        return '';
+    }
+}
+
+/**
  * مجموع نخوانده‌های DM → بج دراور + ردیف‌های اخیر دراور.
  *
  * ⚠️ قدم ۲: منبع شمارنده /api/dm/unread است (نه /api/messages).
  */
 export async function refreshConversationBadges() {
     try {
-        const u = await getDmUnread();
-        const total = u.ok ? (u.unread.total || 0) : 0;
+        const [u, openId] = await Promise.all([getDmUnread(), openPeerId()]);
+        let total = u.ok ? (u.unread.total || 0) : 0;
+        if (u.ok && openId) {
+            const row = (u.unread.byPeer || []).find((r) => String(r.peerId) === openId);
+            if (row) total = Math.max(0, total - (Number(row.count) || 0));
+        }
         updateDrawerBadges({ messages: total });
-        pushRecentConversations();
+        pushRecentConversations(openId);
         return total;
     } catch {
         updateDrawerBadges({ messages: 0 });
@@ -121,16 +145,23 @@ export async function refreshConversationBadges() {
 
 /**
  * ردیف‌های دراور — مرتب بر آخرین فعالیت (تازه‌ترین بالا).
+ *
+ * @param {string} [openId] مخاطبِ باز — بج او صفر نمایش داده می‌شود (10.37)
  */
-export function pushRecentConversations() {
+export function pushRecentConversations(openId) {
     try {
-        const rows = (_conversations || []).slice(0, 200).map((c) => ({
-            userId: String((c.user && c.user.id) || ''),
-            name: displayNameOf(c.user),
-            avatarUrl: (c.user && c.user.avatarUrl) || null,
-            unread: c.unread || 0,
-            lastActivity: c.lastActivity || null,
-        })).filter((r) => r.userId);
+        const skip = String(openId || '');
+        const rows = (_conversations || []).slice(0, 200).map((c) => {
+            const uid = String((c.user && c.user.id) || '');
+            return {
+                userId: uid,
+                name: displayNameOf(c.user),
+                avatarUrl: (c.user && c.user.avatarUrl) || null,
+                // ⚠️ گفتگوی باز = خوانده‌شده از دید کاربر (همان لحظه دیده می‌شود)
+                unread: (skip && uid === skip) ? 0 : (c.unread || 0),
+                lastActivity: c.lastActivity || null,
+            };
+        }).filter((r) => r.userId);
         rows.sort((a, b) => {
             const x = String(a.lastActivity || '');
             const y = String(b.lastActivity || '');
@@ -206,6 +237,17 @@ async function openConversationMenu(otherUserId, anchor) {
                 await listConversations();
                 await refreshConversationBadges();
             } else if (id === 'close') {
+                // ⚠️ 10.37: درخواست کاربر — بستن گفتگو قبلاً بی‌هیچ تأییدی و
+                // بلافاصله انجام می‌شد (یک کلیک اشتباه کافی بود). حالا اول
+                // تأیید می‌گیریم و اگر کاربر منصرف شد، هیچ تغییری نمی‌دهیم.
+                const ok = await showConfirmModal({
+                    title: tr('conn.closeChat', 'بستن گفتگو'),
+                    message: tr('v10.closeChatConfirm', 'گفتگو با این مخاطب بسته شود؟ تاریخچه پاک نمی‌شود، ولی تا شروع دوباره از فهرست پنهان می‌ماند.'),
+                    confirmText: tr('conn.closeChat', 'بستن گفتگو'),
+                    cancelText: tr('common.cancel', 'انصراف'),
+                    danger: true,
+                });
+                if (!ok) return;
                 const connRes = await findActiveConnectionWith(otherUserId);
                 if (connRes.ok && connRes.connection) {
                     await closeConnection(connRes.connection.id);

@@ -59,7 +59,20 @@ export function openMenu({ anchor, items, onSelect, label }) {
         const text = document.createElement('span');
         text.className = 'menu-item-label';
         text.textContent = String(item.label ?? item.id);
-        btn.appendChild(text);
+        // ⚠️ 10.37: توضیح یک‌خطی زیر برچسب — برای آیتم‌هایی که تفاوتشان از
+        // نامشان پیداست نیست (مثلاً «بستن گروه» در برابر «حذف گروه»).
+        if (item.desc) {
+            const wrap = document.createElement('span');
+            wrap.className = 'menu-item-text';
+            wrap.appendChild(text);
+            const desc = document.createElement('span');
+            desc.className = 'menu-item-desc';
+            desc.textContent = String(item.desc);
+            wrap.appendChild(desc);
+            btn.appendChild(wrap);
+        } else {
+            btn.appendChild(text);
+        }
         btn.addEventListener('click', () => {
             const id = item.id;
             closeMenu();

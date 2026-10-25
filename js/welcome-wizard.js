@@ -181,10 +181,30 @@ function renderLangStep(sec) {
 }
 
 // ─── قدم ۱: خوش‌آمد ───
+//
+// ⚠️ 10.37: متن این قدم با قابلیت‌های فعلی هم‌گام شد. نسخه‌ی قبلی فقط
+// «ذخیره روی همین دستگاه» را می‌گفت و کاربر فکر می‌کرد برنامه همچنان
+// تک‌دستگاهی/آفلاین است؛ در حالی که با حساب آنلاین، همگام‌سازی چنددستگاهی،
+// گفتگوی خصوصی و گروه هم وجود دارد. حالا دو حالت کنار هم توضیح داده می‌شود
+// (بدون حساب / با حساب) و ورود صریحاً «اختیاری» معرفی می‌شود.
 function renderWelcomeStep(sec) {
     stepTitle(sec, tr('welcome.title', '👋 خوش آمدید'));
-    sec.appendChild(el('p', 'welcome-text', tr('welcome.textShort', 'برنامه‌ریز شخصی آفلاین و خصوصی.')));
-    sec.appendChild(el('p', 'storage-guidance', tr('welcome.storageGuidance', '')));
+    sec.appendChild(el('p', 'welcome-text', tr('v10.welcomeShort', 'برنامه‌ریز وظایف، با دو حالت کار: تنها روی دستگاه، یا همراه با حساب آنلاین.')));
+
+    const modes = el('div', 'wizard-modes');
+
+    const localBox = el('div', 'wizard-mode');
+    localBox.appendChild(el('div', 'wizard-mode-title', tr('v10.welcomeLocalTitle', 'بدون حساب — فقط روی این دستگاه')));
+    localBox.appendChild(el('p', 'wizard-mode-text', tr('v10.welcomeLocal', 'وظایف و تنظیماتت در همین مرورگر ذخیره می‌شود و به هیچ سروری نمی‌رود.')));
+    modes.appendChild(localBox);
+
+    const cloudBox = el('div', 'wizard-mode wizard-mode--cloud');
+    cloudBox.appendChild(el('div', 'wizard-mode-title', tr('v10.welcomeCloudTitle', 'با حساب — روی سرور هم ذخیره می‌شود')));
+    cloudBox.appendChild(el('p', 'wizard-mode-text', tr('v10.welcomeCloud', 'با ورود به حساب، وظایف روی سرور ذخیره و بین دستگاه‌ها همگام می‌شود؛ همچنین گفتگوی خصوصی و گروه فعال می‌شود.')));
+    modes.appendChild(cloudBox);
+
+    sec.appendChild(modes);
+    sec.appendChild(el('p', 'storage-guidance', tr('v10.welcomeNote', 'ورود اختیاری است: هر وقت خواستی از «حساب من» وارد شو.')));
     renderChrome(sec, { showBack: true, showNext: true, showSkip: true });
 }
 
