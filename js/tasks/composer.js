@@ -19,12 +19,13 @@ import {
     setDetailBridge,
     getSharedItem,
     getSharedTaskDeep,
+    addOptimisticSharedItem,
+    stripSharedPayload,
 } from './source.js';
-import { createDmTask } from '../communication/dm-tasks.js';
+import { enqueueDmOp, flushDmQueue } from '../communication/dm-queue.js';
+import { getDmUnread } from '../communication/dm-tasks.js';
 import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
-import { apiFetch, apiErrorMessage } from '../api.js';
-import { showToast } from '../ui.js';
-import { t as i18nT } from '../i18n.js';
+import { apiFetch } from '../api.js';
 import { refreshDestBanner, hideDestBanner } from './banner.js';
 
 export {
@@ -37,6 +38,14 @@ export {
 
 /**
  * ساخت وظیفه از کامپوزر واحد (مقصد = جاری صفحه).
+ *
+ * ⚠️ 10.40 (آفلاین‌فرست):
+ *   - DM و گروه هر دو اول در **صف** می‌نشینند، بعد در لیست **همان لحظه**
+ *     نمایش داده می‌شوند (خوش‌بینانه) و ارسال در پس‌زمینه انجام می‌شود.
+ *   - اگر شبکه نبود، هیچ پیام خطایی نمی‌آید؛ آیتم با پرچم pending می‌ماند و
+ *     در اولین فرصت (آنلاین‌شدن یا flush بعدی) به سرور می‌رود.
+ *   - فقط ردِ دائمی سرور (بلاک/سقف اولین تماس) در `source.js` به کاربر
+ *     اطلاع داده می‌شود و ردیف خوش‌بینانه حذف می‌شود.
  */
 export async function submitTask(kind) {
     const dest = getDestination();
@@ -46,33 +55,43 @@ export async function submitTask(kind) {
     const built = buildTaskFromComposer(kind);
     if (!built) return;
     const { task } = built;
+
     if (dest.type === 'peer') {
-        const res = await createDmTask(dest.peerId, task);
-        if (!res.ok) {
-            const msg = apiErrorMessage(res.error);
-            const input = document.getElementById('taskInput');
-            if (input) {
-                input.setAttribute('aria-invalid', 'true');
-                input.title = msg;
-            }
-            showToast(msg);
-            return res;
-        }
+        await enqueueDmOp(dest.peerId, 'create', task.id, {
+            kind: 'task',
+            payload: stripSharedPayload(task, dest),
+        });
+        addOptimisticSharedItem(task, dest);
+        flushDmQueue(dest.peerId)
+            .then((r) => { if (r && r.flushed > 0) syncAfterFlush(); })
+            .catch(() => {});
     } else if (dest.type === 'group') {
-        await enqueueGroupOp(dest.groupId, 'save', task.id, { kind: 'task', payload: task });
-        try {
-            const fr = await flushGroup(dest.groupId);
-            if (fr && fr.failed > 0) {
-                showToast(i18nT('errors.saveFailed'));
-                return { ok: false };
-            }
-        } catch { /* آفلاین: pending می‌ماند */ }
+        await enqueueGroupOp(dest.groupId, 'save', task.id, {
+            kind: 'task',
+            payload: stripSharedPayload(task, dest),
+        });
+        addOptimisticSharedItem(task, dest);
+        flushGroup(dest.groupId)
+            .then((fr) => { if (fr && fr.flushed > 0) syncAfterFlush(); })
+            .catch(() => {});
     }
+
     resetComposerForm();
     const { render } = await import('../ui.js');
     await refreshSharedList();
     render();
-    return { ok: true };
+    return { ok: true, queued: true };
+}
+
+/**
+ * بعد از flush موفق: لیست را با حقیقت سرور تطبیق بده (idهای سروری، revision).
+ */
+async function syncAfterFlush() {
+    try {
+        const { render } = await import('../ui.js');
+        await refreshSharedList();
+        render();
+    } catch { /* best-effort */ }
 }
 
 /**

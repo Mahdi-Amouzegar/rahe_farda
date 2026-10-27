@@ -159,6 +159,12 @@ async function preloadDrawerLists() {
             refreshGroupBadges().catch(() => {}),
         ]);
     } catch { /* best-effort */ }
+    finally {
+        // ⚠️ 10.40: «در حال بارگذاری…» باید تمام شود، حتی اگر شبکه خطا داد؛
+        // وگرنه دراور برای همیشه پیام لودینگ نشان می‌دهد.
+        markDrawerListsLoaded();
+        rerenderDrawer();
+    }
 }
 
 let _drawerRefreshAt = 0;
@@ -248,7 +254,7 @@ import { events, EV } from './events.js';
 
 // ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
 import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation/workspace.js';
-import { initSidebar, openDrawer, rerenderDrawer } from './navigation/sidebar.js';
+import { initSidebar, openDrawer, rerenderDrawer, markDrawerListsLoaded } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
 import { initSheet, openSheet } from './ui/sheet.js';
 import { refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
@@ -267,6 +273,8 @@ import {
 import { takePendingJoinToken, processPendingJoin } from './communication/groups.js';
 import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
+// ⚠️ 10.40: صف آفلاین DM (قبلاً نداشت — پیام آفلاین با خطا رد می‌شد)
+import { initDmQueue } from './communication/dm-queue.js';
 import { initWelcomeWizard } from './welcome-wizard.js';
 import { openSharePicker } from './communication/shares.js';
 import { exportBackupV2, importBackupV2, normalizeBackup } from './backup-v2.js';
@@ -375,6 +383,55 @@ const dueChipsManager = new DueChipsManager();
 // ═══════════════════════════════════════════════════════════════════════════
 
 let _authTrapCleanup = null;
+
+/**
+ * متن دوزبانه‌ی کوچک برای پیام‌های همین‌جا (بدون افزودن کلید تازه به locale).
+ * @param {string} fa
+ * @param {string} en
+ * @returns {string}
+ */
+function bi(fa, en) {
+    try {
+        return getLang() === 'en' ? en : fa;
+    } catch {
+        return fa;
+    }
+}
+
+/**
+ * کپی متن در کلیپ‌بورد.
+ *
+ * ⚠️ 10.40: `navigator.clipboard` در برخی مرورگرها/PWA و در حالت غیر-secure
+ * موجود نیست؛ fallback با textarea + execCommand همان نتیجه را می‌دهد.
+ *
+ * @param {string} text
+ * @returns {Promise<boolean>}
+ */
+async function copyToClipboard(text) {
+    const value = String(text || '');
+    if (!value) return false;
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(value);
+            return true;
+        }
+    } catch { /* fallback پایین */ }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * باز کردن مودال «حساب من».
@@ -658,7 +715,15 @@ function renderAuthModal() {
             <div class="auth-ttl-row">
                 <button type="button" class="btn-small" id="authGenCodeBtn">${i18nT('auth.loggedIn.syncCodeGenerate')}</button>
             </div>
-            <div class="auth-user-row" id="authNewCodeRow" hidden><span>${i18nT('auth.loggedIn.syncCodeNewLabel')}</span> <strong dir="ltr" id="authNewCodeValue"></strong></div>
+            <div class="auth-user-row" id="authNewCodeRow" hidden>
+                <span>${i18nT('auth.loggedIn.syncCodeNewLabel')}</span>
+                <button type="button" class="auth-code-btn" id="authNewCodeCopy" dir="ltr"
+                    title="${bi('برای کپی کلیک کنید', 'Click to copy')}"
+                    aria-label="${bi('کپی کد همگام‌سازی', 'Copy sync code')}">
+                    <span id="authNewCodeValue"></span>
+                </button>
+            </div>
+            <div class="auth-remaining" id="authNewCodeHint" hidden>${bi('روی کد بزنید تا کپی شود', 'Tap the code to copy it')}</div>
             <div class="auth-remaining" id="authNewCodeExp" hidden></div>
         </div>
 
@@ -768,6 +833,19 @@ function renderAuthModal() {
                     exp.hidden = !result.expiresAt;
                 }
                 if (row) row.hidden = false;
+                const hint = document.getElementById('authNewCodeHint');
+                if (hint) hint.hidden = false;
+                // ⚠️ 10.40: خود کد یک دکمه است — کلیک = کپی در کلیپ‌بورد
+                const copyBtn = document.getElementById('authNewCodeCopy');
+                if (copyBtn && val) {
+                    copyBtn.addEventListener('click', async () => {
+                        const code = val.textContent || '';
+                        const copied = await copyToClipboard(code);
+                        showToast(copied
+                            ? bi('کد همگام‌سازی کپی شد', 'Sync code copied')
+                            : bi('کپی نشد — کد را دستی انتخاب کنید', 'Copy failed — select the code manually'));
+                    });
+                }
             } finally {
                 const b = document.getElementById('authGenCodeBtn');
                 if (b) b.disabled = false;
@@ -3035,6 +3113,8 @@ try {
 }
 // ⚠️ فاز ۸ (8.3-C): صف آفلاین تسک‌های گروه
 initGroupQueue();
+// ⚠️ 10.40: صف آفلاین DM — flush خودکار هنگام آنلاین‌شدن
+initDmQueue();
 initHeaderStatus();
 initPWA();
 

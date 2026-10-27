@@ -238,6 +238,38 @@ html[dir="ltr"] .drawer {
     padding: 2px 12px;
 }
 
+/* ═══ «در حال بارگذاری» در برابر «خالی» (10.40) ═══
+   ⚠️ قبلاً تا رسیدن پاسخ سرور همان پیام «هنوز گفتگویی نیست» دیده می‌شد و
+   کاربر فکر می‌کرد داده‌اش پاک شده. حالا حالت بارگذاری یک نشانه‌ی بصری
+   جداگانه دارد: نقطه‌ی نبض‌دار + متن کم‌رنگ‌تر. */
+.drawer-hint-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-faint);
+    animation: drawerHintPulse 1.4s ease-in-out infinite;
+}
+
+.drawer-hint-loading::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+}
+
+@keyframes drawerHintPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .drawer-hint-loading {
+        animation: none;
+    }
+}
+
 /* بج «بلاک شده» در نتایج جستجو — هشدار با رنگ مناسب */
 .blocked-tag {
     font-size: 0.78rem;

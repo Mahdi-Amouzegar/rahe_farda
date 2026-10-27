@@ -13,6 +13,7 @@
 import { trapFocus } from '../core.js';
 import { t as i18nT } from '../i18n.js';
 import { isLoggedIn, getCurrentUser } from '../auth.js';
+import { events } from '../events.js';
 import { setBadge } from '../ui/badge.js';
 import { avatarNode } from '../ui/avatar.js';
 import { splitLeadingEmoji } from './nav-icon.js';
@@ -35,6 +36,29 @@ let _showCreateGroup = false;
 let _drawerTab = 'contacts';
 let _searchQuery = '';
 let _searchResults = { users: [], groups: [] };
+
+/**
+ * ⚠️ 10.40: آیا لیست مخاطبان/گروه‌ها از سرور آمده؟
+ *
+ * قبلاً تا لحظه‌ی رسیدن پاسخ، دراور «هنوز گفتگویی نیست / هنوز عضو گروهی نیستی»
+ * نشان می‌داد — یعنی «خالی» و «در حال بارگذاری» یکی بودند و کاربر فکر می‌کرد
+ * داده‌اش پاک شده. حالا تا وقتی loaded نشده، پیام بارگذاری نمایش داده می‌شود.
+ */
+let _listsLoaded = { contacts: false, groups: false };
+
+/**
+ * اعلام پایان بارگذاری لیست‌های دراور (حتی وقتی شبکه خطا داد).
+ * @param {'contacts'|'groups'} [kind] — بدون آرگومان: هر دو
+ */
+export function markDrawerListsLoaded(kind) {
+    if (!kind || kind === 'contacts') _listsLoaded.contacts = true;
+    if (!kind || kind === 'groups') _listsLoaded.groups = true;
+}
+
+function loadingHint() {
+    const v = i18nT('common.loading');
+    return v !== 'common.loading' ? v : 'در حال بارگذاری…';
+}
 
 function drawerRoot() {
     return document.getElementById('drawerRoot');
@@ -357,7 +381,14 @@ function renderContactsTab(aside) {
         aside.appendChild(row);
     }
     if (_recentConversations.length === 0 && _incomingRequests.length === 0) {
-        aside.appendChild(el('div', 'drawer-hint', i18nT('workspace.messagesEmpty') !== 'workspace.messagesEmpty' ? i18nT('workspace.messagesEmpty') : 'هنوز گفتگویی نیست.'));
+        // ⚠️ 10.40: «در حال بارگذاری» جدا از «خالی»
+        aside.appendChild(el(
+            'div',
+            'drawer-hint' + (_listsLoaded.contacts ? '' : ' drawer-hint-loading'),
+            _listsLoaded.contacts
+                ? (i18nT('workspace.messagesEmpty') !== 'workspace.messagesEmpty' ? i18nT('workspace.messagesEmpty') : 'هنوز گفتگویی نیست.')
+                : loadingHint()
+        ));
     }
 }
 
@@ -497,7 +528,14 @@ function renderGroupsTab(aside) {
         aside.appendChild(row);
     }
     if (_recentGroups.length === 0 && _groupInvitations.length === 0) {
-        aside.appendChild(el('div', 'drawer-hint', i18nT('workspace.groupsEmpty') !== 'workspace.groupsEmpty' ? i18nT('workspace.groupsEmpty') : 'هنوز عضو گروهی نیستی.'));
+        // ⚠️ 10.40: «در حال بارگذاری» جدا از «خالی»
+        aside.appendChild(el(
+            'div',
+            'drawer-hint' + (_listsLoaded.groups ? '' : ' drawer-hint-loading'),
+            _listsLoaded.groups
+                ? (i18nT('workspace.groupsEmpty') !== 'workspace.groupsEmpty' ? i18nT('workspace.groupsEmpty') : 'هنوز عضو گروهی نیستی.')
+                : loadingHint()
+        ));
     }
 }
 
@@ -685,6 +723,7 @@ export function updateDrawerBadges({ messages, groups, notifications }) {
  */
 export function setRecentConversations(list) {
     _recentConversations = Array.isArray(list) ? list.slice(0, 200) : [];
+    _listsLoaded.contacts = true;
 }
 
 /**
@@ -693,6 +732,7 @@ export function setRecentConversations(list) {
  */
 export function setRecentGroups(list) {
     _recentGroups = Array.isArray(list) ? list.slice(0, 200) : [];
+    _listsLoaded.groups = true;
 }
 
 /**
@@ -797,6 +837,14 @@ function buildCreateGroupForm() {
  */
 export function initSidebar(opts) {
     _opts = opts || {};
+    // ⚠️ 10.40: با خروج، وضعیت «بارگذاری‌شده» صفر می‌شود تا ورود بعدی
+    // دوباره «در حال بارگذاری…» نشان دهد، نه «خالی».
+    if (!initSidebar._authBound) {
+        initSidebar._authBound = true;
+        events.on('auth:logout', () => {
+            _listsLoaded = { contacts: false, groups: false };
+        });
+    }
     const root = drawerRoot();
     if (!root) return;
     const scrim = document.getElementById('drawerScrim');

@@ -920,6 +920,56 @@
         box-shadow: 0 0 0 3px rgba(201, 74, 74, 0.18), 0 5px 18px rgba(0, 0, 0, 0.2);
     }
 
+    /* ═══ 10.40: کد همگام‌سازی قابل کپی ═══
+       ⚠️ کد قبلاً یک <strong> ساده بود؛ هیچ دکمه/کپی‌ای نداشت و کاربر باید
+       متن را دستی انتخاب می‌کرد — که در موبایل عملاً ممکن نبود. حالا خود کد
+       یک دکمه است: monospace، LTR، با حاشیه‌ی خط‌چین تا «قابل لمس» به نظر
+       برسد و با هاور/اکتیو بازخورد بدهد. */
+    .auth-code-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 100%;
+        padding: 6px 12px;
+        border: 1.5px dashed var(--accent-cyan-border);
+        border-radius: var(--radius-sm);
+        background: var(--bg-2);
+        color: var(--accent-cyan);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        /* ⚠️ اگر Clipboard API در دسترس نبود، یک کلیک کل کد را انتخاب می‌کند */
+        -webkit-user-select: all;
+        user-select: all;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, transform 0.12s ease;
+    }
+
+    .auth-code-btn #authNewCodeValue {
+        direction: ltr;
+        unicode-bidi: plaintext;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .auth-code-btn:hover {
+        border-color: var(--accent-cyan);
+        background: var(--accent-cyan-soft);
+        box-shadow: 0 0 14px var(--accent-cyan-soft);
+    }
+
+    .auth-code-btn:active {
+        transform: scale(0.985);
+    }
+
+    .auth-code-btn:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+
     /* ═══ Light theme overrides ═══ */
     html.theme-light .picker {
         background: #ffffff;
@@ -982,5 +1032,16 @@
 
     html.theme-light .picker-day.selected {
         box-shadow: 0 4px 12px var(--accent-purple-soft);
+    }
+
+    /* ⚠️ 10.40: دکمه‌ی کد همگام‌سازی در تم روشن */
+    html.theme-light .auth-code-btn {
+        background: #f8fafc;
+        border-color: #cfe3ea;
+    }
+
+    html.theme-light .auth-code-btn:hover {
+        background: var(--accent-cyan-soft);
+        border-color: var(--accent-cyan);
     }
 }

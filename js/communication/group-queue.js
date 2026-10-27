@@ -204,6 +204,28 @@ export async function enqueueGroupOp(groupId, type, entityId, data) {
 }
 
 /**
+ * opهای pending یک گروه (مرتب بر زمان ساخت) — برای «نمای آفلاین».
+ *
+ * ⚠️ 10.40: `refreshSharedList` وقتی آفلاین است (یا fetch شکست می‌خورد)
+ * باید تسک‌های ساخته/ویرایش‌شده‌ی هنوزنرفته را هم نشان دهد، وگرنه کاربر
+ * چیزی که همین حالا نوشته از لیست محو می‌شود. ردیف‌های صف همان payload کامل
+ * را دارند، پس منبع درست همین‌جاست.
+ *
+ * @param {string} groupId
+ * @returns {Promise<object[]>}
+ */
+export async function getPendingGroupOps(groupId) {
+    try {
+        const rows = await readGroupEntries(groupId);
+        return rows
+            .filter((e) => e.status === 'pending')
+            .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    } catch {
+        return [];
+    }
+}
+
+/**
  * تعداد opهای pending یک گروه (برای نشانگر pending در UI).
  */
 export async function getPendingCount(groupId) {

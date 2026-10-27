@@ -10,12 +10,15 @@ import { apiFetch } from '../api.js';
 import { state } from '../core.js';
 import { events, EV } from '../events.js';
 import { stripPhotoBytesForSync, putCachedPhoto } from '../media-cache.js';
-import { enqueueUpload } from '../media-upload.js';
+import { enqueueUpload, remapUploadTaskId } from '../media-upload.js';
 import { dataUrlToBlob } from '../media.js';
+import { isOnline } from '../net.js';
 import { listDmTasks, updateDmTask, deleteDmTask } from '../communication/dm-tasks.js';
-import { enqueueGroupOp, flushGroup } from '../communication/group-queue.js';
+import { enqueueDmOp, getPendingDmOps } from '../communication/dm-queue.js';
+import { enqueueGroupOp, flushGroup, getPendingGroupOps } from '../communication/group-queue.js';
+import { loadSharedItems, saveSharedItems, setSharedCacheUser } from './shared-cache.js';
 import { getDestination } from './destination.js';
-import { t as i18nT } from '../i18n.js';
+import { t as i18nT, getLang } from '../i18n.js';
 // ⚠️ 10.24: منطق دوره در sessions.js است (بدون چرخه‌ی import با store.js).
 import { advanceRecurOnTick } from '../sessions.js';
 
@@ -342,8 +345,231 @@ function myId() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// نمای آفلاین مقصد مشترک (10.40)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ مسئله‌ای که این بخش حل می‌کند:
+//   قبلاً `refreshSharedList` فقط از سرور می‌خواند. آفلاین (یا با خطای شبکه)
+//   `_items = []` می‌شد و لیست گفتگو/گروه **خالی** دیده می‌شد، در حالی که
+//   کاربر همین چند لحظه قبل همان لیست را دیده بود.
+//
+// ⚠️ حالا:
+//   ۱. هر بار لود موفق، لیست روی دیسک ذخیره می‌شود (`shared-cache.js`).
+//   ۲. آفلاین/خطا → آخرین نسخه‌ی ذخیره‌شده + opهای صف‌مانده نشان داده می‌شود.
+//   ۳. آنلاین → لیست سرور + overlay صف؛ تسک‌های ساخته/ویرایش‌شده‌ی آفلاین
+//      محو نمی‌شوند و بعد از flush خودشان به سرور می‌روند.
+//   ۴. تسکی که در سرور حذف شده ولی نسخه‌ی محلی دارد → یک‌بار از کاربر پرسیده
+//      می‌شود («حذف محلی» یا «ارسال نسخه‌ی محلی»).
+
+let _offline = false;
+const _conflictAsked = new Set();
+
+/**
+ * آیا نمای فعلی از کش محلی آمده (سرور در دسترس نبود)؟
+ * @returns {boolean}
+ */
+export function isSharedOffline() {
+    return _offline;
+}
+
+/**
+ * opهای صف‌مانده‌ی مقصد (DM یا گروه) به شکل یکسان.
+ * @returns {Promise<{type:string, entityId:string, payload:object|null, at:string}[]>}
+ */
+async function pendingOverlayOps(dest) {
+    const out = [];
+    try {
+        if (dest.type === 'peer' && dest.peerId) {
+            for (const e of await getPendingDmOps(dest.peerId)) {
+                out.push({
+                    type: e.type === 'delete' ? 'delete' : 'save',
+                    entityId: String(e.entityId),
+                    payload: (e.data && e.data.payload) || null,
+                    at: e.createdAt,
+                });
+            }
+        } else if (dest.type === 'group' && dest.groupId) {
+            for (const e of await getPendingGroupOps(dest.groupId)) {
+                out.push({
+                    type: e.type === 'delete' ? 'delete' : 'save',
+                    entityId: String(e.entityId),
+                    payload: (e.data && e.data.payload) || null,
+                    at: e.createdAt,
+                });
+            }
+        }
+    } catch { /* صف در دسترس نیست → بدون overlay */ }
+    return out;
+}
+
+/**
+ * اعمال opهای صف روی لیست (بدون تغییر لیست ورودی).
+ *
+ * @param {object[]} items
+ * @param {object[]} ops
+ * @param {object} dest
+ * @returns {object[]}
+ */
+function applyPendingOverlay(items, ops, dest) {
+    const out = (Array.isArray(items) ? items : []).map((t) => ({ ...t }));
+    if (!ops || ops.length === 0) return out;
+    const byId = new Map(out.map((t) => [String(t.id), t]));
+    for (const op of ops) {
+        const id = String(op.entityId);
+        if (op.type === 'delete') {
+            const idx = out.findIndex((t) => String(t.id) === id);
+            if (idx >= 0) out.splice(idx, 1);
+            byId.delete(id);
+            continue;
+        }
+        if (!op.payload || typeof op.payload !== 'object') continue;
+        const existing = byId.get(id);
+        if (existing) {
+            Object.assign(existing, op.payload);
+            existing.id = id;
+            existing._shared = {
+                ...(existing._shared || {}),
+                mine: true,
+                dest,
+                remoteId: id,
+                pending: true,
+            };
+            continue;
+        }
+        const item = normalizeRemote(op.payload, {
+            serverId: id,
+            createdAt: op.at,
+            updatedAt: op.at,
+            mine: true,
+            dest,
+        });
+        item._shared.pending = true;
+        out.push(item);
+        byId.set(id, item);
+    }
+    return out;
+}
+
+/**
+ * افزودن خوش‌بینانه‌ی تسک تازه به نمای جاری (پیش از تأیید سرور).
+ *
+ * ⚠️ بدون این، پیامی که آفلاین فرستاده می‌شود تا لحظه‌ی آنلاین‌شدن در هیچ
+ * لیستی دیده نمی‌شد — همان چیزی که کاربر گزارش کرد.
+ *
+ * @param {object} task — آبجکت تسک ساخته‌شده در کامپوزر
+ * @param {object} dest
+ * @returns {object|null}
+ */
+export function addOptimisticSharedItem(task, dest) {
+    if (!task || task.id == null || !dest) return null;
+    const item = {
+        ...baseLocalShape(),
+        ...task,
+        id: String(task.id),
+        _shared: {
+            mine: true,
+            dest,
+            remoteId: String(task.id),
+            senderName: null,
+            pending: true,
+        },
+    };
+    const idx = _items.findIndex((t) => String(t.id) === String(item.id));
+    if (idx >= 0) _items[idx] = item;
+    else _items.push(item);
+    return item;
+}
+
+/**
+ * حذف یک آیتم از نمای جاری + کش دیسک.
+ */
+function removeLocalSharedItem(id) {
+    const key = String(id);
+    const idx = _items.findIndex((t) => String(t.id) === key);
+    if (idx >= 0) _items.splice(idx, 1);
+    const dest = getDestination();
+    const cacheKey = sharedCacheKey(dest);
+    if (cacheKey) saveSharedItems(cacheKey, _items);
+}
+
+/**
+ * تسک‌هایی که در سرور حذف شده‌اند ولی نسخه‌ی محلی (خودی) هنوز داریم.
+ *
+ * ⚠️ آیتم دیگران عمداً پرسیده نمی‌شود: حذف در سرور برای آن‌ها یعنی «از دید من
+ * هم برود» و پرسیدنش فقط مزاحمت است.
+ */
+function detectDeletedConflicts(cached, serverItems, ops) {
+    if (!Array.isArray(cached) || cached.length === 0) return [];
+    const serverIds = new Set((serverItems || []).map((t) => String(t.id)));
+    const opIds = new Set((ops || []).map((o) => String(o.entityId)));
+    const out = [];
+    for (const c of cached) {
+        if (!c || c.id == null) continue;
+        const id = String(c.id);
+        if (serverIds.has(id) || opIds.has(id)) continue;
+        if (!c._shared || !c._shared.mine) continue;
+        out.push(c);
+    }
+    return out;
+}
+
+/**
+ * پرسش از کاربر برای هر تسک «در سرور حذف‌شده» (حداکثر ۳ مورد در هر بار).
+ *
+ * @param {object[]} conflicts
+ * @param {object} dest
+ */
+async function promptDeletedConflicts(conflicts, dest) {
+    let showConfirmModal;
+    try {
+        ({ showConfirmModal } = await import('../core.js'));
+    } catch {
+        return;
+    }
+    const en = getLang() === 'en';
+    for (const item of conflicts.slice(0, 3)) {
+        const id = String(item.id);
+        if (_conflictAsked.has(id)) continue;
+        _conflictAsked.add(id);
+        const label = String(item.text || '').slice(0, 60) || (en ? 'this task' : 'این وظیفه');
+        let keepLocal = false;
+        try {
+            keepLocal = await showConfirmModal({
+                title: en ? 'Deleted on the server' : 'در سرور حذف شده',
+                message: en
+                    ? `“${label}” no longer exists on the server, but a local version is still here. Send the local version to the server?`
+                    : `«${label}» در سرور حذف شده ولی نسخه‌ی محلی‌اش هنوز اینجاست. نسخه‌ی محلی به سرور فرستاده شود؟`,
+                confirmText: en ? 'Send local version' : 'ارسال نسخه‌ی محلی',
+                cancelText: en ? 'Delete locally' : 'حذف محلی',
+            });
+        } catch {
+            keepLocal = false;
+        }
+        try {
+            if (!keepLocal) {
+                removeLocalSharedItem(id);
+                continue;
+            }
+            if (dest.type === 'peer') {
+                // ⚠️ سرور id خودش را می‌سازد؛ «ارسال دوباره» = یک پیام تازه
+                const res = await apiFetch('/api/dm/tasks', {
+                    method: 'POST',
+                    body: { peerId: dest.peerId, kind: item.kind || 'task', payload: stripShared(item) },
+                });
+                if (res && res.ok) removeLocalSharedItem(id);
+            } else {
+                await writeSharedTask(dest, id, stripShared(item));
+            }
+        } catch { /* best-effort */ }
+    }
+}
+
 /**
  * بارگذاری دوباره‌ی لیست مقصد جاری (local → خالی).
+ *
+ * ⚠️ 10.40: آفلاین/خطا دیگر لیست را خالی نمی‌کند — آخرین نسخه‌ی ذخیره‌شده
+ * به‌همراه تسک‌های صف‌مانده برمی‌گردد.
  */
 export async function refreshSharedList() {
     const dest = getDestination();
@@ -351,28 +577,67 @@ export async function refreshSharedList() {
         _items = [];
         _loading = false;
         _error = null;
+        _offline = false;
         return { ok: true, items: [] };
     }
+    const cacheKey = sharedCacheKey(dest);
+    setSharedCacheUser(myId());
     _loading = true;
     _error = null;
     try {
+        const cached = cacheKey ? loadSharedItems(cacheKey) : [];
+
+        // ─── آفلاین: همان برداشت قبلی + تسک‌های صف‌مانده ───
+        if (!isOnline()) {
+            const ops = await pendingOverlayOps(dest);
+            _items = applyPendingOverlay(cached, ops, dest);
+            _offline = true;
+            if (cacheKey) cacheSharedItems(cacheKey, _items, dest.name);
+            return { ok: true, items: _items, offline: true, cached: true };
+        }
+
         let res;
-        if (dest.type === 'peer') {
-            res = await fetchPeerTasks(dest.peerId, myId(), dest.name);
-        } else if (dest.type === 'group') {
-            res = await fetchGroupTasks(dest.groupId, myId());
-        } else {
-            res = { ok: false, error: { code: 'BAD_DESTINATION' } };
+        try {
+            if (dest.type === 'peer') {
+                res = await fetchPeerTasks(dest.peerId, myId(), dest.name);
+            } else if (dest.type === 'group') {
+                res = await fetchGroupTasks(dest.groupId, myId());
+            } else {
+                res = { ok: false, error: { code: 'BAD_DESTINATION' } };
+            }
+        } catch {
+            res = { ok: false, error: { code: 'NETWORK_ERROR' } };
         }
-        if (!res.ok) {
-            _error = res.error || { code: 'LOAD_FAILED' };
+
+        // ─── خطای شبکه: به کش برمی‌گردیم (نه لیست خالی) ───
+        if (!res || !res.ok) {
+            const ops = await pendingOverlayOps(dest);
+            if (cached.length > 0 || ops.length > 0) {
+                _items = applyPendingOverlay(cached, ops, dest);
+                _offline = true;
+                return { ok: true, items: _items, offline: true, cached: true };
+            }
+            _error = (res && res.error) || { code: 'LOAD_FAILED' };
             _items = [];
-            return res;
+            return res || { ok: false, error: _error };
         }
-        _items = res.items || [];
+
+        // ─── آنلاین: سرور + overlay صف ───
+        const ops = await pendingOverlayOps(dest);
+        const serverItems = res.items || [];
+        const merged = applyPendingOverlay(serverItems, ops, dest);
+        _items = merged;
+        _offline = false;
         // ⚠️ REQ-02: بازدید هم کش یادآور را تازه می‌کند
-        cacheSharedItems(sharedCacheKey(dest), _items, dest.name);
-        return { ok: true, items: _items };
+        if (cacheKey) {
+            cacheSharedItems(cacheKey, merged, dest.name);
+            saveSharedItems(cacheKey, merged);
+        }
+        const conflicts = detectDeletedConflicts(cached, serverItems, ops);
+        if (conflicts.length > 0) {
+            promptDeletedConflicts(conflicts, dest).catch(() => {});
+        }
+        return { ok: true, items: merged, offline: false, conflicts: conflicts.length };
     } finally {
         _loading = false;
     }
@@ -460,8 +725,23 @@ export async function enqueueSharedPhotosForUpload(dest, taskObj) {
 async function writeSharedTask(dest, remoteId, taskObj) {
     try {
         if (dest.type === 'peer') {
-            const res = await updateDmTask(remoteId, stripSharedPayload(taskObj, dest));
-            if (res && res.ok) enqueueSharedPhotosForUpload(dest, taskObj).catch(() => {});
+            const payload = stripSharedPayload(taskObj, dest);
+            // ⚠️ 10.40: آفلاین یا خطای شبکه → صف DM. قبلاً مستقیم PATCH می‌زد و
+            // «ذخیره ناموفق بود» می‌داد؛ ویرایش کاربر از دست می‌رفت.
+            if (!isOnline()) {
+                await enqueueDmOp(dest.peerId, 'update', remoteId, { kind: 'task', payload });
+                return { ok: true, queued: true };
+            }
+            const res = await updateDmTask(remoteId, payload);
+            if (res && res.ok) {
+                enqueueSharedPhotosForUpload(dest, taskObj).catch(() => {});
+                return res;
+            }
+            const code = res && res.error && res.error.code;
+            if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') {
+                await enqueueDmOp(dest.peerId, 'update', remoteId, { kind: 'task', payload });
+                return { ok: true, queued: true };
+            }
             return res;
         }
         if (dest.type === 'group') {
@@ -686,10 +966,29 @@ export async function deleteSharedTask(remoteId) {
     if (!item || !item._shared || !item._shared.mine) return { ok: false };
     const dest = item._shared.dest;
     if (dest.type === 'peer') {
-        return deleteDmTask(remoteId);
+        // ⚠️ 10.40: حذف آفلاین هم باید در صف بماند و همان لحظه از لیست برود
+        if (!isOnline()) {
+            await enqueueDmOp(dest.peerId, 'delete', remoteId, null);
+            removeLocalSharedItem(remoteId);
+            return { ok: true, queued: true };
+        }
+        const res = await deleteDmTask(remoteId);
+        const code = res && res.error && res.error.code;
+        if (!res || !res.ok) {
+            // ⚠️ 10.40: خطای شبکه → صف؛ خطای دائمی → همان پاسخ سرور برمی‌گردد
+            if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') {
+                await enqueueDmOp(dest.peerId, 'delete', remoteId, null);
+                removeLocalSharedItem(remoteId);
+                return { ok: true, queued: true };
+            }
+            return res || { ok: false };
+        }
+        removeLocalSharedItem(remoteId);
+        return res;
     }
     if (dest.type === 'group') {
         await enqueueGroupOp(dest.groupId, 'delete', remoteId, null);
+        removeLocalSharedItem(remoteId);
         try {
             await flushGroup(dest.groupId);
         } catch { /* آفلاین */ }
@@ -848,3 +1147,79 @@ export async function fetchGroupTasks(groupId, myId, opts) {
     });
     return { ok: true, items };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// سیم‌کشی صف‌ها → نمای مشترک (10.40)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _queueWired = false;
+
+function wireQueueEvents() {
+    if (_queueWired) return;
+    _queueWired = true;
+
+    /**
+     * DM: سرور برای هر پیام id تازه می‌سازد. بعد از flush باید:
+     *   ۱. id لوکال در لیست با id سروری عوض شود (وگرنه ردیف تکراری می‌شود)
+     *   ۲. taskId آپلودهای صف‌مانده نگاشت مجدد شود (وگرنه presign تا ابد 403)
+     */
+    events.on('dm:queue-flushed', ({ peerId, created, deleted }) => {
+        try {
+            const key = 'peer:' + String(peerId || '');
+            let changed = false;
+            for (const row of (created || [])) {
+                const tempId = String(row.tempId);
+                const serverId = String(row.serverId);
+                const item = _items.find((t) => String(t.id) === tempId);
+                if (item) {
+                    item.id = serverId;
+                    if (item._shared) {
+                        item._shared.remoteId = serverId;
+                        delete item._shared.pending;
+                    }
+                    const srv = row.task || {};
+                    if (srv.updatedAt || srv.updated_at) item.updatedAt = srv.updatedAt || srv.updated_at;
+                    changed = true;
+                }
+                remapUploadTaskId(tempId, serverId).catch(() => {});
+            }
+            for (const id of (deleted || [])) {
+                const idx = _items.findIndex((t) => String(t.id) === String(id));
+                if (idx >= 0) { _items.splice(idx, 1); changed = true; }
+            }
+            if (changed) saveSharedItems(key, _items);
+        } catch { /* best-effort */ }
+    });
+
+    /** رد دائمی یک op (بلاک/سقف اولین تماس/۴۰۴) — کاربر باید بداند ارسال نشد. */
+    events.on('dm:queue-rejected', async ({ peerId, type }) => {
+        try {
+            const dest = getDestination();
+            const same = dest.type === 'peer' && String(dest.peerId) === String(peerId);
+            if (type === 'create' && same) {
+                // ردیف خوش‌بینانه‌ای که هرگز ساخته نشد باید برود
+                await refreshSharedList();
+                const { render } = await import('../ui.js');
+                render();
+            }
+            const { showToast } = await import('../ui.js');
+            const en = getLang() === 'en';
+            showToast(en
+                ? 'Not sent — you cannot message this contact right now.'
+                : 'ارسال نشد — در حال حاضر امکان پیام به این مخاطب نیست.');
+        } catch { /* silent */ }
+    });
+
+    /** آنلاین شدن: لیست مقصد باز با حقیقت سرور تطبیق داده شود. */
+    events.on(EV.NET_ONLINE, async () => {
+        try {
+            const dest = getDestination();
+            if (dest.type === 'local') return;
+            await refreshSharedList();
+            const { render } = await import('../ui.js');
+            render();
+        } catch { /* best-effort */ }
+    });
+}
+
+wireQueueEvents();

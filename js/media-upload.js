@@ -42,6 +42,8 @@
 import { state, uid } from './core.js';
 import { events, EV } from './events.js';
 import { isOnline } from './net.js';
+import { getQueue } from './sync-queue.js';
+import { hasPendingDmCreate } from './communication/dm-queue.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
@@ -90,6 +92,26 @@ export function isMockStorageUrl(url) {
 
 /** خطای غیرقابل‌تلاش‌مجدد: سرور storage ندارد. */
 const ERR_STORAGE_UNCONFIGURED = 'MEDIA_STORAGE_UNCONFIGURED';
+
+/**
+ * ⚠️ 10.40 (BUG-42): «تسک هنوز روی سرور نیست».
+ *
+ * presign برای مدیای متصل به تسک، مالکیت تسک را چک می‌کند
+ * (`getTaskByIdForUser` / `isDmTaskParticipant`). اگر تسک همین حالا ساخته شده
+ * و op ذخیره‌اش هنوز در صف sync است، سرور آن را نمی‌شناسد و **403** می‌دهد.
+ * نسخه‌ی قبلی این را «شکست آپلود» حساب می‌کرد: retry تا ۵ بار، بج ❗ روی
+ * عکس و پیام خطا — در حالی که عکس سالم بود و فقط باید کمی صبر می‌کرد.
+ *
+ * حالا این حالت «تعویق» است: status روی pending می‌ماند، شمارنده‌ی شکست
+ * بالا نمی‌رود، پیام خطا نمی‌آید و بعد از هر flush موفق دوباره تلاش می‌شود.
+ */
+const ERR_TASK_NOT_READY = 'MEDIA_TASK_NOT_READY';
+
+/** حداکثر تعداد تعویق قبل از اعلام شکست واقعی (هر بار ~۱۰ ثانیه ≈ ۶-۷ دقیقه). */
+const MAX_DEFER_COUNT = 40;
+
+/** فاصله‌ی تلاش بعدی برای آپلودِ معوق (ms). */
+const DEFER_DELAY_MS = 10000;
 
 /** تأخیر پایه برای exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 3000;
@@ -389,10 +411,40 @@ export async function processQueue() {
                 continue;
             }
 
+            // ─── 10.40: آپلود معوق (تسک هنوز روی سرور نیست) را زودتر از موعد نجو ───
+            const deferUntil = upload.deferUntil ? Date.parse(upload.deferUntil) : 0;
+            if (Number.isFinite(deferUntil) && deferUntil > Date.now()) {
+                continue;
+            }
+
             try {
                 await processOne(upload);
                 processed++;
             } catch (err) {
+                // ─── 10.40 (BUG-42): تعویق، نه شکست ───
+                if (err && err.code === ERR_TASK_NOT_READY) {
+                    upload.deferCount = (upload.deferCount || 0) + 1;
+                    upload.lastError = ERR_TASK_NOT_READY;
+                    if (upload.deferCount > MAX_DEFER_COUNT) {
+                        // بعد از این‌همه تلاش، دیگر واقعاً مشکلی هست (مالکیت/حذف تسک)
+                        upload.status = 'failed';
+                        upload.retries = MAX_UPLOAD_RETRIES;
+                        await putUpload(upload);
+                        failed++;
+                        events.emit('media:upload-failed', {
+                            mediaId: upload.mediaId,
+                            taskId: upload.taskId,
+                            error: upload.lastError,
+                            retries: upload.retries,
+                        });
+                    } else {
+                        upload.status = 'pending';
+                        upload.deferUntil = new Date(Date.now() + DEFER_DELAY_MS).toISOString();
+                        await putUpload(upload);
+                    }
+                    continue;
+                }
+
                 failed++;
                 const fatal = err && err.code === ERR_STORAGE_UNCONFIGURED;
                 upload.retries = fatal ? MAX_UPLOAD_RETRIES : (upload.retries || 0) + 1;
@@ -430,6 +482,13 @@ export async function processQueue() {
 async function processOne(upload) {
     const mediaId = upload.mediaId;
 
+    // ─── مرحله ۰: آیا تسکِ مقصد روی سرور هست؟ (10.40) ───
+    if (upload.taskId && await isTaskNotReady(upload.taskId)) {
+        const err = new Error(ERR_TASK_NOT_READY);
+        err.code = ERR_TASK_NOT_READY;
+        throw err;
+    }
+
     // ─── مرحله ۱: presign (اگر هنوز نگرفته‌ایم) ───
     if (!upload.serverMediaId || !upload.uploadUrl || isUrlExpired(upload.uploadUrlExpiresAt)) {
         await stepPresign(upload);
@@ -463,6 +522,30 @@ function isUrlExpired(expiresAt) {
     return Date.now() >= ms - 30000; // ۳۰ ثانیه قبل از انقضا
 }
 
+/**
+ * آیا تسک مقصد هنوز روی سرور ساخته نشده؟ (10.40 / BUG-42)
+ *
+ * دو منبع:
+ *   ۱. صف sync شخصی — op ذخیره‌ی همان `taskId` هنوز pending است.
+ *   ۲. صف DM — تسک با id لوکال هنوز `create` نشده (سرور id خودش را می‌سازد).
+ *
+ * ⚠️ برای گروه نیازی نیست: آپلود گروهی با `taskId=null` + `groupId` می‌رود.
+ *
+ * @param {string} taskId
+ * @returns {Promise<boolean>}
+ */
+async function isTaskNotReady(taskId) {
+    if (!taskId) return false;
+    try {
+        const ops = await getQueue();
+        if (ops.some((op) => op && String(op.entityId) === String(taskId))) return true;
+    } catch { /* صف در دسترس نیست → سعی می‌کنیم */ }
+    try {
+        if (await hasPendingDmCreate(taskId)) return true;
+    } catch { /* silent */ }
+    return false;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Step 1: Presign
 // ═══════════════════════════════════════════════════════════════════════════
@@ -490,6 +573,16 @@ async function stepPresign(upload) {
     });
 
     const data = await response.json().catch(() => null);
+
+    // ⚠️ 10.40 (BUG-42): 403/404 در presign یعنی «تسک هنوز روی سرور نیست»
+    // یا «متعلق به این کاربر نیست». اولی با کمی صبر حل می‌شود؛ پس به‌جای
+    // شکست، تعویق می‌کنیم (بدون retry-count و بدون پیام خطا).
+    if (response.status === 403 || response.status === 404) {
+        const err = new Error(ERR_TASK_NOT_READY);
+        err.code = ERR_TASK_NOT_READY;
+        err.status = response.status;
+        throw err;
+    }
 
     if (!response.ok || !data || data.ok !== true) {
         const msg = data?.error?.message || `HTTP ${response.status}`;
@@ -624,6 +717,34 @@ export async function cancelUpload(mediaId) {
 }
 
 /**
+ * نگاشت مجدد taskId آپلودهای صف‌مانده (10.40).
+ *
+ * ⚠️ چرا لازم است؟ در DM، سرور برای هر پیام id خودش را می‌سازد. عکسِ پیامی
+ * که آفلاین ساخته شده با id لوکال در صف آپلود نشسته؛ بعد از flush، تسک با id
+ * سروری ساخته می‌شود و اگر آپلود با id قدیمی بماند، presign تا ابد 403 می‌دهد.
+ *
+ * @param {string} tempId — id لوکال (همان که در `_shared.remoteId` بود)
+ * @param {string} serverId — id سروری
+ * @returns {Promise<number>} تعداد رکوردهای به‌روزشده
+ */
+export async function remapUploadTaskId(tempId, serverId) {
+    if (!tempId || !serverId || String(tempId) === String(serverId)) return 0;
+    try {
+        const uploads = await readAllUploads();
+        let n = 0;
+        for (const u of uploads) {
+            if (String(u.taskId) !== String(tempId)) continue;
+            u.taskId = String(serverId);
+            await putUpload(u);
+            n++;
+        }
+        return n;
+    } catch {
+        return 0;
+    }
+}
+
+/**
  * حذف آپلودهای موفق قدیمی‌تر از N روز.
  */
 async function purgeOldUploads() {
@@ -740,6 +861,17 @@ export async function initMediaUpload() {
     // ─── auth:login ───
     events.on('auth:login', () => {
         scheduleProcess();
+    });
+
+    // ─── 10.40: بعد از هر flush موفق، آپلودهای معوق را دوباره امتحان کن ───
+    events.on(EV.SYNC_FLUSHED, () => {
+        if (state.sync.enabled && isOnline()) scheduleProcess();
+    });
+    events.on('dm:queue-flushed', () => {
+        if (state.sync.enabled && isOnline()) scheduleProcess();
+    });
+    events.on(EV.GROUP_QUEUE_CHANGED, () => {
+        if (state.sync.enabled && isOnline()) scheduleProcess();
     });
 
     // ─── visibilitychange ───
