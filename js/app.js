@@ -176,12 +176,26 @@ const DRAWER_REFRESH_MS = 60000;
 async function refreshDrawerListsThrottled() {
     try {
         const now = Date.now();
-        if (now - _drawerRefreshAt < DRAWER_REFRESH_MS) return;
+        // ⚠️ 10.41: هر مسیر خروجی باید وضعیت «در حال بارگذاری» را ببندد.
+        // `openDrawer` قبل از رندر علامت لودینگ می‌زند؛ اگر اینجا فقط `return`
+        // کنیم، دراور برای همیشه «در حال بارگذاری…» می‌ماند.
+        if (!isLoggedIn()) {
+            markDrawerListsLoaded();
+            rerenderDrawer();
+            return;
+        }
+        if (now - _drawerRefreshAt < DRAWER_REFRESH_MS) {
+            // داده کمتر از ۶۰ ثانیه قدمت دارد → همان وضعیت معتبر است
+            markDrawerListsLoaded();
+            rerenderDrawer();
+            return;
+        }
         _drawerRefreshAt = now;
-        if (!isLoggedIn()) return;
-        await preloadDrawerLists();
+        await preloadDrawerLists(); // finally: markDrawerListsLoaded + rerenderDrawer
+    } catch {
+        markDrawerListsLoaded();
         rerenderDrawer();
-    } catch { /* best-effort */ }
+    }
 }
 function applyDestinationLabel() {
     try {

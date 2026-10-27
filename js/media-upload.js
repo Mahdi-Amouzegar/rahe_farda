@@ -107,11 +107,17 @@ const ERR_STORAGE_UNCONFIGURED = 'MEDIA_STORAGE_UNCONFIGURED';
  */
 const ERR_TASK_NOT_READY = 'MEDIA_TASK_NOT_READY';
 
-/** حداکثر تعداد تعویق قبل از اعلام شکست واقعی (هر بار ~۱۰ ثانیه ≈ ۶-۷ دقیقه). */
+/** حداکثر تعداد تعویق قبل از اعلام شکست واقعی (هر بار ~۴ ثانیه ≈ ۲.۵ دقیقه). */
 const MAX_DEFER_COUNT = 40;
 
-/** فاصله‌ی تلاش بعدی برای آپلودِ معوق (ms). */
-const DEFER_DELAY_MS = 10000;
+/**
+ * فاصله‌ی تلاش بعدی برای آپلودِ معوق (ms).
+ *
+ * ⚠️ 10.41: از ۱۰ ثانیه به ۴ ثانیه کم شد — در حالت عادی (تسکی که همین حالا
+ * ذخیره شده) کاربر نباید ۱۰ ثانیه بج ⏳ ببیند. سقف تعویق (۴۰ بار) هم با
+ * همین عدد بازه‌ی ~۲.۵ دقیقه می‌دهد که برای انتظار روی صف کافی است.
+ */
+const DEFER_DELAY_MS = 4000;
 
 /** تأخیر پایه برای exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 3000;
@@ -137,6 +143,19 @@ let _timerActive = false;
 
 /** @type {number|null} */
 let _timerId = null;
+
+/**
+ * @type {number|null} — تایمر تلاش بعدی برای آپلودِ معوق (10.41)
+ *
+ * ⚠️ چرا لازم شد: چرخه‌ی `processQueue` آپلودِ `deferUntil`-دار را با
+ * `continue` رد می‌کرد و هیچ‌کس دوباره صدایش نمی‌زد. نتیجه: بج ⏳ برای همیشه
+ * می‌ماند، چون تنها محرک‌های بعدی رویدادهایی بودند که ممکن بود دیگر تکرار
+ * نشوند (SYNC_FLUSHED/ONLINE). حالا خودِ صف تایمر می‌گذارد.
+ */
+let _deferTimer = null;
+
+/** @type {number} — زمان مطلق تلاش بعدی که `_deferTimer` برایش کوک شده (0 = هیچ) */
+let _deferTimerAt = 0;
 
 /** @type {IDBDatabase|null} */
 let _db = null;
@@ -372,6 +391,57 @@ function scheduleProcess() {
 }
 
 /**
+ * زمان‌بندی تلاش بعدی برای آپلودهای معوق (10.41).
+ *
+ * ⚠️ بدون این، یک آپلودِ `deferUntil`-دار تا ابد در وضعیت `pending` می‌ماند:
+ * چرخه‌ی بعدی آن را رد می‌کند و چرخه‌ی بعد از آن هم فقط با یک رویداد بیرونی
+ * (flush صف، آنلاین شدن، تغییر صف گروه) اتفاق می‌افتد — که ممکن است دیگر
+ * هرگز نیاید. نشانه‌ی کاربر: بج ⏳ که هرگز به ✓ تبدیل نمی‌شود.
+ *
+ * @param {number} atMs — زمان مطلق تلاش بعدی (epoch ms)
+ */
+function scheduleDeferredPass(atMs) {
+    if (!Number.isFinite(atMs)) return;
+    // فقط زودترین زمان را نگه می‌داریم؛ دیرترها در همان چرخه دیده می‌شوند.
+    if (_deferTimer) {
+        if (_deferTimerAt && _deferTimerAt <= atMs) return;
+        clearTimeout(_deferTimer);
+    }
+    const delay = Math.max(500, atMs - Date.now());
+    _deferTimerAt = atMs;
+    _deferTimer = setTimeout(() => {
+        _deferTimer = null;
+        _deferTimerAt = 0;
+        scheduleProcess();
+    }, delay);
+}
+
+/**
+ * پاک کردن تعویقِ آپلودهای `pending` (10.41).
+ *
+ * بعد از یک flush موفق، دلیلی که باعث تعویق شده («تسک هنوز روی سرور نیست»)
+ * دیگر برقرار نیست؛ پس نباید تا پایان پنجره‌ی `deferUntil` صبر کنیم.
+ *
+ * @returns {Promise<void>}
+ */
+async function clearDeferrals() {
+    try {
+        const uploads = await readAllUploads();
+        for (const u of uploads) {
+            if (u.status === 'pending' && u.deferUntil) {
+                u.deferUntil = null;
+                await putUpload(u);
+            }
+        }
+        if (_deferTimer) {
+            clearTimeout(_deferTimer);
+            _deferTimer = null;
+            _deferTimerAt = 0;
+        }
+    } catch { /* silent — نبود IDB نباید جریان را بشکند */ }
+}
+
+/**
  * پردازش صف آپلود.
  *
  * ⚠️ این تابع:
@@ -397,6 +467,8 @@ export async function processQueue() {
     _processing = true;
     let processed = 0;
     let failed = 0;
+    /** @type {number} — زودترین زمان تلاش بعدی برای آپلودهای معوق (0 = هیچ) */
+    let nextDeferAt = 0;
 
     try {
         const uploads = await readAllUploads();
@@ -412,8 +484,11 @@ export async function processQueue() {
             }
 
             // ─── 10.40: آپلود معوق (تسک هنوز روی سرور نیست) را زودتر از موعد نجو ───
+            // ⚠️ 10.41: رد کردن کافی نیست — باید برای همان لحظه تایمر بگذاریم،
+            // وگرنه آپلود تا ابد pending می‌ماند (بج ⏳ که ✓ نمی‌شود).
             const deferUntil = upload.deferUntil ? Date.parse(upload.deferUntil) : 0;
             if (Number.isFinite(deferUntil) && deferUntil > Date.now()) {
+                if (!nextDeferAt || deferUntil < nextDeferAt) nextDeferAt = deferUntil;
                 continue;
             }
 
@@ -439,8 +514,11 @@ export async function processQueue() {
                         });
                     } else {
                         upload.status = 'pending';
-                        upload.deferUntil = new Date(Date.now() + DEFER_DELAY_MS).toISOString();
+                        const retryAt = Date.now() + DEFER_DELAY_MS;
+                        upload.deferUntil = new Date(retryAt).toISOString();
                         await putUpload(upload);
+                        // ⚠️ 10.41: خودمان دوباره صدایش می‌زنیم — منتظر رویداد نمی‌مانیم.
+                        if (!nextDeferAt || retryAt < nextDeferAt) nextDeferAt = retryAt;
                     }
                     continue;
                 }
@@ -470,6 +548,9 @@ export async function processQueue() {
     } finally {
         _processing = false;
     }
+
+    // ⚠️ 10.41: اگر آپلودی معوق ماند، تلاش بعدی را خودمان زمان‌بندی کن.
+    if (nextDeferAt) scheduleDeferredPass(nextDeferAt);
 
     return { processed, failed };
 }
@@ -538,7 +619,11 @@ async function isTaskNotReady(taskId) {
     if (!taskId) return false;
     try {
         const ops = await getQueue();
-        if (ops.some((op) => op && String(op.entityId) === String(taskId))) return true;
+        // ⚠️ 10.41: فقط opهایی که واقعاً در راه‌اند. `getQueue` همه‌ی ردیف‌ها را
+        // می‌دهد و یک ردیف رهاشده/کهنه هم می‌توانست تا ابد آپلود را معوق کند.
+        if (ops.some((op) => op
+            && String(op.entityId) === String(taskId)
+            && (op.status === 'pending' || op.status === 'in-flight'))) return true;
     } catch { /* صف در دسترس نیست → سعی می‌کنیم */ }
     try {
         if (await hasPendingDmCreate(taskId)) return true;
@@ -864,11 +949,16 @@ export async function initMediaUpload() {
     });
 
     // ─── 10.40: بعد از هر flush موفق، آپلودهای معوق را دوباره امتحان کن ───
+    // ⚠️ 10.41: فقط `scheduleProcess` کافی نبود — آپلود `deferUntil` داشت و
+    // همان چرخه ردش می‌کرد، پس بج ⏳ هرگز به ✓ نمی‌رسید. حالا تعویق را پاک
+    // می‌کنیم، چون دلیلی که باعثش شده بود (نبودن تسک روی سرور) برطرف شده.
     events.on(EV.SYNC_FLUSHED, () => {
-        if (state.sync.enabled && isOnline()) scheduleProcess();
+        if (!state.sync.enabled || !isOnline()) return;
+        clearDeferrals().finally(() => scheduleProcess());
     });
     events.on('dm:queue-flushed', () => {
-        if (state.sync.enabled && isOnline()) scheduleProcess();
+        if (!state.sync.enabled || !isOnline()) return;
+        clearDeferrals().finally(() => scheduleProcess());
     });
     events.on(EV.GROUP_QUEUE_CHANGED, () => {
         if (state.sync.enabled && isOnline()) scheduleProcess();

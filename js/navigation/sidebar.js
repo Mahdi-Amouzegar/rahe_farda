@@ -42,17 +42,55 @@ let _searchResults = { users: [], groups: [] };
  *
  * قبلاً تا لحظه‌ی رسیدن پاسخ، دراور «هنوز گفتگویی نیست / هنوز عضو گروهی نیستی»
  * نشان می‌داد — یعنی «خالی» و «در حال بارگذاری» یکی بودند و کاربر فکر می‌کرد
- * داده‌اش پاک شده. حالا تا وقتی loaded نشده، پیام بارگذاری نمایش داده می‌شود.
+ * داده‌اش پاک شده.
+ *
+ * ⚠️ 10.41: این پرچم **یک‌طرفه** بود و همان مشکل را برمی‌گرداند: اگر preload
+ * اولیه شکست می‌خورد، `finally` آن را true می‌کرد و دراور تا ابد «خالی»
+ * نشان می‌داد؛ بعد تازه‌سازیِ باز شدن دراور داده را می‌آورد و کاربر یک
+ * «خالی → پر» می‌دید. حالا حالت بارگذاری به **درخواستِ در جریان** گره خورده
+ * است (`_listsLoading`)، نه به یک قفل یک‌بارمصرف.
  */
 let _listsLoaded = { contacts: false, groups: false };
+
+/** آیا همین حالا درخواستِ لیست در جریان است؟ (10.41) */
+let _listsLoading = { contacts: false, groups: false };
+
+/**
+ * اعلام شروع بارگذاری لیست‌های دراور.
+ *
+ * ⚠️ 10.41: باید **قبل از** اولین رندر صدا زده شود؛ `onDrawerOpened` بعد از
+ * رندر اجرا می‌شود و اگر آنجا علامت بزنیم، کاربر همان لحظه پیام «خالی» را
+ * می‌بیند (همان چیزی که گزارش شد).
+ *
+ * @param {'contacts'|'groups'} [kind] — بدون آرگومان: هر دو
+ */
+export function beginDrawerListsLoading(kind) {
+    if (!kind || kind === 'contacts') _listsLoading.contacts = true;
+    if (!kind || kind === 'groups') _listsLoading.groups = true;
+}
 
 /**
  * اعلام پایان بارگذاری لیست‌های دراور (حتی وقتی شبکه خطا داد).
  * @param {'contacts'|'groups'} [kind] — بدون آرگومان: هر دو
  */
 export function markDrawerListsLoaded(kind) {
-    if (!kind || kind === 'contacts') _listsLoaded.contacts = true;
-    if (!kind || kind === 'groups') _listsLoaded.groups = true;
+    if (!kind || kind === 'contacts') {
+        _listsLoaded.contacts = true;
+        _listsLoading.contacts = false;
+    }
+    if (!kind || kind === 'groups') {
+        _listsLoaded.groups = true;
+        _listsLoading.groups = false;
+    }
+}
+
+/**
+ * آیا باید به‌جای پیام «خالی»، «در حال بارگذاری…» نشان داده شود؟
+ * @param {'contacts'|'groups'} kind
+ * @returns {boolean}
+ */
+function isListLoading(kind) {
+    return _listsLoading[kind] === true || _listsLoaded[kind] !== true;
 }
 
 function loadingHint() {
@@ -381,13 +419,14 @@ function renderContactsTab(aside) {
         aside.appendChild(row);
     }
     if (_recentConversations.length === 0 && _incomingRequests.length === 0) {
-        // ⚠️ 10.40: «در حال بارگذاری» جدا از «خالی»
+        // ⚠️ 10.40/10.41: «در حال بارگذاری» جدا از «خالی»
+        const loading = isListLoading('contacts');
         aside.appendChild(el(
             'div',
-            'drawer-hint' + (_listsLoaded.contacts ? '' : ' drawer-hint-loading'),
-            _listsLoaded.contacts
-                ? (i18nT('workspace.messagesEmpty') !== 'workspace.messagesEmpty' ? i18nT('workspace.messagesEmpty') : 'هنوز گفتگویی نیست.')
-                : loadingHint()
+            'drawer-hint' + (loading ? ' drawer-hint-loading' : ''),
+            loading
+                ? loadingHint()
+                : (i18nT('workspace.messagesEmpty') !== 'workspace.messagesEmpty' ? i18nT('workspace.messagesEmpty') : 'هنوز گفتگویی نیست.')
         ));
     }
 }
@@ -528,13 +567,14 @@ function renderGroupsTab(aside) {
         aside.appendChild(row);
     }
     if (_recentGroups.length === 0 && _groupInvitations.length === 0) {
-        // ⚠️ 10.40: «در حال بارگذاری» جدا از «خالی»
+        // ⚠️ 10.40/10.41: «در حال بارگذاری» جدا از «خالی»
+        const loading = isListLoading('groups');
         aside.appendChild(el(
             'div',
-            'drawer-hint' + (_listsLoaded.groups ? '' : ' drawer-hint-loading'),
-            _listsLoaded.groups
-                ? (i18nT('workspace.groupsEmpty') !== 'workspace.groupsEmpty' ? i18nT('workspace.groupsEmpty') : 'هنوز عضو گروهی نیستی.')
-                : loadingHint()
+            'drawer-hint' + (loading ? ' drawer-hint-loading' : ''),
+            loading
+                ? loadingHint()
+                : (i18nT('workspace.groupsEmpty') !== 'workspace.groupsEmpty' ? i18nT('workspace.groupsEmpty') : 'هنوز عضو گروهی نیستی.')
         ));
     }
 }
@@ -619,6 +659,14 @@ export function openDrawer(opener) {
         _closeTimer = null;
     }
     _opener = opener || document.activeElement || null;
+
+    // ⚠️ 10.41: اولین رندرِ دراور باید «در حال بارگذاری…» باشد، نه «خالی».
+    // تازه‌سازی لیست‌ها در `onDrawerOpened` و **بعد از** رندر شروع می‌شود؛
+    // اگر اینجا علامت نزنیم، کاربر در همان لحظه پیام «هنوز گفتگویی نیست»
+    // را می‌بیند و بعد ناگهان پر می‌شود — همان چیزی که گزارش شد.
+    const willRefresh = isLoggedIn() && _opts && typeof _opts.onDrawerOpened === 'function';
+    if (willRefresh) beginDrawerListsLoading();
+
     renderDrawer();
     root.hidden = false;
     // ⚠️ reflow اجباری تا transition از حالت بسته اجرا شود
@@ -635,9 +683,18 @@ export function openDrawer(opener) {
     try {
         if (_opts && typeof _opts.onDrawerOpened === 'function') {
             const r = _opts.onDrawerOpened();
-            if (r && typeof r.catch === 'function') r.catch(() => {});
+            // ⚠️ 10.41: اگر تازه‌سازی بترکد، وضعیت لودینگ نباید ابدی بماند.
+            if (r && typeof r.catch === 'function') {
+                r.catch(() => {
+                    markDrawerListsLoaded();
+                    rerenderDrawer();
+                });
+            }
         }
-    } catch { /* silent */ }
+    } catch {
+        markDrawerListsLoaded();
+        rerenderDrawer();
+    }
 }
 
 /**
@@ -843,6 +900,7 @@ export function initSidebar(opts) {
         initSidebar._authBound = true;
         events.on('auth:logout', () => {
             _listsLoaded = { contacts: false, groups: false };
+            _listsLoading = { contacts: false, groups: false };
         });
     }
     const root = drawerRoot();
@@ -881,4 +939,6 @@ export function __resetSidebarForTest() {
     _drawerTab = 'contacts';
     _searchQuery = '';
     _searchResults = { users: [], groups: [] };
+    _listsLoaded = { contacts: false, groups: false };
+    _listsLoading = { contacts: false, groups: false };
 }

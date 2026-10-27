@@ -990,6 +990,9 @@ export async function renderDetailPhotos() {
     if (!grid) return;
 
     if (list.length === 0) {
+        // ⚠️ 10.41: شمارنده باید پاک شود. قبلاً این شاخه زودهنگام return می‌کرد
+        // و عددِ وظیفه‌ی قبلی («۳ / ۸») روی سرتیتر وظیفه‌ی بی‌عکس می‌ماند.
+        if (countEl) countEl.textContent = '';
         grid.innerHTML = `<div class="session-empty">${i18nT('detail.photo.empty')}</div>`;
         return;
     }
