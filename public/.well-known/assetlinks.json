@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "io.github.mahdi_amouzegar.twa",
+        "package_name": "com.mahdiamouzegar.rahefarda",
         "sha256_cert_fingerprints": ["FA:D7:82:37:2F:FF:F1:80:6C:0C:BD:43:7E:0A:56:77:D5:84:DE:FF:78:B4:1E:5A:10:5B:6C:A8:31:E3:1A:9A"]
       }
     }]
