@@ -3013,6 +3013,85 @@
         overflow-wrap: anywhere;
     }
 
+    /* ═══ 10.45: کادر پروفایل ویرایش‌پذیر (نام / نام کاربری / آواتار) ═══ */
+    .auth-edit-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 10px;
+        font-size: 0.86rem;
+        color: var(--text-muted);
+    }
+
+    .auth-edit-label {
+        flex: 0 0 auto;
+        font-weight: 600;
+    }
+
+    .auth-edit-value-wrap {
+        flex: 1 1 120px;
+        min-width: 0;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .auth-edit-value {
+        color: var(--text-primary);
+        font-weight: 700;
+        text-align: end;
+        overflow-wrap: anywhere;
+    }
+
+    .auth-row-actions {
+        flex: 0 0 auto;
+        display: inline-flex;
+        gap: 6px;
+    }
+
+    .auth-inline-input {
+        width: 100%;
+        min-width: 0;
+        padding: 6px 10px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        background: var(--bg-2);
+        color: var(--text-primary);
+        font: inherit;
+        font-weight: 600;
+    }
+
+    .auth-inline-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .auth-edit-hint {
+        flex: 1 1 100%;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        line-height: 1.7;
+    }
+
+    .auth-edit-error {
+        flex: 1 1 100%;
+        color: var(--accent-pink);
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1.7;
+    }
+
+    .auth-avatar-row .auth-avatar-slot {
+        flex: 1 1 auto;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .auth-avatar-thumb {
+        width: 44px;
+        height: 44px;
+        overflow: hidden;
+    }
+
     /* ═══ Auth TTL Block ═══ */
     .auth-ttl-block {
         display: flex;
@@ -3183,6 +3262,25 @@
         .auth-user-row strong {
             text-align: start;
             width: 100%;
+        }
+
+        /* ⚠️ 10.45: ردیف‌های ویرایش‌پذیر در موبایل تمام‌عرض می‌شوند */
+        .auth-edit-row {
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .auth-edit-value-wrap {
+            flex: 1 1 100%;
+            justify-content: flex-start;
+        }
+
+        .auth-edit-value {
+            text-align: start;
+        }
+
+        .auth-avatar-row .auth-avatar-slot {
+            justify-content: flex-start;
         }
 
         .auth-ttl-row {

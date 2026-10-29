@@ -276,19 +276,34 @@ export function getCurrentUser() {
 }
 
 /**
- * به‌روزرسانی avatarUrl کاربر در session ذخیره‌شده (تصمیم F).
- * فقط کش محلی است؛ مرجع نهایی سرور است.
+ * به‌روزرسانی چند فیلد از کاربر در session ذخیره‌شده (۱۰.۴۵).
+ *
+ * ⚠️ فقط کش محلی است؛ مرجع نهایی سرور است. برای آواتار هم همین تابع کافی است
+ *    (`setStoredUserAvatar` قدیمی روی همین سوار است).
+ *
+ * @param {Object} patch — مثل { displayName: '...' } یا { avatarUrl: null }
  */
-export function setStoredUserAvatar(avatarUrl) {
+export function setStoredUserFields(patch) {
     try {
         const raw = localStorage.getItem(AUTH_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw);
         if (!parsed || !parsed.user) return;
-        if (avatarUrl) parsed.user.avatarUrl = avatarUrl;
-        else delete parsed.user.avatarUrl;
+        const entries = Object.entries(patch || {});
+        for (const [key, value] of entries) {
+            if (value === null || value === undefined) delete parsed.user[key];
+            else parsed.user[key] = value;
+        }
         localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
     } catch { /* silent */ }
+}
+
+/**
+ * به‌روزرسانی avatarUrl کاربر در session ذخیره‌شده (تصمیم F).
+ * فقط کش محلی است؛ مرجع نهایی سرور است.
+ */
+export function setStoredUserAvatar(avatarUrl) {
+    setStoredUserFields({ avatarUrl: avatarUrl || null });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

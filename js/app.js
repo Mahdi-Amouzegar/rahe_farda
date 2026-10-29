@@ -285,7 +285,9 @@ import { refreshConversationBadges, openConversationMenuFor, startDmPoll, listCo
 // ⚠️ 10.37: پایش سبک درخواست دوستی/دعوت گروه/انتقال مالکیت → toast پایین صفحه
 import { startInviteWatch } from './communication/invite-watch.js';
 import { renderBlockedList } from './communication/connections.js';
-import { renderAvatarSettings } from './ui/avatar-settings.js';
+// ⚠️ 10.45: کادر پروفایل ویرایش‌پذیر «حساب من» (نام / نام کاربری / آواتار).
+//    آواتار از تنظیمات به اینجا منتقل شد (کارت آواتار در تنظیمات حذف شد).
+import { renderAccountProfile } from './ui/account-profile.js';
 import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog, openPublicGroupPreview, closeModalShell } from './communication/groups.js';
 import {
     searchUsers,
@@ -702,8 +704,6 @@ function renderAuthModal() {
 
     // ─── حالت ۲: وارد شده ───
     const user = auth.user || {};
-    const displayName = user.displayName || i18nT('auth.defaultUserName');
-    const username = user.telegramUsername ? `@${user.telegramUsername}` : '—';
     const expiryText = formatExpiry(auth.expiresAt);
     const currentTtl = user.tokenTtlDays || 90;
     const warning = auth.shouldWarnExpiry
@@ -716,10 +716,7 @@ function renderAuthModal() {
     }).join('');
 
     body.innerHTML = `
-        <div class="auth-user-info">
-            <div class="auth-user-row"><span>${i18nT('auth.loggedIn.nameLabel')}</span> <strong>${escapeHtml(displayName)}</strong></div>
-            <div class="auth-user-row"><span>${i18nT('auth.loggedIn.usernameLabel')}</span> <strong dir="ltr">${escapeHtml(username)}</strong></div>
-        </div>
+        <div class="auth-user-info" id="accountProfileBlock"></div>
 
         <div class="auth-ttl-block">
             <label class="auth-ttl-label" for="authTtlSelect">${i18nT('auth.loggedIn.ttlLabel')}</label>
@@ -763,6 +760,15 @@ function renderAuthModal() {
             <button class="btn-small auth-disconnect-btn" id="authDisconnectBtn" type="button" title="${i18nT('auth.disconnect.title')}">${i18nT('auth.loggedIn.disconnectButton')}</button>
         </div>
     `;
+
+    // ⚠️ 10.45: کادر پروفایل با DOM API پر می‌شود (نام / نام کاربری / آواتار).
+    //    بعد از هر ذخیره، وضعیت حساب و دراور هم تازه می‌شوند.
+    renderAccountProfile({
+        onChange: () => {
+            updateAccountStatusText();
+            try { rerenderDrawer(); } catch { /* دراور بسته است */ }
+        }
+    }).catch(() => { /* آفلاین — کش محلی نمایش داده شد */ });
 
     const logoutBtn = document.getElementById('authLogoutBtn');
     if (logoutBtn) {
@@ -1511,8 +1517,7 @@ function toggleSettings(force) {
         updateAccountStatusText();
         // ⚠️ تصمیم ۲: تازه‌سازی لیست بلاک‌ها هنگام باز شدن تنظیمات
         renderBlockedList();
-        // ⚠️ تصمیم F: رندر بخش آواتار
-        renderAvatarSettings();
+        // ⚠️ 10.45: بخش آواتار از تنظیمات حذف شد و به «حساب من» رفت
     } else {
         settingsTrapCleanup?.();
         settingsTrapCleanup = null;
