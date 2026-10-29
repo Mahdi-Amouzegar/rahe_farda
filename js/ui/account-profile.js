@@ -87,28 +87,39 @@ export function validateDisplayNameInput(raw) {
 }
 
 /**
- * خواندن پروفایل از سرور با fallback به کش محلی (آفلاین).
+ * پروفایل از کش محلی session (بدون شبکه) — برای رندر فوری.
  *
- * @returns {Promise<{displayName: string|null, username: string|null, avatarUrl: string|null}>}
+ * @returns {{displayName: string|null, username: string|null, avatarUrl: string|null}}
  */
-async function loadProfile() {
+function localProfile() {
     const local = getCurrentUser() || {};
-    const fallback = {
+    return {
         displayName: local.displayName || null,
         username: local.username || null,
         avatarUrl: local.avatarUrl || null,
     };
+}
+
+/**
+ * خواندن پروفایل از سرور.
+ *
+ * ⚠️ سقف زمان کوتاه‌تر از پیش‌فرض (۶ ثانیه): این درخواست فقط «تازه‌سازی» است و
+ *    کش محلی از قبل نمایش داده شده؛ اگر آفلاین باشیم نباید مودال منتظر بماند.
+ *
+ * @returns {Promise<object|null>} null یعنی شکست (کش محلی معتبر بماند)
+ */
+async function fetchProfile() {
     try {
-        const res = await apiFetch('/api/users/me');
-        if (res && res.ok && res.data) {
-            return {
-                displayName: res.data.displayName || null,
-                username: res.data.username || null,
-                avatarUrl: res.data.avatarUrl || null,
-            };
-        }
-    } catch { /* آفلاین — کش محلی */ }
-    return fallback;
+        const res = await apiFetch('/api/users/me', { timeoutMs: 6000 });
+        if (!res || !res.ok || !res.data) return null;
+        return {
+            displayName: res.data.displayName || null,
+            username: res.data.username || null,
+            avatarUrl: res.data.avatarUrl || null,
+        };
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -367,35 +378,47 @@ export async function renderAccountProfile(opts) {
         if (typeof options.onChange === 'function') options.onChange();
     };
 
-    box.replaceChildren();
-    if (!isLoggedIn()) return;
+    const paint = (data) => {
+        box.replaceChildren();
+        box.appendChild(buildFieldRow({
+            kind: 'displayName',
+            label: tr('auth.loggedIn.nameLabel', 'نام:'),
+            value: data.displayName,
+            placeholder: tr('auth.loggedIn.namePlaceholder', 'نام شما'),
+            maxLength: DISPLAY_NAME_MAX,
+            onSaved: onChange,
+        }));
 
-    const data = await loadProfile();
-    // ⚠️ ممکن است کاربر بین await لاگ‌اوت کرده باشد
+        box.appendChild(buildFieldRow({
+            kind: 'username',
+            label: tr('auth.loggedIn.usernameLabel', 'نام کاربری:'),
+            value: data.username || '',
+            display: data.username ? '@' + data.username : null,
+            dir: 'ltr',
+            placeholder: tr('auth.loggedIn.usernamePlaceholder', 'username'),
+            hint: tr('auth.loggedIn.usernameHint', 'حروف کوچک انگلیسی، عدد و _ — ۳ تا ۲۰ کاراکتر'),
+            maxLength: USERNAME_MAX,
+            onSaved: onChange,
+        }));
+
+        box.appendChild(buildAvatarRow(data, onChange));
+    };
+
+    if (!isLoggedIn()) {
+        box.replaceChildren();
+        return;
+    }
+
+    // ۱) رندر فوری از کش محلی — مودال هرگز «خالی» دیده نمی‌شود
+    paint(localProfile());
+
+    // ۲) تازه‌سازی از سرور (اگر آفلاین بود، همان کش محلی می‌ماند)
+    const fresh = await fetchProfile();
+    if (!fresh) return;
     if (!document.getElementById('accountProfileBlock')) return;
-
-    box.appendChild(buildFieldRow({
-        kind: 'displayName',
-        label: tr('auth.loggedIn.nameLabel', 'نام:'),
-        value: data.displayName,
-        placeholder: tr('auth.loggedIn.namePlaceholder', 'نام شما'),
-        maxLength: DISPLAY_NAME_MAX,
-        onSaved: onChange,
-    }));
-
-    box.appendChild(buildFieldRow({
-        kind: 'username',
-        label: tr('auth.loggedIn.usernameLabel', 'نام کاربری:'),
-        value: data.username || '',
-        display: data.username ? '@' + data.username : null,
-        dir: 'ltr',
-        placeholder: tr('auth.loggedIn.usernamePlaceholder', 'username'),
-        hint: tr('auth.loggedIn.usernameHint', 'حروف کوچک انگلیسی، عدد و _ — ۳ تا ۲۰ کاراکتر'),
-        maxLength: USERNAME_MAX,
-        onSaved: onChange,
-    }));
-
-    box.appendChild(buildAvatarRow(data, onChange));
+    // ⚠️ اگر کاربر مشغول ویرایش است، رندر دوباره ورودی‌اش را نابود می‌کند
+    if (box.querySelector('.auth-inline-input')) return;
+    paint(fresh);
 }
 
 /**
