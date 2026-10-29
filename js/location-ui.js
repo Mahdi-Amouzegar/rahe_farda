@@ -10,7 +10,7 @@
 //   - sync با فلگ _syncing محافظت شده تا loop بین location:updated و refreshSavedLocationUI جلوگیری شود
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { state, escapeHtml, uid, trapFocus, showConfirmModal } from './core.js';
+import { state, escapeHtml, uid, trapFocus, showConfirmModal, registerModalCancel } from './core.js';
 import { findTask, saveTasks } from './store.js';
 import {
     mapHint,
@@ -221,7 +221,10 @@ function askLocationName(defaultValue) {
         }
         setTimeout(() => { input.focus(); input.select(); }, 60);
 
+        let unregisterCancel = () => {};
+
         const cleanup = () => {
+            unregisterCancel();
             overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             confirmBtn.removeEventListener('click', onOk);
@@ -259,6 +262,9 @@ function askLocationName(defaultValue) {
             else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(null); }
         };
         const onOverlay = e => { if (e.target === overlay) finish(null); };
+
+        // دکمه‌ی برگشت اندروید = همان «انصراف» (Promise باید resolve شود)
+        unregisterCancel = registerModalCancel('namePrompt', () => finish(null));
 
         confirmBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
@@ -299,7 +305,10 @@ function askConflictResolution(name, conflict) {
         }
         setTimeout(() => replaceBtn.focus(), 60);
 
+        let unregisterCancel = () => {};
+
         const cleanup = () => {
+            unregisterCancel();
             overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             replaceBtn.removeEventListener('click', onReplace);
@@ -322,6 +331,9 @@ function askConflictResolution(name, conflict) {
         const onRename = () => finish('rename');
         const onCancel = () => finish(null);
         const onOverlay = e => { if (e.target === overlay) finish(null); };
+
+        // دکمه‌ی برگشت اندروید = همان «انصراف»
+        unregisterCancel = registerModalCancel('nameConflict', () => finish(null));
 
         replaceBtn.addEventListener('click', onReplace);
         renameBtn.addEventListener('click', onRename);
@@ -1031,7 +1043,9 @@ if (document.readyState === 'loading') {
 export {
     sync as refreshSavedLocationUI,
     sync as updateLocChip,
-    label as locationLabelFor
+    label as locationLabelFor,
+    // ⚠️ 10.43: برای لایه‌ی برگشت — بستن «مکان‌های ذخیره‌شده» بدون کلیک کاربر
+    closeManageModal
 };
 
 export function isRelocateActive() {

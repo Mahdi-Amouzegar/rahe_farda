@@ -108,10 +108,14 @@ function drawerEl() {
 
 /**
  * آیا دراور باز است؟
+ *
+ * ⚠️ 10.43: کلاس `open` هم چک می‌شود. `closeDrawer` کلاس را **فوراً** برمی‌دارد
+ * ولی `hidden` را بعد از پایان انیمیشن (۲۶۰ms) ست می‌کند؛ با چک قبلی، در آن
+ * بازه‌ی کوتاه دراور «باز» گزارش می‌شد و یک فشار دکمه‌ی برگشت هدر می‌رفت.
  */
 export function isDrawerOpen() {
     const root = drawerRoot();
-    return !!root && !root.hidden;
+    return !!root && !root.hidden && root.classList.contains('open');
 }
 
 function el(tag, className, text) {

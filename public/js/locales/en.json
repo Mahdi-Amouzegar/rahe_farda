@@ -68,11 +68,11 @@
     "accountTitle": "Online account",
     "accountLoggedIn": "You are signed in — sync is active.",
     "accountDesc": "With an online account, multi-device sync, messages and groups are enabled. All core features work without it too.",
-    "accountTelegram": "Sign in with Telegram",
-    "accountCode": "Sign in with code"
+    "accountSignIn": "Sign in to your account"
   },
   "nav": {
     "drawerTitle": "Rahe Farda menu",
+    "backExitHint": "Press back again to exit",
     "search": "🔎 Search",
     "tasks": "📋 My tasks",
     "messages": "💬 Messages",

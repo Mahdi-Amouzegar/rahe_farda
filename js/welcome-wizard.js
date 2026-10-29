@@ -7,7 +7,7 @@
 //    ۲ حالت نمایش (auto/light/dark)
 //    ۳ ساده/پیشرفته (proMode)
 //    ۴ مجوزها (اعلان/موقعیت/میکروفون، با توضیح + قابل رد)
-//    ۵ حساب آنلاین (تلگرام / کد → مودال حساب موجود)
+//    ۵ حساب آنلاین (یک دکمه‌ی «ورود به حساب کاربری» → همان مودال حساب)
 //
 // ⚠️ قدم نام کاربری در فاز ۱۱ حذف شد (نمایشی و بی‌کاربرد بود).
 //
@@ -77,6 +77,31 @@ function finishTour() {
     if (ti) {
         try { ti.focus({ preventScroll: true }); } catch { /* silent */ }
     }
+}
+
+/**
+ * آیا ویزارد باز است؟
+ */
+export function isWizardOpen() {
+    const ov = overlay();
+    return Boolean(ov) && !ov.hidden;
+}
+
+/**
+ * برگشت داخل ویزارد (دکمه‌ی برگشت اندروید): یک قدم عقب؛ در قدم صفر تور تمام
+ * می‌شود (همان رفتار «رد کردن»).
+ * @returns {boolean} true اگر ویزارد باز بود و مدیریت شد
+ */
+export function wizardBack() {
+    const ov = overlay();
+    if (!ov || ov.hidden) return false;
+    if (_step > 0) {
+        _step = Math.max(0, _step - 1);
+        renderStep();
+        return true;
+    }
+    finishTour();
+    return true;
 }
 
 function renderChrome(sec, { showBack, showNext, showSkip, onNext }) {
@@ -305,7 +330,11 @@ function renderPermStep(sec) {
         for (const r of rows) {
             const st = await permState(r.kind);
             const row = el('div', 'wizard-perm-row');
-            const name = el('strong', null, r.label);
+            // ⚠️ 10.43: ردیف‌ها قبلاً هیچ CSS ای نداشتند، پس <strong> و <span>
+            // به‌صورت inline به هم می‌چسبیدند («اعلانفعال است»). حالا CSS
+            // (flex + gap) فاصله را می‌دهد و دونقطه هم برچسب را از وضعیت جدا می‌کند:
+            // «اعلان: فعال است».
+            const name = el('strong', null, r.label + ':');
             row.appendChild(name);
             row.appendChild(el('span', 'wizard-hint', permStatusText(st)));
             const btn = el('button', 'btn-small', tr('wiz.permEnableBtn', 'فعال‌سازی'));
@@ -329,22 +358,17 @@ function renderAccountStep(sec) {
         sec.appendChild(el('p', 'wizard-text', tr('wiz.accountLoggedIn', 'وارد شده‌اید — همگام‌سازی فعال است.')));
     } else {
         sec.appendChild(el('p', 'wizard-text', tr('wiz.accountDesc', 'با حساب آنلاین، همگام‌سازی بین دستگاه‌ها، پیام و گروه فعال می‌شود. بدون آن هم همه‌ی قابلیت‌های اصلی کار می‌کنند.')));
+        // ⚠️ 10.43: قبلاً دو دکمه بود («ورود با تلگرام» و «ورود با کد») که هر دو
+        // به یک مودال می‌رفتند — کاربر فکر می‌کرد دو مسیر ورود متفاوت است.
+        // حالا یک دکمه‌ی صادق: «ورود به حساب کاربری» (انتخاب روش داخل مودال است).
         const row = el('div', 'welcome-settings-buttons');
-        const tg = el('button', 'btn-add picker-confirm', tr('wiz.accountTelegram', 'ورود با تلگرام'));
-        tg.type = 'button';
-        tg.addEventListener('click', () => {
+        const signIn = el('button', 'btn-add picker-confirm', tr('wiz.accountSignIn', 'ورود به حساب کاربری'));
+        signIn.type = 'button';
+        signIn.addEventListener('click', () => {
             finishTour();
             if (_opts && typeof _opts.onOpenAuth === 'function') _opts.onOpenAuth();
         });
-        // ⚠️ ورود با کد هنوز در مودال حساب «به‌زودی» است — دکمه به همان مودال می‌رود تا وضعیت واقعی دیده شود
-        const code = el('button', 'btn-clear', tr('wiz.accountCode', 'ورود با کد'));
-        code.type = 'button';
-        code.addEventListener('click', () => {
-            finishTour();
-            if (_opts && typeof _opts.onOpenAuth === 'function') _opts.onOpenAuth();
-        });
-        row.appendChild(tg);
-        row.appendChild(code);
+        row.appendChild(signIn);
         sec.appendChild(row);
     }
     renderChrome(sec, {

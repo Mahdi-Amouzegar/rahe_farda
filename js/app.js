@@ -30,6 +30,8 @@ import {
     showConfirmModal,
     showInfoModal,
     trapFocus,
+    // ⚠️ 10.43: انصراف مودال‌های Promise-محور از طریق دکمه‌ی برگشت
+    cancelModal,
     MAX_LENGTH,
     input,
     addBtn,
@@ -114,7 +116,9 @@ import {
 import {
     openDetail,
     closeDetail,
-    bindDetailInputs
+    bindDetailInputs,
+    // ⚠️ 10.43: لایه‌ی برگشت — بستن لایت‌باکس عکس
+    closeLightbox
 } from './detail.js';
 import {
     render,
@@ -254,7 +258,9 @@ import {
     saveLocationFromPopup,
     showMobileBanner,
     hideMobileBanner,
-    isRelocateActive
+    isRelocateActive,
+    // ⚠️ 10.43: لایه‌ی برگشت — بستن «مکان‌های ذخیره‌شده»
+    closeManageModal
 } from './location-ui.js';
 import {
     showRouteTo,
@@ -263,20 +269,24 @@ import {
     getActiveRouteDestination
 } from './route-ui.js';
 import { initMapSearch } from './map-search.js';
-import { bindWeatherModal } from './weather-modal.js';
+import { bindWeatherModal, closeWeatherModal } from './weather-modal.js';
 import { events, EV } from './events.js';
 
 // ⚠️ فاز ۸ (T3) — App Shell: Workspace + Drawer
 import { initWorkspace, switchWorkspace, getActiveWorkspace } from './navigation/workspace.js';
-import { initSidebar, openDrawer, rerenderDrawer, markDrawerListsLoaded } from './navigation/sidebar.js';
+import { initSidebar, openDrawer, rerenderDrawer, markDrawerListsLoaded, isDrawerOpen, closeDrawer } from './navigation/sidebar.js';
 import { initHeader, refreshHeaderContext } from './navigation/header.js';
-import { initSheet, openSheet } from './ui/sheet.js';
+import { initSheet, openSheet, isSheetOpen, closeSheet } from './ui/sheet.js';
+// ⚠️ 10.43: منوی ⋯ — یکی از لایه‌های دکمه‌ی برگشت
+import { isMenuOpen, closeMenu } from './ui/menu.js';
+// ⚠️ 10.43: مدیریت مرکزی دکمه‌ی برگشت (TWA/اندروید + مرورگر)
+import { initBackStack } from './navigation/back-stack.js';
 import { refreshConversationBadges, openConversationMenuFor, startDmPoll, listConversations, refreshIncomingRequests } from './communication/conversations.js';
 // ⚠️ 10.37: پایش سبک درخواست دوستی/دعوت گروه/انتقال مالکیت → toast پایین صفحه
 import { startInviteWatch } from './communication/invite-watch.js';
 import { renderBlockedList } from './communication/connections.js';
 import { renderAvatarSettings } from './ui/avatar-settings.js';
-import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog, openPublicGroupPreview } from './communication/groups.js';
+import { openGroupMenuFor, listGroups, refreshGroupBadges, refreshGroupInbox, respondGroupInvitation, createGroup, openCreateGroupDialog, openPublicGroupPreview, closeModalShell } from './communication/groups.js';
 import {
     searchUsers,
     acceptConnection,
@@ -289,7 +299,7 @@ import { openSearchWorkspace } from './communication/search.js';
 import { initGroupQueue } from './communication/group-queue.js';
 // ⚠️ 10.40: صف آفلاین DM (قبلاً نداشت — پیام آفلاین با خطا رد می‌شد)
 import { initDmQueue } from './communication/dm-queue.js';
-import { initWelcomeWizard } from './welcome-wizard.js';
+import { initWelcomeWizard, isWizardOpen, wizardBack } from './welcome-wizard.js';
 import { openSharePicker } from './communication/shares.js';
 import { exportBackupV2, importBackupV2, normalizeBackup } from './backup-v2.js';
 
@@ -3136,6 +3146,80 @@ initPWA();
 initAuth();
 
 setKind(state.prefs.pendingKind || 'task');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10.43 — دکمه‌ی برگشت اندروید/TWA: یک لایه‌ی مرکزی، بدون هندلر جداگانه
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ ریشه‌ی مشکل: برنامه تک‌صفحه‌ای است و هیچ ورودی تاریخچه‌ای ندارد؛ TWA
+//    دکمه‌ی برگشت را به تاریخچه‌ی وب می‌سپارد، پس «تاریخچه‌ی خالی» = بستن برنامه.
+//    `back-stack.js` یک ورودی نگهبان نگه می‌دارد و pop را به «بستن بالاترین لایه»
+//    تبدیل می‌کند. اینجا فقط فهرست لایه‌ها اعلام می‌شود.
+//
+// ⚠️ ترتیب = پایین → بالا (لایه‌ی صفحه‌ای اول، مودال‌های تأیید/اطلاع آخر).
+//    برگشت همیشه بالاترین لایه‌ی **باز** را می‌بندد؛ پس ترتیب، ترتیب بصری است:
+//    مقصد/فضا ← جزئیات ← دراور/شیت ← مودال‌ها ← منو ← تأیید/اطلاع ← لایت‌باکس.
+const isVisible = (id) => {
+    const node = document.getElementById(id);
+    return Boolean(node) && !node.hidden;
+};
+
+const BACK_LAYERS = [
+    // ─── سطح صفحه (مثل route در برنامه‌های چندصفحه‌ای) ───
+    {
+        id: 'destination',
+        isOpen: () => getDestination().type !== 'local',
+        // ⚠️ همان مسیر «ورود به وظایف» در دراور (initSidebar.onNavigate) تا
+        //    برچسب هدر هم هم‌گام شود؛ `resetToLocal` تنها آن را عوض نمی‌کند.
+        close: () => { resetToLocal().then(() => applyDestinationLabel()).catch(() => {}); },
+    },
+    {
+        id: 'search-workspace',
+        isOpen: () => getActiveWorkspace() === 'search',
+        close: () => switchWorkspace('tasks'),
+    },
+    { id: 'detail', isOpen: () => Boolean(state.currentDetailId), close: closeDetail },
+    { id: 'trash', isOpen: () => isVisible('trashPage'), close: closeTrash },
+    {
+        id: 'map-fullscreen',
+        isOpen: () => Boolean(document.querySelector('.map-wrap.fullscreen')),
+        close: () => toggleFullscreen(),
+    },
+    // ─── پنل‌های کشویی ───
+    { id: 'drawer', isOpen: isDrawerOpen, close: closeDrawer },
+    { id: 'sheet', isOpen: isSheetOpen, close: closeSheet },
+    // ─── مودال‌های محتوایی ───
+    { id: 'calendar', isOpen: () => isVisible('calOverlay'), close: closeCal },
+    { id: 'picker', isOpen: () => isVisible('pickerOverlay'), close: closePicker },
+    { id: 'template', isOpen: () => isVisible('templateModal'), close: closeTemplateModal },
+    { id: 'export', isOpen: () => isVisible('exportModal'), close: closeExportModal },
+    { id: 'import', isOpen: () => isVisible('importModal'), close: closeImportModal },
+    { id: 'auth', isOpen: () => isVisible('authModal'), close: closeAuthModal },
+    { id: 'settings', isOpen: () => isVisible('settingsModal'), close: () => toggleSettings(false) },
+    { id: 'weather', isOpen: () => isVisible('weatherModal'), close: closeWeatherModal },
+    { id: 'saved-locations', isOpen: () => isVisible('savedLocationsModal'), close: closeManageModal },
+    {
+        id: 'group-modal',
+        isOpen: () => Boolean(document.getElementById('groupModalOverlay')),
+        close: closeModalShell,
+    },
+    { id: 'welcome', isOpen: isWizardOpen, close: wizardBack },
+    // ─── آخرین لایه‌ها: منو و مودال‌های Promise-محور ───
+    // ⚠️ این‌ها باید با «انصراف» بسته شوند، نه با مخفی‌کردن صرف؛ وگرنه Promise
+    //    فراخوان معلق می‌ماند (مثلاً «ذخیره‌ی مکان» تا ابد منتظر می‌ماند).
+    { id: 'menu', isOpen: isMenuOpen, close: closeMenu },
+    { id: 'confirm', isOpen: () => isVisible('confirmModal'), close: () => cancelModal('confirm') },
+    { id: 'info', isOpen: () => isVisible('infoModal'), close: () => cancelModal('info') },
+    { id: 'location-name', isOpen: () => isVisible('namePromptModal'), close: () => cancelModal('namePrompt') },
+    { id: 'location-conflict', isOpen: () => isVisible('nameConflictModal'), close: () => cancelModal('nameConflict') },
+    { id: 'lightbox', isOpen: () => isVisible('lightbox'), close: closeLightbox },
+];
+
+initBackStack({
+    layers: BACK_LAYERS,
+    message: () => t('nav.backExitHint'),
+    showToast,
+});
+
 // ⚠️ فاز ۸ (8B): ویزارد خوش‌آمد چندمرحله‌ای (جایگزین دیالوگ تک‌مرحله‌ای قبلی)
 if (!state.prefs.tourSeen) {
     initWelcomeWizard({ onOpenAuth: () => openAuthModal(), applyDisplay: () => applyDisplaySettings() });

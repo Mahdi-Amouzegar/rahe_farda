@@ -1092,6 +1092,42 @@ html[dir="ltr"] .drawer {
     color: var(--text-muted);
 }
 
+/* ⚠️ 10.43: این دو کلاس قبلاً هیچ استایلی نداشتند. نتیجه: <strong> (نام مجوز)
+   و <span class="wizard-hint"> (وضعیت) به‌صورت inline به هم می‌چسبیدند و
+   «اعلانفعال است» دیده می‌شد. حالا هر ردیف flex است، فاصله دارد و دکمه‌ی
+   «فعال‌سازی» به انتهای ردیف می‌رود (در هر دو جهت rtl/ltr). */
+.wizard-perms {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wizard-perm-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--rf-border);
+    border-radius: var(--rf-radius-sm);
+    background: var(--surface-soft);
+}
+
+.wizard-perm-row strong {
+    flex: 0 0 auto;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.wizard-perm-row .wizard-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wizard-perm-row .btn-small {
+    flex: 0 0 auto;
+    margin-inline-start: auto;
+}
+
 .welcome-opt.selected {
     border-color: var(--accent-cyan);
 }

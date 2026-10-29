@@ -512,7 +512,12 @@ function openLightbox(src, opts) {
     }, 30);
 }
 
-function closeLightbox() {
+/**
+ * بستن لایت‌باکس.
+ * ⚠️ 10.43: export شد تا لایه‌ی مرکزی برگشت (back-stack) بتواند بدون
+ * شبیه‌سازی کلیک، همان مسیر بستن را صدا بزند.
+ */
+export function closeLightbox() {
     const lb = document.getElementById('lightbox');
     const img = document.getElementById('lightboxImg');
     if (!lb || !img) return;

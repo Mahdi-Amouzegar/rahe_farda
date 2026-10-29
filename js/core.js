@@ -359,6 +359,57 @@ export function trapFocus(container) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Modal cancel registry (10.43)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ چرا لازم است: مودال‌های Promise-محور (تأیید/اطلاع/نام مکان) تنها راه بستنشان
+//    کلیک روی دکمه‌ی خودشان است و همان کلیک است که Promise را resolve می‌کند.
+//    دکمه‌ی برگشت اندروید اگر فقط `hidden = true` کند، Promise معلق می‌ماند و
+//    جریان فراخوان (مثلاً «ذخیره‌ی مکان») تا ابد منتظر می‌ماند.
+//    پس هر مودال یک «تابع انصراف» ثبت می‌کند و لایه‌ی برگشت همان را صدا می‌زند —
+//    یعنی دقیقاً همان مسیری که کاربر با دکمه‌ی «انصراف» طی می‌کند.
+
+const _modalCancels = new Map();
+
+/**
+ * ثبت تابع انصراف یک مودال.
+ * @param {string} id
+ * @param {() => void} fn
+ * @returns {() => void} unregister
+ */
+export function registerModalCancel(id, fn) {
+    if (typeof id !== 'string' || typeof fn !== 'function') return () => {};
+    _modalCancels.set(id, fn);
+    return () => {
+        if (_modalCancels.get(id) === fn) _modalCancels.delete(id);
+    };
+}
+
+/**
+ * انصراف دادن مودال فعال (مثل کلیک روی دکمه‌ی انصراف).
+ * @param {string} id
+ * @returns {boolean} true اگر مودالی ثبت شده بود
+ */
+export function cancelModal(id) {
+    const fn = _modalCancels.get(id);
+    if (typeof fn !== 'function') return false;
+    _modalCancels.delete(id);
+    try {
+        fn();
+    } catch (err) {
+        console.warn('[modal] cancel failed:', id, err);
+    }
+    return true;
+}
+
+/**
+ * آیا برای این مودال تابع انصراف ثبت شده است؟
+ */
+export function hasModalCancel(id) {
+    return _modalCancels.has(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Modals
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -386,8 +437,10 @@ export function showConfirmModal(options) {
 
     return new Promise(resolve => {
         let trapCleanup = null;
+        let unregisterCancel = () => {};
 
         const cleanup = () => {
+            unregisterCancel();
             overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             okBtn.removeEventListener('click', onOk);
@@ -412,6 +465,9 @@ export function showConfirmModal(options) {
         const onKey = e => {
             if (e.key === 'Escape') { e.preventDefault(); finish(false); }
         };
+
+        // دکمه‌ی برگشت اندروید = همان «انصراف»
+        unregisterCancel = registerModalCancel('confirm', () => finish(false));
 
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
@@ -457,8 +513,10 @@ export function showInfoModal(options) {
 
     return new Promise(resolve => {
         let trapCleanup = null;
+        let unregisterCancel = () => {};
 
         const cleanup = () => {
+            unregisterCancel();
             overlay.hidden = true;
             overlay.classList.remove('picker-overlay--stacked');
             okBtn.removeEventListener('click', onOk);
@@ -481,6 +539,9 @@ export function showInfoModal(options) {
         const onKey = e => {
             if (e.key === 'Escape') { e.preventDefault(); finish(); }
         };
+
+        // دکمه‌ی برگشت اندروید = همان «بستن»
+        unregisterCancel = registerModalCancel('info', () => finish());
 
         okBtn.addEventListener('click', onOk);
         overlay.addEventListener('click', onOverlay);

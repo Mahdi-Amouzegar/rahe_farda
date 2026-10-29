@@ -95,7 +95,11 @@ function openModal() {
     if (closeBtn) setTimeout(() => closeBtn.focus({ preventScroll: true }), 60);
 }
 
-function closeModal() {
+/**
+ * بستن مودال هوا.
+ * ⚠️ 10.43: export شد تا لایه‌ی مرکزی برگشت (back-stack) از آن استفاده کند.
+ */
+export function closeWeatherModal() {
     if (_weatherTrapCleanup) {
         _weatherTrapCleanup();
         _weatherTrapCleanup = null;
@@ -324,10 +328,10 @@ export function bindWeatherModal() {
     if (!modal) return;
 
     const closeBtn = document.getElementById('weatherModalOk');
-    closeBtn?.addEventListener('click', closeModal);
+    closeBtn?.addEventListener('click', closeWeatherModal);
 
     modal.addEventListener('click', e => {
-        if (e.target === modal) closeModal();
+        if (e.target === modal) closeWeatherModal();
     });
 
     document.addEventListener('keydown', e => {
@@ -335,7 +339,7 @@ export function bindWeatherModal() {
         if (!modal.hidden) {
             e.preventDefault();
             e.stopPropagation();
-            closeModal();
+            closeWeatherModal();
         }
     }, true);
 
