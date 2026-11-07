@@ -362,7 +362,7 @@ function renderAccountStep(sec) {
         // به یک مودال می‌رفتند — کاربر فکر می‌کرد دو مسیر ورود متفاوت است.
         // حالا یک دکمه‌ی صادق: «ورود به حساب کاربری» (انتخاب روش داخل مودال است).
         const row = el('div', 'welcome-settings-buttons');
-        const signIn = el('button', 'btn-add picker-confirm', tr('wiz.accountSignIn', 'ورود به حساب کاربری'));
+        const signIn = el('button', 'btn-add picker-confirm wizard-cta', tr('wiz.accountSignIn', 'ورود به حساب کاربری'));
         signIn.type = 'button';
         signIn.addEventListener('click', () => {
             finishTour();
@@ -376,7 +376,10 @@ function renderAccountStep(sec) {
         showNext: false,
         showSkip: false,
     });
-    const done = el('button', 'btn-add picker-confirm', tr('wiz.finish', 'شروع'));
+    // ⚠️ 10.47: متن دکمه صریح شد تا کاربر بداند با زدن آن **بدون** حساب کاربری
+    // وارد می‌شود (قبلاً فقط «شروع» بود و معلوم نبود حساب لازم است یا نه).
+    // `wizard-cta` هم آن را تمام‌عرض می‌کند.
+    const done = el('button', 'btn-add picker-confirm wizard-cta', tr('wiz.finish', 'شروع بدون حساب کاربری'));
     done.type = 'button';
     done.addEventListener('click', () => finishTour());
     sec.appendChild(done);

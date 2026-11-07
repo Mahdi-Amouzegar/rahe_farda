@@ -105,4 +105,30 @@ describe('wizard — flow (8B)', () => {
         done.click();
         expect(state.prefs.tourSeen).toBe(true);
     });
+
+    // ⚠️ 10.47: متن دکمه صریح شد تا کاربر بداند بدون حساب وارد می‌شود.
+    it('قدم آخر: دکمه «شروع بدون حساب کاربری» است (نه «شروع» خالی)', () => {
+        initWelcomeWizard({});
+        for (let i = 0; i < 5; i++) clickNext();
+        const done = [...document.querySelectorAll('#wizardRoot .btn-add')].pop();
+        expect(done.textContent).toBe('شروع بدون حساب کاربری');
+    });
+
+    // ⚠️ 10.47: هر دو CTAی قدم حساب باید تمام‌عرض باشند.
+    it('قدم حساب: هر دو دکمه‌ی اصلی کلاس تمام‌عرض دارند', () => {
+        initWelcomeWizard({});
+        for (let i = 0; i < 5; i++) clickNext();
+        const ctas = [...document.querySelectorAll('#wizardRoot .wizard-cta')];
+        expect(ctas.map((b) => b.textContent))
+            .toEqual(['ورود به حساب کاربری', 'شروع بدون حساب کاربری']);
+    });
+
+    // ⚠️ 10.47: «بعدی» در نوار ناوبری باید کنار «برگشت» بماند — تمام‌عرض نشود.
+    it('دکمه‌ی «بعدی» تمام‌عرض نیست', () => {
+        initWelcomeWizard({});
+        clickNext();
+        const next = document.querySelector('#wizardRoot .wizard-nav .btn-add');
+        expect(next).toBeTruthy();
+        expect(next.classList.contains('wizard-cta')).toBe(false);
+    });
 });
