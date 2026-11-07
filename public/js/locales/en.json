@@ -242,6 +242,11 @@
     "login": {
       "message": "To sync across devices, choose one of the methods below.",
       "hint": "Your data stays on this device. Sync is disabled by default.",
+      "telegramHowTitle": "How does Telegram sign-in work?",
+      "telegramStep1": "Tap “Sign in with Telegram”. You will be asked for the mobile number linked to your Telegram account; this prompt is secure and belongs to the Telegram app itself.",
+      "telegramStep2": "Enter your mobile number; a confirmation message is sent to that Telegram account.",
+      "telegramStep3": "Open the message in Telegram and tap “Confirm”.",
+      "telegramStep4": "Your account is verified and you are signed in at the same time.",
       "telegramButton": "Sign in with Telegram",
       "syncCodeButton": "Sign in with sync code",
       "syncCodeSoon": "Soon",

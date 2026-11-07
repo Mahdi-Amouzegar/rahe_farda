@@ -617,6 +617,15 @@ function renderAuthModal() {
                 ${i18nT('auth.login.message')}
                 <br><small class="auth-hint">${i18nT('auth.login.hint')}</small>
             </p>
+            <div class="auth-steps">
+                <p class="auth-steps-title">${i18nT('auth.login.telegramHowTitle')}</p>
+                <ol class="auth-steps-list">
+                    <li>${i18nT('auth.login.telegramStep1')}</li>
+                    <li>${i18nT('auth.login.telegramStep2')}</li>
+                    <li>${i18nT('auth.login.telegramStep3')}</li>
+                    <li>${i18nT('auth.login.telegramStep4')}</li>
+                </ol>
+            </div>
             <div class="auth-options">
                 <button type="button" class="btn-add auth-option-btn" id="authTelegramBtn">
                     <span aria-hidden="true">📱</span>

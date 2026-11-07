@@ -2979,6 +2979,40 @@
         line-height: 1.8;
     }
 
+    /* ═══ Auth Steps (راهنمای گام‌به‌گام ورود با تلگرام) ═══ */
+    .auth-steps {
+        margin: 0 0 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--surface-soft);
+    }
+
+    .auth-steps-title {
+        margin: 0 0 6px;
+        color: var(--text-primary);
+        font-size: 0.78rem;
+        font-weight: 800;
+        line-height: 1.7;
+    }
+
+    .auth-steps-list {
+        margin: 0;
+        padding-inline-start: 1.2rem;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        line-height: 1.85;
+    }
+
+    .auth-steps-list li::marker {
+        color: var(--accent-cyan);
+        font-weight: 800;
+    }
+
+    .auth-steps-list li + li {
+        margin-top: 4px;
+    }
+
     /* ═══ Auth User Info (حالت وارد شده) ═══ */
     .auth-user-info {
         display: flex;
